@@ -29,7 +29,7 @@ $ ./gradlew test
 ### Develop
 Откройте в IDE -- [IntelliJ IDEA Community Edition](https://www.jetbrains.com/idea/) нам будет достаточно.
 
-В своём Java package `ru.mail.polis.lsm.<username>` реализуйте интерфейс [`DAO`](src/main/java/ru/mail/polis/lsm/DAO.java), используя одну из реализаций `java.util.SortedMap`.
+В своём Java package `ru.mail.polis.lsm.<username>` реализуйте интерфейс [`DAO`](src/main/java/ru/mail/polis/lsm/DAO.java), используя одну из concurrent реализаций `java.util.SortedMap`.
 
 Возвращайте свою реализацию интерфейса в [`DAOFactory`](src/main/java/ru/mail/polis/lsm/DAOFactory.java#L57).
 
