@@ -1,7 +1,7 @@
 # 2021-nosql-lsm
 Курсовой проект 2021 года [курса](https://polis.mail.ru/curriculum/program/discipline/1169/) "Использование баз данных" в [Технополис](https://polis.mail.ru).
 
-## Этап 1. In-memory (deadline 2021-05-05 00:00:00 MSK)
+## Этап 1. In-memory (deadline 2021-05-12 00:00:00 MSK)
 ### Fork
 [Форкните проект](https://help.github.com/articles/fork-a-repo/), склонируйте и добавьте `upstream`:
 ```
