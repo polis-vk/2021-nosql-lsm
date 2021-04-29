@@ -81,4 +81,8 @@ class Utils {
             throw new RuntimeException(e);
         }
     }
+
+    private static void doNothing() {
+        //noop
+    }
 }
