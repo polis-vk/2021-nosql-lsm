@@ -4,7 +4,7 @@
 ## Этап 1. In-memory (deadline 2021-05-05 00:00:00 MSK)
 ### Fork
 [Форкните проект](https://help.github.com/articles/fork-a-repo/), склонируйте и добавьте `upstream`:
-```
+```bash
 $ git clone git@github.com:<username>/2021-nosql-lsm.git
 Cloning into '2021-nosql-lsm'...
 ...
