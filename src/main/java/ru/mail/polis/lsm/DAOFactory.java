@@ -5,7 +5,7 @@ import java.io.IOException;
 public class DAOFactory {
 
     public static DAO create(DAOConfig config) throws IOException {
-        throw new UnsupportedOperationException("Implement me");
+        return new MyDAOImplementation(config);
     }
 
 }
