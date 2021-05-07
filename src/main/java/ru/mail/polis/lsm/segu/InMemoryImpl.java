@@ -14,23 +14,23 @@ public class InMemoryImpl implements DAO {
     private final SortedMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
 
     @Override
-    public Iterator<Record> range(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
+    public Iterator<Record> range(@Nullable final ByteBuffer fromKey, @Nullable final ByteBuffer toKey) {
         return map(fromKey, toKey).values().stream()
                 .filter(record -> record.getValue() != null)
                 .iterator();
     }
 
     @Override
-    public void upsert(Record record) {
+    public void upsert(final Record record) {
         storage.put(record.getKey(), record);
     }
 
     @Override
     public void close() {
-
+        // Currently not implemented
     }
 
-    private SortedMap<ByteBuffer, Record> map(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
+    private SortedMap<ByteBuffer, Record> map(@Nullable final ByteBuffer fromKey, @Nullable final ByteBuffer toKey) {
         if (fromKey == null && toKey == null) {
             return storage;
         }
