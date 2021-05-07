@@ -15,16 +15,14 @@ public class InMemoryImpl implements DAO {
 
     @Override
     public Iterator<Record> range(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
-        return map(fromKey, toKey).values().iterator();
+        return map(fromKey, toKey).values().stream()
+                .filter(record -> record.getValue() != null)
+                .iterator();
     }
 
     @Override
     public void upsert(Record record) {
-        if (record.getValue() == null) {
-            storage.remove(record.getKey());
-        } else {
-            storage.put(record.getKey(), record);
-        }
+        storage.put(record.getKey(), record);
     }
 
     @Override
