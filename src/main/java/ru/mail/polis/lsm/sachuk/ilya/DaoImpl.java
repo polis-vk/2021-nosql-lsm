@@ -16,7 +16,7 @@ import java.util.concurrent.locks.ReentrantLock;
 public class DaoImpl implements DAO {
 
     private final SortedMap<ByteBuffer, Record> storage = new TreeMap<>();
-    private Lock lock = new ReentrantLock();
+    private final Lock lock = new ReentrantLock();
 
     @Override
     public Iterator<Record> range(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
