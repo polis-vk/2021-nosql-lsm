@@ -6,23 +6,25 @@ import ru.mail.polis.lsm.Record;
 import javax.annotation.Nullable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.SortedMap;
-import java.util.TreeMap;
+import java.util.*;
 
 public class DaoImpl implements DAO {
 
     private final SortedMap<ByteBuffer, Record> sortedMap = new TreeMap<>();
 
     @Override
-    public Iterator<Record> range(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
-        return map(fromKey, toKey).values().iterator();
+    public synchronized Iterator<Record> range(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
+        Map<ByteBuffer, Record> mapCopy = new TreeMap<>(map(fromKey, toKey));
+        return mapCopy.values().iterator();
     }
 
     @Override
-    public void upsert(Record record) {
-        sortedMap.put(record.getKey(), record);
+    public synchronized void upsert(Record record) {
+        if (record.getValue() != null) {
+            sortedMap.put(record.getKey(), record);
+        } else {
+            sortedMap.remove(record.getKey());
+        }
     }
 
     @Override
