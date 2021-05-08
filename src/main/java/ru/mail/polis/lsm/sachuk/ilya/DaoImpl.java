@@ -6,41 +6,51 @@ import ru.mail.polis.lsm.Record;
 import javax.annotation.Nullable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.*;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.SortedMap;
+import java.util.TreeMap;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class DaoImpl implements DAO {
 
-    private final SortedMap<ByteBuffer, Record> sortedMap = new TreeMap<>();
+    private final SortedMap<ByteBuffer, Record> storage = new TreeMap<>();
+    private Lock lock = new ReentrantLock();
 
     @Override
-    public synchronized Iterator<Record> range(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
+    public Iterator<Record> range(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
+        lock.lock();
         Map<ByteBuffer, Record> mapCopy = new TreeMap<>(map(fromKey, toKey));
+        lock.unlock();
         return mapCopy.values().iterator();
     }
 
     @Override
-    public synchronized void upsert(Record record) {
+    public void upsert(Record record) {
+        lock.lock();
         if (record.getValue() != null) {
-            sortedMap.put(record.getKey(), record);
+            storage.put(record.getKey(), record);
         } else {
-            sortedMap.remove(record.getKey());
+            storage.remove(record.getKey());
         }
+        lock.unlock();
     }
 
     @Override
     public void close() throws IOException {
-        sortedMap.clear();
+        storage.clear();
     }
 
     private Map<ByteBuffer, Record> map(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
         if (fromKey == null && toKey == null) {
-            return sortedMap;
+            return storage;
         } else if (fromKey == null) {
-            return sortedMap.headMap(toKey);
+            return storage.headMap(toKey);
         } else if (toKey == null) {
-            return sortedMap.tailMap(fromKey);
+            return storage.tailMap(fromKey);
         }
-        return sortedMap.subMap(fromKey, toKey);
+        return storage.subMap(fromKey, toKey);
     }
 }
 
