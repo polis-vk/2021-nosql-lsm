@@ -4,7 +4,6 @@ import ru.mail.polis.lsm.DAO;
 import ru.mail.polis.lsm.Record;
 
 import javax.annotation.Nullable;
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Iterator;
 import java.util.Map;
@@ -38,7 +37,7 @@ public class DaoImpl implements DAO {
     }
 
     @Override
-    public void close() throws IOException {
+    public void close() {
         storage.clear();
     }
 
