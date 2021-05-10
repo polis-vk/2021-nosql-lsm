@@ -1,10 +1,10 @@
 # 2021-nosql-lsm
 Курсовой проект 2021 года [курса](https://polis.mail.ru/curriculum/program/discipline/1169/) "Использование баз данных" в [Технополис](https://polis.mail.ru).
 
-## Этап 1. In-memory (deadline 2021-05-05 00:00:00 MSK)
+## Этап 1. In-memory (deadline 2021-05-12 00:00:00 MSK)
 ### Fork
 [Форкните проект](https://help.github.com/articles/fork-a-repo/), склонируйте и добавьте `upstream`:
-```
+```bash
 $ git clone git@github.com:<username>/2021-nosql-lsm.git
 Cloning into '2021-nosql-lsm'...
 ...
@@ -16,12 +16,7 @@ From github.com:polis-mail-ru/2021-nosql-lsm
 ```
 
 ### Make
-Так можно запустить интерактивную консоль:
-```
-$ ./gradlew run
-```
-
-А вот так -- тесты:
+Так можно запустить тесты (ровно то, что делает CI):
 ```
 $ ./gradlew test
 ```
