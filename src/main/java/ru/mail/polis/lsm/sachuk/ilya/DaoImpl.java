@@ -8,14 +8,11 @@ import java.nio.ByteBuffer;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.SortedMap;
-import java.util.TreeMap;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.ConcurrentSkipListMap;
 
 public class DaoImpl implements DAO {
 
-    private volatile SortedMap<ByteBuffer, Record> storage = new TreeMap<>();
-    private final Lock lock = new ReentrantLock();
+    private final SortedMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
 
     @Override
     public Iterator<Record> range(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
@@ -24,20 +21,13 @@ public class DaoImpl implements DAO {
 
     @Override
     public void upsert(Record record) {
-        lock.lock();
 
-        try {
-            SortedMap<ByteBuffer, Record> mapCopy = new TreeMap<>(storage);
-
-            if (record.getValue() != null) {
-                mapCopy.put(record.getKey(), record);
-            } else {
-                mapCopy.remove(record.getKey());
-            }
-            storage = mapCopy;
-        } finally {
-            lock.unlock();
+        if (record.getValue() != null) {
+            storage.put(record.getKey(), record);
+        } else {
+            storage.remove(record.getKey());
         }
+
     }
 
     @Override
@@ -46,14 +36,16 @@ public class DaoImpl implements DAO {
     }
 
     private Map<ByteBuffer, Record> map(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
+
         if (fromKey == null && toKey == null) {
             return storage;
         } else if (fromKey == null) {
             return storage.headMap(toKey);
         } else if (toKey == null) {
             return storage.tailMap(fromKey);
+        } else {
+            return storage.subMap(fromKey, toKey);
         }
-        return storage.subMap(fromKey, toKey);
     }
 }
 
