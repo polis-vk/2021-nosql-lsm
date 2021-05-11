@@ -2,7 +2,7 @@
 Курсовой проект 2021 года [курса](https://polis.mail.ru/curriculum/program/discipline/1169/) "Использование баз данных" в [Технополис](https://polis.mail.ru).
 
 ## Этап 1. In-memory (deadline 2021-05-12 00:00:00 MSK)
-### Fork
+#### Fork
 [Форкните проект](https://help.github.com/articles/fork-a-repo/), склонируйте и добавьте `upstream`:
 ```bash
 $ git clone git@github.com:<username>/2021-nosql-lsm.git
@@ -31,4 +31,4 @@ $ ./gradlew test
 Продолжайте запускать тесты и исправлять ошибки, не забывая [подтягивать новые тесты и фиксы из `upstream`](https://help.github.com/articles/syncing-a-fork/). Если заметите ошибку в `upstream`, заводите баг и присылайте pull request ;)
 
 ### Report
-Когда всё будет готово, присылайте pull request в `master` со своей реализацией на review. Не забывайте **отвечать на комментарии в PR** и **исправлять замечания**!
+Когда всё будет готово, присылайте pull request в 'master' со своей реализацией на review. Не забывайте **отвечать на комментарии в PR** и **исправлять замечания**!
