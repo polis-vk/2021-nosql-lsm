@@ -9,34 +9,23 @@ import java.nio.ByteBuffer;
 import java.util.Iterator;
 import java.util.SortedMap;
 import java.util.concurrent.ConcurrentSkipListMap;
-import java.util.concurrent.locks.ReentrantLock;
 
 public class InMemoryDAO implements DAO {
 
     private final SortedMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
-    ReentrantLock lock = new ReentrantLock();
 
     @Override
     public Iterator<Record> range(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
-        lock.lock();
-        try {
-            return map(fromKey, toKey).values().iterator();
-        } finally {
-            lock.unlock();
-        }
+        return map(fromKey, toKey).values().iterator();
     }
 
     @Override
     public void upsert(Record record) {
-        lock.lock();
-        try {
-            if (record.getValue() == null) {
-                storage.remove(record.getKey());
-            } else {
-                storage.put(record.getKey(), record);
-            }
-        } finally {
-            lock.unlock();
+
+        if (record.getValue() == null) {
+            storage.remove(record.getKey());
+        } else {
+            storage.put(record.getKey(), record);
         }
     }
 
