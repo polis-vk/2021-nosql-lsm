@@ -5,12 +5,10 @@ import ru.mail.polis.lsm.Record;
 
 import javax.annotation.Nullable;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Iterator;
 import java.util.SortedMap;
 import java.util.concurrent.ConcurrentSkipListMap;
-
 
 public class InMemoryDAO implements DAO {
     private final SortedMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
@@ -34,7 +32,7 @@ public class InMemoryDAO implements DAO {
     @Override
     public void upsert(Record record) {
         if (record.getValue() == null) {
-            Record r = storage.get(record.getKey());
+            final Record r = storage.get(record.getKey());
             if (r != null) {
                 storage.remove(r.getKey());
             }
@@ -44,7 +42,7 @@ public class InMemoryDAO implements DAO {
     }
 
     @Override
-    public void close() throws IOException {
-
+    public void close() {
+        //implement in future
     }
 }
