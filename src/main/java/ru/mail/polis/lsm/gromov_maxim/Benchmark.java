@@ -107,19 +107,19 @@ public class Benchmark {
     private Record getRandomRecord() {
         final int string_size = 20;
         String symbols = "abcdefghijklmnopqrstuvwxyz";
-        String random = new Random().ints(string_size, 0, symbols.length())
+        final String random = new Random().ints(string_size, 0, symbols.length())
                 .mapToObj(symbols::charAt)
                 .map(Object::toString)
                 .collect(Collectors.joining());
-        ByteBuffer key = ByteBuffer.wrap((random).getBytes(StandardCharsets.UTF_8));
-        ByteBuffer value = ByteBuffer.wrap((random).getBytes(StandardCharsets.UTF_8));
+        final ByteBuffer key = ByteBuffer.wrap((random).getBytes(StandardCharsets.UTF_8));
+        final ByteBuffer value = ByteBuffer.wrap((random).getBytes(StandardCharsets.UTF_8));
         return Record.of(key, value);
 
     }
 
     private Long getSum() {
         long sum = 0;
-        for(var item : time) {
+        for(final var item : time) {
             sum += item;
         }
         return sum;
