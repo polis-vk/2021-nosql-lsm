@@ -33,6 +33,8 @@ plugins:
         enabled: false
       UselessParentheses:
         enabled: false
+      MethodArgumentCouldBeFinal:
+        enabled: false
   sonar-java:
     enabled: true
     config:
