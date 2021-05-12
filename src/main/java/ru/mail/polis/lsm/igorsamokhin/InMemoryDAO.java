@@ -1,22 +1,19 @@
-package ru.mail.polis.lsm.igor_samokhin;
+package ru.mail.polis.lsm.igorsamokhin;
+
+import ru.mail.polis.lsm.DAO;
+import ru.mail.polis.lsm.Record;
+
+import javax.annotation.Nullable;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Iterator;
 import java.util.SortedMap;
 import java.util.concurrent.ConcurrentSkipListMap;
-import javax.annotation.Nullable;
-import ru.mail.polis.lsm.DAO;
-import ru.mail.polis.lsm.DAOConfig;
-import ru.mail.polis.lsm.Record;
+
 
 public class InMemoryDAO implements DAO {
-    private final DAOConfig config;
     private final SortedMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
-
-    public InMemoryDAO(DAOConfig config) {
-        this.config = config;
-    }
 
     @Override
     public Iterator<Record> range(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
@@ -31,7 +28,7 @@ public class InMemoryDAO implements DAO {
         } else if (toKey == null) {
             return storage.tailMap(fromKey);
         }
-        return storage.subMap(fromKey,toKey);
+        return storage.subMap(fromKey, toKey);
     }
 
     @Override

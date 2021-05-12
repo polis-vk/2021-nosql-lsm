@@ -1,4 +1,4 @@
 @ParametersAreNonnullByDefault
-package ru.mail.polis.lsm.igor_samokhin;
+package ru.mail.polis.lsm.igorsamokhin;
 
 import javax.annotation.ParametersAreNonnullByDefault;
