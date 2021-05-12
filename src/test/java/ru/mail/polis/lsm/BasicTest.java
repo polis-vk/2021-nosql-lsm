@@ -7,6 +7,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.Iterator;
 import java.util.Map;
@@ -36,7 +37,7 @@ class BasicTest {
 
     @Test
     void empty() {
-        ByteBuffer notExistedKey = ByteBuffer.wrap("NOT_EXISTED_KEY".getBytes());
+        ByteBuffer notExistedKey = ByteBuffer.wrap("NOT_EXISTED_KEY".getBytes(StandardCharsets.UTF_8));
         Iterator<Record> shouldBeEmpty = dao.range(notExistedKey, null);
 
         assertFalse(shouldBeEmpty.hasNext());
