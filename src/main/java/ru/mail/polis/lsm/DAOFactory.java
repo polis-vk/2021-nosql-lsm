@@ -2,9 +2,18 @@ package ru.mail.polis.lsm;
 
 import ru.mail.polis.lsm.vadimershov.InMemoryDAO;
 
-public class DAOFactory {
+public final class DAOFactory {
 
-    public static DAO create(DAOConfig config) {
+    private DAOFactory() {
+        // Only static methods
+    }
+
+    /**
+     * Create an instance of {@link DAO} with supplied {@link DAOConfig}.
+     */
+    public static DAO create(DAOConfig config) throws IOException {
+        assert config.getDir().toFile().exists();
+
         return new InMemoryDAO();
     }
 
