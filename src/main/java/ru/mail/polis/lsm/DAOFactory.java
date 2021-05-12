@@ -1,8 +1,6 @@
 package ru.mail.polis.lsm;
 
-import ru.mail.polis.lsm.vadim_ershov.InMemoryDAO;
-
-import java.io.IOException;
+import ru.mail.polis.lsm.vadimershov.InMemoryDAO;
 
 public class DAOFactory {
 

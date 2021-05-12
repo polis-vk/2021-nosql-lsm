@@ -1,4 +1,4 @@
-package ru.mail.polis.lsm.vadim_ershov;
+package ru.mail.polis.lsm.vadimershov;
 
 import ru.mail.polis.lsm.DAO;
 import ru.mail.polis.lsm.Record;
