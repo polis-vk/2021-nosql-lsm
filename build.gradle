@@ -38,10 +38,13 @@ test {
 
 checkstyle {
     configFile = new File("checkstyle.xml")
+    checkstyleTest.enabled = false
 }
 
 pmd {
     consoleOutput = true
     toolVersion = "6.21.0"
+    ruleSets = []
     ruleSetConfig = project.resources.text.fromFile("pmd.xml")
+    sourceSets = [sourceSets.main]
 }
