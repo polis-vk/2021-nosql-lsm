@@ -5,9 +5,6 @@ import java.io.IOException;
 public final class DAOFactory {
 
     private DAOFactory() {
-    }
-
-    private DAOFactory() {
         // Only static methods
     }
 
