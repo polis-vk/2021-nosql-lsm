@@ -27,20 +27,19 @@ public class InMemoryDAO implements DAO {
     public Iterator<Record> range(@Nullable final ByteBuffer fromKey, @Nullable final ByteBuffer toKey) {
         lock.readLock().lock();
         try {
-            final NavigableMap<ByteBuffer, Record> copy = this.store;
-            if (copy == null) {
+            if (store == null) {
                 throw new IllegalStateException("Can't iterate closed DAO");
             }
 
             final SortedMap<ByteBuffer, Record> view;
             if (fromKey == null && toKey == null) {
-                view = copy;
+                view = store;
             } else if (fromKey == null) {
-                view = copy.headMap(toKey);
+                view = store.headMap(toKey);
             } else if (toKey == null) {
-                view = copy.tailMap(fromKey);
+                view = store.tailMap(fromKey);
             } else {
-                view = copy.subMap(fromKey, toKey);
+                view = store.subMap(fromKey, toKey);
             }
 
             return view.values().iterator();
@@ -53,15 +52,14 @@ public class InMemoryDAO implements DAO {
     public void upsert(final Record record) {
         lock.readLock().lock();
         try {
-            final NavigableMap<ByteBuffer, Record> copy = this.store;
-            if (copy == null) {
+            if (store == null) {
                 throw new IllegalStateException("Can't modify closed DAO");
             }
 
             if (record.getValue() == null) {
-                copy.remove(record.getKey());
+                store.remove(record.getKey());
             } else {
-                copy.put(record.getKey(), record);
+                store.put(record.getKey(), record);
             }
         } finally {
             lock.readLock().unlock();
@@ -72,6 +70,10 @@ public class InMemoryDAO implements DAO {
     public void close() {
         lock.writeLock().lock();
         try {
+            if (store == null) {
+                throw new IllegalStateException("Double close");
+            }
+
             store = null;
         } finally {
             lock.writeLock().unlock();
