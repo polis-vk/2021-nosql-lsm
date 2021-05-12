@@ -5,9 +5,9 @@ import ru.mail.polis.lsm.Record;
 
 import javax.annotation.Nullable;
 import java.nio.ByteBuffer;
-import java.util.Collection;
 import java.util.Iterator;
 import java.util.NavigableMap;
+import java.util.SortedMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 
 /**
@@ -20,23 +20,27 @@ public class InMemoryDAO implements DAO {
 
     @Override
     public Iterator<Record> range(@Nullable final ByteBuffer fromKey, @Nullable final ByteBuffer toKey) {
-        final Collection<Record> view;
+        final SortedMap<ByteBuffer, Record> view;
         if (fromKey == null && toKey == null) {
-            view = store.values();
+            view = store;
         } else if (fromKey == null) {
-            view = store.headMap(toKey).values();
+            view = store.headMap(toKey);
         } else if (toKey == null) {
-            view = store.tailMap(fromKey).values();
+            view = store.tailMap(fromKey);
         } else {
-            view = store.subMap(fromKey, toKey).values();
+            view = store.subMap(fromKey, toKey);
         }
 
-        return view.stream().filter(r -> r.getValue() != null).iterator();
+        return view.values().iterator();
     }
 
     @Override
     public void upsert(final Record record) {
-        store.put(record.getKey(), record);
+        if (record.getValue() == null) {
+            store.remove(record.getKey());
+        } else {
+            store.put(record.getKey(), record);
+        }
     }
 
     @Override
