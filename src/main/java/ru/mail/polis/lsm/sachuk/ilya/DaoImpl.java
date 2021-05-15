@@ -82,11 +82,10 @@ public class DaoImpl implements DAO {
         if (Files.exists(path)) {
             try (BufferedInputStream bufferedInputStream = new BufferedInputStream(Files.newInputStream(path))) {
                 while (bufferedInputStream.available() > 0) {
-                    int keyLength = bufferedInputStream.read();
-                    ByteBuffer keyByteBuffer = ByteBuffer.wrap(bufferedInputStream.readNBytes(keyLength));
 
-                    int valueLength = bufferedInputStream.read();
-                    ByteBuffer valueByteBuffer = ByteBuffer.wrap(bufferedInputStream.readNBytes(valueLength));
+                    ByteBuffer keyByteBuffer = readFromFile(bufferedInputStream);
+
+                    ByteBuffer valueByteBuffer = readFromFile(bufferedInputStream);
 
                     storage.put(keyByteBuffer, Record.of(keyByteBuffer, valueByteBuffer));
                 }
@@ -94,6 +93,11 @@ public class DaoImpl implements DAO {
                 e.printStackTrace();
             }
         }
+    }
+
+    private ByteBuffer readFromFile(BufferedInputStream bufferedInputStream) throws IOException {
+        int length = bufferedInputStream.read();
+        return ByteBuffer.wrap(bufferedInputStream.readNBytes(length));
     }
 
     private void writeToFile(BufferedOutputStream bufferedOutputStream, ByteBuffer byteBuffer) throws IOException {
