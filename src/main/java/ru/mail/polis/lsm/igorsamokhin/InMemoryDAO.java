@@ -27,22 +27,24 @@ public class InMemoryDAO implements DAO {
     public InMemoryDAO(DAOConfig config) {
         this.config = config;
 
-        Path path = config.getDir().resolve(FILE_NAME);
+        final Path path = config.getDir().resolve(FILE_NAME);
         if (!path.toFile().exists()) {
             return;
         }
 
         try (FileChannel fileChannel = FileChannel.open(path,
                 StandardOpenOption.READ, StandardOpenOption.CREATE_NEW)) {
-            long size = fileChannel.size();
-            ByteBuffer buffer = ByteBuffer.allocate(Integer.BYTES);
+            final long size = fileChannel.size();
+            final ByteBuffer buffer = ByteBuffer.allocate(Integer.BYTES);
+            ByteBuffer key;
+            ByteBuffer value;
             while (fileChannel.position() != size) {
-                ByteBuffer key = readValue(fileChannel, buffer);
-                ByteBuffer value = readValue(fileChannel, buffer);
+                key = readValue(fileChannel, buffer);
+                value = readValue(fileChannel, buffer);
                 storage.put(key, Record.of(key, value));
             }
         } catch (IOException e) {
-            System.err.println(Arrays.toString(e.getStackTrace()));
+            e.printStackTrace();
         }
     }
 
@@ -50,8 +52,8 @@ public class InMemoryDAO implements DAO {
         tmp.position(0);
         channel.read(tmp);
         tmp.position(0);
-        int size = tmp.getInt();
-        ByteBuffer returnBuff = ByteBuffer.allocate(size);
+        final int size = tmp.getInt();
+        final ByteBuffer returnBuff = ByteBuffer.allocate(size);
         channel.read(returnBuff);
         returnBuff.position(0);
         return returnBuff;
@@ -89,8 +91,8 @@ public class InMemoryDAO implements DAO {
     public void close() throws IOException {
         Files.deleteIfExists(config.getDir().resolve(FILE_NAME));
 
-        Path dir = config.getDir();
-        Path file = config.getDir().resolve(FILE_NAME);
+        final Path dir = config.getDir();
+        final Path file = config.getDir().resolve(FILE_NAME);
         if (!dir.toFile().exists()) {
             Files.createDirectory(dir);
         }
@@ -99,8 +101,8 @@ public class InMemoryDAO implements DAO {
         }
 
         try (FileChannel fileChannel = FileChannel.open(file, StandardOpenOption.WRITE)) {
-            ByteBuffer size = ByteBuffer.allocate(Integer.BYTES);
-            for (Record record : storage.values()) {
+            final ByteBuffer size = ByteBuffer.allocate(Integer.BYTES);
+            for (final Record record : storage.values()) {
                 writeInt(record.getKey(), fileChannel, size);
                 writeInt(record.getValue(), fileChannel, size);
             }
