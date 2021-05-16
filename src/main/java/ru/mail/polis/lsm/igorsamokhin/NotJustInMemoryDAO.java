@@ -14,17 +14,20 @@ import java.nio.channels.WritableByteChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
-import java.util.Arrays;
 import java.util.Iterator;
 import java.util.SortedMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 
-public class InMemoryDAO implements DAO {
+public class NotJustInMemoryDAO implements DAO {
     private final SortedMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
     private final DAOConfig config;
     private static final String FILE_NAME = "save.dat";
 
-    public InMemoryDAO(DAOConfig config) {
+    /**
+     * Creates DAO object
+     * @param config - objects contains directory with data files
+     */
+    public NotJustInMemoryDAO(DAOConfig config) {
         this.config = config;
 
         final Path path = config.getDir().resolve(FILE_NAME);

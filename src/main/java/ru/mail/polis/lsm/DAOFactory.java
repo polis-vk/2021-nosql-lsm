@@ -1,6 +1,6 @@
 package ru.mail.polis.lsm;
 
-import ru.mail.polis.lsm.igorsamokhin.InMemoryDAO;
+import ru.mail.polis.lsm.igorsamokhin.NotJustInMemoryDAO;
 
 import java.io.IOException;
 
@@ -16,7 +16,7 @@ public final class DAOFactory {
     public static DAO create(DAOConfig config) throws IOException {
         assert config.getDir().toFile().exists();
 
-        return new InMemoryDAO(config);
+        return new NotJustInMemoryDAO(config);
     }
 
 }
