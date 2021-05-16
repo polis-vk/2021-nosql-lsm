@@ -64,14 +64,11 @@ public class DaoImpl implements DAO {
 
     private void save() {
         try (BufferedOutputStream bufferedOutputStream = new BufferedOutputStream(Files.newOutputStream(path))) {
-            storage.forEach((key, value) -> {
-                try {
-                    writeToFile(bufferedOutputStream, key);
-                    writeToFile(bufferedOutputStream, value.getValue());
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            });
+
+            for (Map.Entry<ByteBuffer, Record> byteBufferRecordEntry : storage.entrySet()) {
+                writeToFile(bufferedOutputStream, byteBufferRecordEntry.getKey());
+                writeToFile(bufferedOutputStream, byteBufferRecordEntry.getValue().getValue());
+            }
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -83,7 +80,6 @@ public class DaoImpl implements DAO {
                 while (bufferedInputStream.available() > 0) {
 
                     ByteBuffer keyByteBuffer = readFromFile(bufferedInputStream);
-
                     ByteBuffer valueByteBuffer = readFromFile(bufferedInputStream);
 
                     storage.put(keyByteBuffer, Record.of(keyByteBuffer, valueByteBuffer));
