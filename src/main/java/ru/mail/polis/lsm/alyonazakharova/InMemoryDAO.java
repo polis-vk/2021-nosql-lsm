@@ -31,7 +31,7 @@ public class InMemoryDAO implements DAO {
 
     @Override
     public void close() throws IOException {
-//        maybe will be implemented in the future...
+    // maybe will be implemented in the future...
     }
 
     private SortedMap<ByteBuffer, Record> map(@Nullable final ByteBuffer fromKey,
