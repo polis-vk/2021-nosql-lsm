@@ -24,7 +24,7 @@ public class NotJustInMemoryDAO implements DAO {
     private static final String FILE_NAME = "save.dat";
 
     /**
-     * Creates DAO object
+     * Create DAO object.
      * @param config - objects contains directory with data files
      */
     public NotJustInMemoryDAO(DAOConfig config) {
