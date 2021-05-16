@@ -1,6 +1,6 @@
 package ru.mail.polis.lsm;
 
-import ru.mail.polis.lsm.alyona_zakharova.InMemoryDAO;
+import ru.mail.polis.lsm.alyonazakharova.InMemoryDAO;
 
 import java.io.IOException;
 

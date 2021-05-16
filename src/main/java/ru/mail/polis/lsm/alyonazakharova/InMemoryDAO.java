@@ -1,4 +1,4 @@
-package ru.mail.polis.lsm.alyona_zakharova;
+package ru.mail.polis.lsm.alyonazakharova;
 
 import ru.mail.polis.lsm.DAO;
 import ru.mail.polis.lsm.Record;
@@ -15,12 +15,13 @@ public class InMemoryDAO implements DAO {
     private final SortedMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
 
     @Override
-    public Iterator<Record> range(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
+    public Iterator<Record> range(@Nullable final ByteBuffer fromKey,
+                                  @Nullable final ByteBuffer toKey) {
         return map(fromKey, toKey).values().iterator();
     }
 
     @Override
-    public void upsert(Record record) {
+    public void upsert(final Record record) {
         if (record.getValue() == null) {
             storage.remove(record.getKey());
         } else {
@@ -30,10 +31,11 @@ public class InMemoryDAO implements DAO {
 
     @Override
     public void close() throws IOException {
-
+//        maybe will be implemented in the future...
     }
 
-    private SortedMap<ByteBuffer, Record> map(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
+    private SortedMap<ByteBuffer, Record> map(@Nullable final ByteBuffer fromKey,
+                                              @Nullable final ByteBuffer toKey) {
         if (fromKey == null && toKey == null) {
             return storage;
         } else if (fromKey == null) {
