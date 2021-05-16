@@ -20,11 +20,11 @@ public class DaoImpl implements DAO {
 
     private final SortedMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
 
-    private static final String FILE_TO_SAVE = "data.txt";
+    private static final String FILE_NAME = "data";
     private final Path path;
 
-    public DaoImpl(Path path) {
-        this.path = path.resolve(Paths.get(FILE_TO_SAVE));
+    public DaoImpl(Path dirPath) {
+        this.path = dirPath.resolve(Paths.get(FILE_NAME));
         restoreStorage();
     }
 
