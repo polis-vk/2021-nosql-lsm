@@ -47,7 +47,6 @@ public class DaoImpl implements DAO {
     @Override
     public void close() {
         save();
-        storage.clear();
     }
 
     private Map<ByteBuffer, Record> map(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
