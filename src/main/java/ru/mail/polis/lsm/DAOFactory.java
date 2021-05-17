@@ -1,6 +1,7 @@
 package ru.mail.polis.lsm;
 
 import ru.mail.polis.lsm.dmitry_milya.InMemoryDAO;
+import ru.mail.polis.lsm.dmitry_milya.PersistenceDAO;
 
 import java.io.IOException;
 
@@ -16,7 +17,7 @@ public final class DAOFactory {
     public static DAO create(DAOConfig config) throws IOException {
         assert config.getDir().toFile().exists();
 
-        throw new UnsupportedOperationException("Implement me");
+        return new PersistenceDAO(config);
     }
 
 }
