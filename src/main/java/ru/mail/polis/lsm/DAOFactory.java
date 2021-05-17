@@ -16,6 +16,6 @@ public final class DAOFactory {
     public static DAO create(DAOConfig config) throws IOException {
         assert config.getDir().toFile().exists();
 
-        return new DAOImpl();
+        return new DAOImpl(config);
     }
 }

@@ -1,11 +1,18 @@
 package ru.mail.polis.lsm.ilia;
 
 import ru.mail.polis.lsm.DAO;
+import ru.mail.polis.lsm.DAOConfig;
 import ru.mail.polis.lsm.Record;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.channels.ReadableByteChannel;
+import java.nio.channels.WritableByteChannel;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.util.Iterator;
 import java.util.SortedMap;
 import java.util.concurrent.ConcurrentSkipListMap;
@@ -13,6 +20,37 @@ import java.util.concurrent.ConcurrentSkipListMap;
 public class DAOImpl implements DAO {
 
     private final SortedMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
+
+    private final DAOConfig config;
+    private static final String SAVE_FILE_NAME = "save.dat";
+
+    public DAOImpl(DAOConfig config) {
+        this.config = config;
+
+        Path path = config.getDir().resolve(SAVE_FILE_NAME);
+        if (path.toFile().exists()) {
+            try (FileChannel fileChannel = FileChannel.open(path, StandardOpenOption.CREATE_NEW)) {
+                ByteBuffer buffer = ByteBuffer.allocate(Integer.BYTES);
+                while (fileChannel.position() != fileChannel.size()) {
+                    ByteBuffer key = readValue(fileChannel, buffer);
+                    ByteBuffer value = readValue(fileChannel, buffer);
+                    storage.put(key, Record.of(key, value));
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    private ByteBuffer readValue(ReadableByteChannel channel, ByteBuffer tmp) throws IOException {
+        tmp.position(0);
+        channel.read(tmp);
+        tmp.position(0);
+        ByteBuffer byteBuffer = ByteBuffer.allocate(tmp.getInt());
+        channel.read(byteBuffer);
+        byteBuffer.position(0);
+        return byteBuffer;
+    }
 
     @Override
     public Iterator<Record> range(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
@@ -30,7 +68,28 @@ public class DAOImpl implements DAO {
 
     @Override
     public void close() throws IOException {
+        Files.deleteIfExists(config.getDir().resolve(SAVE_FILE_NAME));
 
+        Path file = config.getDir().resolve(SAVE_FILE_NAME);
+        if (!file.toFile().exists()) {
+            Files.createFile(file);
+        }
+
+        try (FileChannel fileChannel = FileChannel.open(file, StandardOpenOption.WRITE)) {
+            ByteBuffer size = ByteBuffer.allocate(Integer.BYTES);
+            for (Record record : storage.values()) {
+                writeInt(record.getKey(), fileChannel, size);
+                writeInt(record.getValue(), fileChannel, size);
+            }
+        }
+    }
+
+    private static void writeInt(ByteBuffer value, WritableByteChannel channel, ByteBuffer tmp) throws IOException {
+        tmp.position(0);
+        tmp.putInt(value.remaining());
+        tmp.position(0);
+        channel.write(tmp);
+        channel.write(value);
     }
 
     private SortedMap<ByteBuffer, Record> map(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
