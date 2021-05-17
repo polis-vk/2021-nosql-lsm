@@ -28,14 +28,14 @@ public class PersistenceDAO implements DAO {
     public PersistenceDAO(DAOConfig config) {
         this.config = config;
 
-        Path resolve = config.getDir().resolve(SAVE_FILE_NAME);
+        final Path resolve = config.getDir().resolve(SAVE_FILE_NAME);
         if (Files.exists(resolve)) {
             try (FileChannel fileChannel = FileChannel.open(resolve, StandardOpenOption.READ,
                     StandardOpenOption.CREATE_NEW)) {
-                ByteBuffer size = ByteBuffer.allocate(Integer.BYTES);
+                final ByteBuffer size = ByteBuffer.allocate(Integer.BYTES);
                 while (fileChannel.position() < fileChannel.size()) {
-                    ByteBuffer key = readValue(fileChannel, size);
-                    ByteBuffer value = readValue(fileChannel, size);
+                    final ByteBuffer key = readValue(fileChannel, size);
+                    final ByteBuffer value = readValue(fileChannel, size);
                     storage.put(key, Record.of(key, value));
                 }
             } catch (IOException e) {
@@ -48,7 +48,7 @@ public class PersistenceDAO implements DAO {
         tmp.position(0);
         channel.read(tmp);
         tmp.position(0);
-        ByteBuffer byteBuffer = ByteBuffer.allocate(tmp.getInt());
+        final ByteBuffer byteBuffer = ByteBuffer.allocate(tmp.getInt());
         channel.read(byteBuffer);
         byteBuffer.position(0);
         return byteBuffer;
@@ -86,14 +86,14 @@ public class PersistenceDAO implements DAO {
     public void close() throws IOException {
         Files.deleteIfExists(config.getDir().resolve(SAVE_FILE_NAME));
 
-        Path file = config.getDir().resolve(SAVE_FILE_NAME);
+        final Path file = config.getDir().resolve(SAVE_FILE_NAME);
 
         if (!file.toFile().exists()) {
             Files.createFile(file);
         }
 
         try (FileChannel fileChannel = FileChannel.open(file, StandardOpenOption.WRITE)) {
-            ByteBuffer size = ByteBuffer.allocate(Integer.BYTES);
+            final ByteBuffer size = ByteBuffer.allocate(Integer.BYTES);
             for (final Record record : storage.values()) {
                 writeInt(record.getKey(), fileChannel, size);
                 writeInt(record.getValue(), fileChannel, size);
