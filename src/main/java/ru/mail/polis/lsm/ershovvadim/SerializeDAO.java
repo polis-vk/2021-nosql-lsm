@@ -20,7 +20,7 @@ public class SerializeDAO implements DAO {
     private final DAOConfig config;
     private final SortedMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
 
-    public SerializeDAO(DAOConfig config) throws IOException {
+    public SerializeDAO(DAOConfig config) {
         this.config = config;
         Path resolve = config.getDir().resolve(FILE_TO_SAVE);
         if (!Files.exists(resolve)) {
@@ -36,7 +36,7 @@ public class SerializeDAO implements DAO {
                 storage.put(key, Record.of(key, value));
             }
         } catch (IOException e) {
-            throw new IOException("I/O error occurs");
+            e.getStackTrace();
         }
     }
 
