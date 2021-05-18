@@ -20,13 +20,19 @@ import java.util.stream.Stream;
 public class FileMemoryDAO implements DAO {
 
     private final SortedMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
-    private final DAOConfig config;
+    private final Path backupFilePath;
+    private final Path dataFilePath;
+    private final Path tempFilePath;
 
-    private static final String SAVED_FILE_NAME = "Data";
-    private static final String NEW_FILE_NAME = "Temp";
+    private static final String BACKUP_FILE_NAME = "Backup";
+    private static final String DATA_FILE_NAME = "Data";
+    private static final String TEMP_FILE_NAME = "Temp";
 
     public FileMemoryDAO(final DAOConfig config) throws IOException {
-        this.config = config;
+        Path dir = config.getDir();
+        backupFilePath = dir.resolve(BACKUP_FILE_NAME);
+        dataFilePath = dir.resolve(DATA_FILE_NAME);
+        tempFilePath = dir.resolve(TEMP_FILE_NAME);
         restore();
     }
 
@@ -71,9 +77,7 @@ public class FileMemoryDAO implements DAO {
     }
 
     private void save() throws IOException {
-        final Path tempPath = config.getDir().resolve(NEW_FILE_NAME);
-
-        try (BufferedOutputStream stream = new BufferedOutputStream(Files.newOutputStream(tempPath))) {
+        try (BufferedOutputStream stream = new BufferedOutputStream(Files.newOutputStream(tempFilePath))) {
             Iterator<Record> it = getStreamOfValidValues(null, null).iterator();
 
             while (it.hasNext()) {
@@ -83,13 +87,18 @@ public class FileMemoryDAO implements DAO {
             }
         }
 
-        final Path mainPath = tempPath.resolveSibling(SAVED_FILE_NAME);
-
-        Files.move(tempPath, mainPath, StandardCopyOption.ATOMIC_MOVE);
+        if (Files.exists(dataFilePath)) {
+            Files.copy(dataFilePath, backupFilePath, StandardCopyOption.REPLACE_EXISTING);
+        }
+        Files.move(tempFilePath, dataFilePath, StandardCopyOption.REPLACE_EXISTING);
     }
 
     private void restore() throws IOException {
-        final Path path = config.getDir().resolve(SAVED_FILE_NAME);
+        Path path = dataFilePath;
+        if (!Files.exists(path)) {
+            path = backupFilePath;
+        }
+
         if (Files.exists(path)) {
             try (BufferedInputStream stream = new BufferedInputStream(Files.newInputStream(path))) {
                 while (stream.available() > 0) {
