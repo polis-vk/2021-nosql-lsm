@@ -15,8 +15,12 @@ import java.util.Iterator;
 import java.util.SortedMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 
+
+/**
+ * implementation Serialize DAO.
+ */
 public class SerializeDAO implements DAO {
-    private static final String FILE_TO_SAVE = "dao.dat";
+    private static final String FILE_TO_SAVE = "DAO_FILE_TO_SAVE.dat";
     private final DAOConfig config;
     private final SortedMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
 
