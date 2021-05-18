@@ -8,6 +8,7 @@ public class Record {
 
     private final ByteBuffer key;
     private final ByteBuffer value;
+    private boolean hidden = false;
 
     Record(ByteBuffer key, @Nullable ByteBuffer value) {
         this.key = key;
@@ -28,5 +29,13 @@ public class Record {
 
     public ByteBuffer getValue() {
         return value == null ? null : value.asReadOnlyBuffer();
+    }
+
+    public boolean isHidden(){
+        return hidden;
+    }
+
+    public void hide(){
+        hidden = true;
     }
 }
