@@ -1,6 +1,6 @@
 package ru.mail.polis.lsm;
 
-import ru.mail.polis.lsm.dmitry_milya.PersistenceDAO;
+import ru.mail.polis.lsm.dmitrymilya.PersistenceDAO;
 
 import java.io.IOException;
 

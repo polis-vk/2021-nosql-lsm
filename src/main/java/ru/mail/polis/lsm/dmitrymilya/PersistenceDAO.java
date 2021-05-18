@@ -1,4 +1,4 @@
-package ru.mail.polis.lsm.dmitry_milya;
+package ru.mail.polis.lsm.dmitrymilya;
 
 import ru.mail.polis.lsm.DAO;
 import ru.mail.polis.lsm.DAOConfig;
@@ -18,12 +18,14 @@ import java.util.Iterator;
 import java.util.SortedMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 
+/**
+ * Persistent DAO implementation
+ */
 public class PersistenceDAO implements DAO {
 
+    private static final String SAVE_FILE_NAME = "save.dat";
     private final SortedMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
-
     private final DAOConfig config;
-    private static final String SAVE_FILE_NAME = "save.dat";    // save.dat
 
     public PersistenceDAO(DAOConfig config) {
         this.config = config;
