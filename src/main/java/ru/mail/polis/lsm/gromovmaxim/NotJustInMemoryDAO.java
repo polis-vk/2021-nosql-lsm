@@ -17,15 +17,15 @@ import java.util.Iterator;
 import java.util.SortedMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 
-/**
- * Simple database that store data on disk
- */
-
 public class NotJustInMemoryDAO implements DAO {
 
     private final SortedMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
     private static final String DATA_BASE = "database.dat";
     private final DAOConfig config;
+
+    /**
+     * Constructor that initialize buffers.
+     */
 
     public NotJustInMemoryDAO(DAOConfig config) {
         this.config = config;
