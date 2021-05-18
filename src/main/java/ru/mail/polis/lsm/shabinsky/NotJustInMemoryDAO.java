@@ -24,8 +24,10 @@ public class NotJustInMemoryDAO implements DAO {
     private static final String SAVE_FILE_NAME = "save1.dat";
 
     /**
-     * @param config
-     * @throws IOException
+     * NotJustInMemoryDAO constructor
+     *
+     * @param config {@link DAOConfig}
+     * @throws IOException raises an exception
      */
     public NotJustInMemoryDAO(DAOConfig config) throws IOException {
         this.config = config;
@@ -33,7 +35,8 @@ public class NotJustInMemoryDAO implements DAO {
         final Path path = config.getDir().resolve(SAVE_FILE_NAME);
 
         if (Files.exists(path)) {
-            try (FileChannel fileChannel = FileChannel.open(path, StandardOpenOption.READ, StandardOpenOption.CREATE_NEW)) {
+            try (FileChannel fileChannel =
+                     FileChannel.open(path, StandardOpenOption.READ, StandardOpenOption.CREATE_NEW)) {
                 final ByteBuffer buffer = ByteBuffer.allocate(Integer.BYTES);
                 ByteBuffer key;
                 ByteBuffer value;
@@ -66,7 +69,8 @@ public class NotJustInMemoryDAO implements DAO {
 
         final Path file = config.getDir().resolve(SAVE_FILE_NAME);
 
-        try (FileChannel fileChannel = FileChannel.open(file, StandardOpenOption.WRITE, StandardOpenOption.CREATE_NEW)) {
+        try (FileChannel fileChannel =
+                 FileChannel.open(file, StandardOpenOption.WRITE, StandardOpenOption.CREATE_NEW)) {
             final ByteBuffer size = ByteBuffer.allocate(Integer.BYTES);
             for (final Record record : storage.values()) {
                 writeInt(record.getKey(), fileChannel, size);
