@@ -19,7 +19,7 @@ import java.util.SortedMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 
 /**
- * Persistent DAO implementation
+ * Persistent DAO implementation.
  */
 public class PersistenceDAO implements DAO {
 
@@ -27,6 +27,11 @@ public class PersistenceDAO implements DAO {
     private final SortedMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
     private final DAOConfig config;
 
+    /**
+     * Constructs a Persistent DAO object, getting data from the save file.
+     *
+     * @param config DAO config
+     */
     public PersistenceDAO(DAOConfig config) {
         this.config = config;
 
