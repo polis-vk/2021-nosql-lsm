@@ -1,15 +1,22 @@
 package ru.mail.polis.lsm;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.CharsetDecoder;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.FileVisitResult;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.TreeMap;
 
 import static org.junit.jupiter.api.Assertions.assertIterableEquals;
@@ -41,6 +48,33 @@ class Utils {
 
     static ByteBuffer key(int index) {
         return wrap(KEY_PREFIX + index);
+    }
+
+    static byte[] sizeBasedRandomData(int size) {
+        Random random = new Random(size);
+        byte[] result = new byte[size];
+        random.nextBytes(result);
+        return result;
+    }
+
+    static ByteBuffer keyWithSuffix(int key, byte[] suffix) {
+        byte[] keyBytes = (KEY_PREFIX + "_" + key).getBytes(StandardCharsets.UTF_8);
+        byte[] result = new byte[keyBytes.length + suffix.length];
+        System.arraycopy(keyBytes, 0, result, 0, keyBytes.length);
+        System.arraycopy(suffix, 0, result, keyBytes.length, suffix.length);
+        return ByteBuffer.wrap(result);
+    }
+
+    static ByteBuffer valueWithSuffix(int value, byte[] suffix) {
+        byte[] valueBytes = (VALUE_PREFIX + "_" + value).getBytes(StandardCharsets.UTF_8);
+        return join(valueBytes, suffix);
+    }
+
+    static ByteBuffer join(byte[] a, byte[] b) {
+        byte[] result = new byte[a.length + b.length];
+        System.arraycopy(a, 0, result, 0, a.length);
+        System.arraycopy(b, 0, result, a.length, b.length);
+        return ByteBuffer.wrap(result);
     }
 
     static ByteBuffer value(int index) {
@@ -80,5 +114,22 @@ class Utils {
         } catch (CharacterCodingException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    static void recursiveDelete(Path path) throws IOException {
+        Files.walkFileTree(path,
+                new SimpleFileVisitor<>() {
+                    @Override
+                    public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+                        Files.delete(file);
+                        return FileVisitResult.CONTINUE;
+                    }
+
+                    @Override
+                    public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
+                        Files.delete(dir);
+                        return FileVisitResult.CONTINUE;
+                    }
+                });
     }
 }

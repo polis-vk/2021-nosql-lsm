@@ -18,6 +18,7 @@
     <rule ref="rulesets/java/optimizations.xml">
         <exclude name="AvoidInstantiatingObjectsInLoops"/>
         <exclude name="MethodArgumentCouldBeFinal"/>
+        <exclude name="LocalVariableCouldBeFinal"/>
     </rule>
     <rule ref="rulesets/java/strictexception.xml">
         <exclude name="AvoidThrowingRawExceptionTypes"/>
