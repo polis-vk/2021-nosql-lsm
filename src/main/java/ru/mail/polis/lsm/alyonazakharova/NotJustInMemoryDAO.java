@@ -24,7 +24,8 @@ public class NotJustInMemoryDAO implements DAO {
     private static final String SAVE_FILE_NAME = "save.dat";
 
     /**
-     * Restore data if the file exists
+     * Restore data if the file exists.
+     * 
      * @param config is used to get the file directory
      * @throws IOException if an I/O error occurs while opening FileChannel
      */
