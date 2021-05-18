@@ -5,7 +5,7 @@ import ru.mail.polis.lsm.DAOConfig;
 import ru.mail.polis.lsm.Record;
 
 import javax.annotation.Nullable;
-import java.io.*;
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.ReadableByteChannel;
@@ -23,18 +23,23 @@ public class NotJustInMemoryDAO implements DAO {
     private final DAOConfig config;
     private static final String SAVE_FILE_NAME = "save.dat";
 
+    /**
+     * Restore data if the file exists
+     * @param config is used to get the file directory
+     * @throws IOException if an I/O error occurs while opening FileChannel
+     */
     public NotJustInMemoryDAO(DAOConfig config) throws IOException {
         this.config = config;
 
-        Path path = config.getDir().resolve(SAVE_FILE_NAME);
+        final Path path = config.getDir().resolve(SAVE_FILE_NAME);
 
         if (Files.exists(path)) {
             try (FileChannel fileChannel = FileChannel.open(path, StandardOpenOption.READ)) {
-                ByteBuffer size = ByteBuffer.allocate(Integer.BYTES);
+                final ByteBuffer size = ByteBuffer.allocate(Integer.BYTES);
                 while (fileChannel.read(size) > 0) {
-                    ByteBuffer key = readValue(fileChannel, size);
+                    final ByteBuffer key = readValue(fileChannel, size);
                     fileChannel.read(size.flip());
-                    ByteBuffer value = readValue(fileChannel, size);
+                    final ByteBuffer value = readValue(fileChannel, size);
                     storage.put(key, Record.of(key, value));
                 }
             }
@@ -58,14 +63,14 @@ public class NotJustInMemoryDAO implements DAO {
 
     @Override
     public void close() throws IOException {
-        Path file = config.getDir().resolve(SAVE_FILE_NAME);
+        final Path path = config.getDir().resolve(SAVE_FILE_NAME);
 
-        try (FileChannel fileChannel = FileChannel.open(file, StandardOpenOption.WRITE,
+        try (FileChannel fileChannel = FileChannel.open(path, StandardOpenOption.WRITE,
                 StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
 
-            ByteBuffer size = ByteBuffer.allocate(Integer.BYTES);
+            final ByteBuffer size = ByteBuffer.allocate(Integer.BYTES);
 
-            for (Record record : storage.values()) {
+            for (final Record record : storage.values()) {
                 writeValue(record.getKey(), fileChannel, size);
                 writeValue(record.getValue(), fileChannel, size);
             }
@@ -96,7 +101,7 @@ public class NotJustInMemoryDAO implements DAO {
 
     private static ByteBuffer readValue(ReadableByteChannel channel, ByteBuffer size) throws IOException {
         size.flip();
-        ByteBuffer value = ByteBuffer.allocate(size.getInt());
+        final ByteBuffer value = ByteBuffer.allocate(size.getInt());
         channel.read(value);
         return value.flip();
     }
