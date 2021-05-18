@@ -18,17 +18,20 @@ public class DaoImpl implements DAO {
     private final NavigableMap<ByteBuffer, Record> map;
     private static final String SAVE_FILE_NAME = "save.dat";
 
+    /**
+     * Implementation of DAO with Persistence
+     */
     public DaoImpl(DAOConfig config) throws IOException {
         this.config = config;
         this.map = new ConcurrentSkipListMap<>();
-        Path resolve = config.getDir().resolve(SAVE_FILE_NAME);
+        final Path resolve = config.getDir().resolve(SAVE_FILE_NAME);
         if (Files.exists(resolve)) {
             try (FileChannel fileChannel = FileChannel.open(resolve, StandardOpenOption.READ)) {
-               ByteBuffer buffer = ByteBuffer.allocate(Integer.BYTES);
+               final ByteBuffer buffer = ByteBuffer.allocate(Integer.BYTES);
                 while (fileChannel.position() < fileChannel.size()) {
-                    ByteBuffer key = readBuffer(fileChannel, buffer);
+                    final ByteBuffer key = readBuffer(fileChannel, buffer);
 
-                    ByteBuffer value = readBuffer(fileChannel, buffer);
+                    final ByteBuffer value = readBuffer(fileChannel, buffer);
 
                     map.put(key, new Record(key, value));
                 }
@@ -40,7 +43,7 @@ public class DaoImpl implements DAO {
         buffer.position(0);
         fileChannel.read(buffer);
         buffer.position(0);
-        ByteBuffer tmp = ByteBuffer.allocate(buffer.getInt());
+        final ByteBuffer tmp = ByteBuffer.allocate(buffer.getInt());
         fileChannel.read(tmp);
         tmp.position(0);
         return tmp;
@@ -77,10 +80,11 @@ public class DaoImpl implements DAO {
     @Override
     public void close() throws IOException {
         Files.deleteIfExists(config.getDir().resolve(SAVE_FILE_NAME));
-        Path file = config.getDir().resolve(SAVE_FILE_NAME);
-        try (FileChannel fileChannel = FileChannel.open(file, StandardOpenOption.WRITE, StandardOpenOption.CREATE_NEW)) {
-            ByteBuffer size = ByteBuffer.allocate(Integer.BYTES);
-            for (Record record : map.values()) {
+        final Path file = config.getDir().resolve(SAVE_FILE_NAME);
+        try (FileChannel fileChannel =
+                     FileChannel.open(file, StandardOpenOption.WRITE, StandardOpenOption.CREATE_NEW)) {
+            final ByteBuffer size = ByteBuffer.allocate(Integer.BYTES);
+            for (final Record record : map.values()) {
                 if (record.getValue() != null) {
                     writeInt(record.getKey(), fileChannel, size);
                     writeInt(record.getValue(), fileChannel, size);
