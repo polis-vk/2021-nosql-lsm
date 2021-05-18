@@ -23,8 +23,9 @@ public class DaoImpl implements DAO {
     private static final String FILE_NAME = "data";
     private final Path path;
 
-    public DaoImpl(Path dirPath) {
+    public DaoImpl(Path dirPath) throws IOException {
         this.path = dirPath.resolve(Paths.get(FILE_NAME));
+
         restoreStorage();
     }
 
@@ -45,7 +46,7 @@ public class DaoImpl implements DAO {
     }
 
     @Override
-    public void close() {
+    public void close() throws IOException {
         save();
     }
 
@@ -62,19 +63,19 @@ public class DaoImpl implements DAO {
         }
     }
 
-    private void save() {
+    private void save() throws IOException {
+
         try (BufferedOutputStream bufferedOutputStream = new BufferedOutputStream(Files.newOutputStream(path))) {
 
             for (final Map.Entry<ByteBuffer, Record> byteBufferRecordEntry : storage.entrySet()) {
                 writeToFile(bufferedOutputStream, byteBufferRecordEntry.getKey());
                 writeToFile(bufferedOutputStream, byteBufferRecordEntry.getValue().getValue());
             }
-        } catch (IOException e) {
-            e.printStackTrace();
+
         }
     }
 
-    private void restoreStorage() {
+    private void restoreStorage() throws IOException {
         if (Files.exists(path)) {
             try (BufferedInputStream bufferedInputStream = new BufferedInputStream(Files.newInputStream(path))) {
                 while (bufferedInputStream.available() > 0) {
@@ -84,14 +85,13 @@ public class DaoImpl implements DAO {
 
                     storage.put(keyByteBuffer, Record.of(keyByteBuffer, valueByteBuffer));
                 }
-            } catch (IOException e) {
-                e.printStackTrace();
             }
         }
     }
 
     private ByteBuffer readFromFile(BufferedInputStream bufferedInputStream) throws IOException {
         final int length = bufferedInputStream.read();
+
         return ByteBuffer.wrap(bufferedInputStream.readNBytes(length));
     }
 
