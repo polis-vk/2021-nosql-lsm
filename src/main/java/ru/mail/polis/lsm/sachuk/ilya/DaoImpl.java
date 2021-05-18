@@ -23,6 +23,10 @@ public class DaoImpl implements DAO {
     private static final String FILE_NAME = "data";
     private final Path path;
 
+    /**
+     * @param dirPath path to the directory in which will be created file
+     * @throws IOException
+     */
     public DaoImpl(Path dirPath) throws IOException {
         this.path = dirPath.resolve(Paths.get(FILE_NAME));
 
