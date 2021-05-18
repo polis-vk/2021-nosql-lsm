@@ -18,7 +18,7 @@ import java.util.SortedMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 
 /**
- * Implementation of NotInMemory DAO
+ * Implementation of NotInMemory DAO.
  */
 
 public class NotInMemoryImpl implements DAO {
