@@ -24,8 +24,10 @@ public class DaoImpl implements DAO {
     private final Path path;
 
     /**
+     * Constructor that initialize path and restore storage.
+     *
      * @param dirPath path to the directory in which will be created file
-     * @throws IOException
+     * @throws IOException is thrown when an I/O error occurs.
      */
     public DaoImpl(Path dirPath) throws IOException {
         this.path = dirPath.resolve(Paths.get(FILE_NAME));
