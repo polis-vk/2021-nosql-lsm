@@ -23,7 +23,7 @@ public class PersistenceDAO implements DAO {
     private final SortedMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
 
     private final DAOConfig config;
-    private static final String SAVE_FILE_NAME = "save.dat";
+    private static final String SAVE_FILE_NAME = "save.dat";    // save.dat
 
     public PersistenceDAO(DAOConfig config) {
         this.config = config;
