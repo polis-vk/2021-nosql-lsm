@@ -85,7 +85,7 @@ public class FileMemoryDAO implements DAO {
 
         final Path mainPath = tempPath.resolveSibling(SAVED_FILE_NAME);
 
-        Files.copy(tempPath, mainPath, StandardCopyOption.REPLACE_EXISTING);
+        Files.move(tempPath, mainPath, StandardCopyOption.ATOMIC_MOVE);
     }
 
     private void restore() throws IOException {
