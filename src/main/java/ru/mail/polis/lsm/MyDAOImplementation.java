@@ -28,11 +28,10 @@ public class MyDAOImplementation implements DAO {
 
         if (Files.exists(path)) {
             try (FileChannel fileChannel = FileChannel.open(path, StandardOpenOption.READ)) {
-                int size = Integer.BYTES;
+                ByteBuffer size = ByteBuffer.allocate(Integer.BYTES);
                 ByteBuffer key;
                 ByteBuffer value;
-                final long fileChannelSize = fileChannel.size();
-                while (fileChannel.position() != fileChannelSize) {
+                while (fileChannel.position() != fileChannel.size()) {
                     key = readValue(fileChannel, size);
                     value = readValue(fileChannel, size);
                     storage.put(key, Record.of(key, value));
@@ -41,19 +40,19 @@ public class MyDAOImplementation implements DAO {
         }
     }
 
-    private ByteBuffer readValue(FileChannel fileChannel, int size) throws IOException {
-        ByteBuffer temp = fullRead(size, fileChannel);
-        return fullRead(temp.getInt(), fileChannel);
+    private ByteBuffer readValue(FileChannel fileChannel, ByteBuffer temp) throws IOException {
+        fullRead(temp, fileChannel);
+        ByteBuffer value = ByteBuffer.allocate(temp.getInt());
+        fullRead(value, fileChannel);
+        return value;
     }
 
-    private ByteBuffer fullRead(int byteBufferSize, FileChannel fileChannel) throws IOException {
-        ByteBuffer temp = ByteBuffer.allocate(byteBufferSize);
+    private void fullRead(ByteBuffer temp, FileChannel fileChannel) throws IOException {
         temp.position(0);
-        final int tempCapacity = temp.capacity();
-        while (temp.position() != tempCapacity) {
+        while (temp.position() != temp.capacity()) {
             fileChannel.read(temp);
         }
-        return temp.position(0);
+        temp.position(0);
     }
 
     @Override
