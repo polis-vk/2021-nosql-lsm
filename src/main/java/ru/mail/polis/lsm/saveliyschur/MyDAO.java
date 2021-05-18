@@ -32,14 +32,12 @@ public class MyDAO implements DAO {
             final ByteBuffer size = ByteBuffer.allocate(Integer.BYTES);
             try (FileChannel fileChannel = FileChannel.open(file, StandardOpenOption.READ)) {
                 while (fileChannel.position() < fileChannel.size()) {
-                    ByteBuffer key = readvalue(fileChannel, size);
-                    storage.put(key, Record.of(key, readvalue(fileChannel, size)));
+                    ByteBuffer key = readValue(fileChannel, size);
+                    storage.put(key, Record.of(key, readValue(fileChannel, size)));
                 }
             }
         }
     }
-
-
 
     @Override
     public Iterator<Record> range(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
@@ -58,10 +56,10 @@ public class MyDAO implements DAO {
 
         Path file = config.getDir().resolve(FILE_SAVE);
 
-        try (FileChannel fileChannel = FileChannel.open(file, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE)){
+        try (FileChannel fileChannel = FileChannel.open(file, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE)) {
             ByteBuffer size = ByteBuffer.allocate(Integer.BYTES);
-            for(Record record : storage.values()){
-                if(record.getValue() == null){
+            for (Record record : storage.values()) {
+                if (record.getValue() == null) {
                     continue;
                 }
                 writeInt(record.getKey(), fileChannel, size);
@@ -74,19 +72,20 @@ public class MyDAO implements DAO {
         return config;
     }
 
-    private ConcurrentNavigableMap<ByteBuffer, Record> getSubMap(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey,
-                                                                 ConcurrentNavigableMap<ByteBuffer, Record> map){
-        if(fromKey == null && toKey == null)
+    private ConcurrentNavigableMap<ByteBuffer, Record> getSubMap(@Nullable ByteBuffer fromKey,
+                                                                 @Nullable ByteBuffer toKey,
+                                                                 ConcurrentNavigableMap<ByteBuffer, Record> map) {
+        if (fromKey == null && toKey == null)
             return map;
-        else if(fromKey == null)
+        else if (fromKey == null)
             return map.headMap(toKey);
-        else if(toKey == null)
+        else if (toKey == null)
             return map.tailMap(fromKey);
         else
             return map.subMap(fromKey, toKey);
     }
 
-    private static ByteBuffer readvalue(ReadableByteChannel channel, ByteBuffer tmp) throws IOException {
+    private static ByteBuffer readValue(ReadableByteChannel channel, ByteBuffer tmp) throws IOException {
         tmp.position(0);
         channel.read(tmp);
         tmp.position(0);
