@@ -12,9 +12,8 @@ public final class DAOFactory {
      * Create an instance of {@link DAO} with supplied {@link DAOConfig}.
      */
     public static DAO create(DAOConfig config) throws IOException {
-        assert config.getDir().toFile().exists();
 
-        throw new UnsupportedOperationException("Implement me");
+        return new MyDAOImplementation(config);
     }
 
 }
