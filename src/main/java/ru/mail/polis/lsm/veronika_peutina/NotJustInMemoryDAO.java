@@ -76,13 +76,13 @@ public class NotJustInMemoryDAO implements DAO {
     public void close() throws IOException {
         Files.deleteIfExists(config.getDir().resolve(SAVE_FILE_NAME));
         Path pathFile = config.getDir().resolve(SAVE_FILE_NAME);
-        try (FileChannel fileChannel = FileChannel.open(pathFile, StandardOpenOption.WRITE, StandardOpenOption.CREATE_NEW)) {
+        try (FileChannel fileChannel = FileChannel.open(pathFile,
+                            StandardOpenOption.WRITE, StandardOpenOption.CREATE_NEW)) {
             ByteBuffer byteBuffer = ByteBuffer.allocate(Integer.BYTES);
             for (final Record record : storage.values()) {
                 writeRecord(record, fileChannel, byteBuffer);
             }
         }
-        storage.clear();
     }
 
 
