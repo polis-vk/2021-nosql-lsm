@@ -19,7 +19,7 @@ public class DaoImpl implements DAO {
     private static final String SAVE_FILE_NAME = "save.dat";
 
     /**
-     * Implementation of DAO with Persistence
+     * Implementation of DAO with Persistence.
      */
     public DaoImpl(DAOConfig config) throws IOException {
         this.config = config;
