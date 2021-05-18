@@ -1,4 +1,4 @@
-package ru.mail.polis.lsm.saveliy_schur;
+package ru.mail.polis.lsm.saveliyschur;
 
 import ru.mail.polis.lsm.DAO;
 import ru.mail.polis.lsm.DAOConfig;
@@ -17,13 +17,13 @@ import java.util.*;
 import java.util.concurrent.ConcurrentNavigableMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 
-public class InMemoryDAO implements DAO {
+public class MyDAO implements DAO {
 
     private volatile ConcurrentSkipListMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
     private final DAOConfig config;
     private static final String FILE_SAVE = "save.dat";
 
-    public InMemoryDAO(DAOConfig config) throws IOException {
+    public MyDAO(DAOConfig config) throws IOException {
         this.config = config;
 
         Path file = config.getDir().resolve(FILE_SAVE);

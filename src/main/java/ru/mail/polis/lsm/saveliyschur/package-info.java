@@ -1,4 +1,4 @@
 @ParametersAreNonnullByDefault
-package ru.mail.polis.lsm.saveliy_schur;
+package ru.mail.polis.lsm.saveliyschur;
 
 import javax.annotation.ParametersAreNonnullByDefault;

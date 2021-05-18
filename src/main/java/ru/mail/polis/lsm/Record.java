@@ -1,7 +1,6 @@
 package ru.mail.polis.lsm;
 
 import javax.annotation.Nullable;
-import java.io.Serializable;
 import java.nio.ByteBuffer;
 
 @SuppressWarnings("JavaLangClash")
