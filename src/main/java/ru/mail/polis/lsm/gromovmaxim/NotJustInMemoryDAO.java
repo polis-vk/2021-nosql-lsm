@@ -1,4 +1,4 @@
-package ru.mail.polis.lsm.gromov_maxim;
+package ru.mail.polis.lsm.gromovmaxim;
 
 import ru.mail.polis.lsm.DAO;
 import ru.mail.polis.lsm.DAOConfig;

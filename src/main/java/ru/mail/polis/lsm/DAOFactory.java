@@ -1,6 +1,6 @@
 package ru.mail.polis.lsm;
 
-import ru.mail.polis.lsm.gromov_maxim.NotJustInMemoryDAO;
+import ru.mail.polis.lsm.gromovmaxim.NotJustInMemoryDAO;
 
 import java.io.IOException;
 
