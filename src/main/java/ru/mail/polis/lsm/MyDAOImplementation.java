@@ -31,7 +31,8 @@ public class MyDAOImplementation implements DAO {
                 int size = Integer.BYTES;
                 ByteBuffer key;
                 ByteBuffer value;
-                while (fileChannel.position() != fileChannel.size()) {
+                final long fileChannelSize = fileChannel.size();
+                while (fileChannel.position() != fileChannelSize) {
                     key = readValue(fileChannel, size);
                     value = readValue(fileChannel, size);
                     storage.put(key, Record.of(key, value));
@@ -48,7 +49,8 @@ public class MyDAOImplementation implements DAO {
     private ByteBuffer fullRead(int byteBufferSize, FileChannel fileChannel) throws IOException {
         ByteBuffer temp = ByteBuffer.allocate(byteBufferSize);
         temp.position(0);
-        while (temp.position() != temp.capacity()) {
+        final int tempCapacity = temp.capacity();
+        while (temp.position() != tempCapacity) {
             fileChannel.read(temp);
         }
         return temp.position(0);
