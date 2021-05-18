@@ -41,16 +41,18 @@ public class MyDAOImplementation implements DAO {
     }
 
     private ByteBuffer readValue(FileChannel fileChannel, ByteBuffer temp) throws IOException {
+        fullRead(temp, fileChannel);
+        ByteBuffer value = ByteBuffer.allocate(temp.getInt());
+        fullRead(value, fileChannel);
+        return value;
+    }
+
+    private void fullRead(ByteBuffer temp, FileChannel fileChannel) throws IOException {
         temp.position(0);
         while (temp.position() != temp.capacity()) {
             fileChannel.read(temp);
         }
         temp.position(0);
-        ByteBuffer value = ByteBuffer.allocate(temp.getInt());
-        while (value.position() != value.capacity()) {
-            fileChannel.read(value);
-        }
-        return value.position(0);
     }
 
     @Override
