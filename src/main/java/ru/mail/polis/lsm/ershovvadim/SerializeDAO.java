@@ -23,6 +23,11 @@ public class SerializeDAO implements DAO {
     private final DAOConfig config;
     private final SortedMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
 
+    /**
+     * Constructor SerializeDAO object, deserialize data from file
+     *
+     * @param config DAOConfig
+     */
     public SerializeDAO(DAOConfig config) {
         this.config = config;
         Path resolve = config.getDir().resolve(FILE_TO_SAVE);
