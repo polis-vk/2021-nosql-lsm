@@ -30,23 +30,16 @@ public class MyDAOImplementation implements DAO {
         if (Files.exists(path)) {
             try (FileChannel fileChannel = FileChannel.open(path, StandardOpenOption.READ)) {
                 ByteBuffer size = ByteBuffer.allocate(Integer.BYTES);
-                ByteBuffer key = null;
-                ByteBuffer value = null;
+                ByteBuffer key;
+                ByteBuffer value;
                 while (fileChannel.position() != fileChannel.size()) {
-                    Record record = readRecord(fileChannel, key, value, size);
+                    key = readValue(fileChannel, size);
+                    value = readValue(fileChannel, size);
+                    Record record = Record.of(key, value);
                     storage.put(record.getKey(), record);
                 }
             }
         }
-    }
-
-    private Record readRecord(FileChannel fileChannel,
-                              ByteBuffer key,
-                              ByteBuffer value,
-                              ByteBuffer size) throws IOException {
-        key = readValue(fileChannel, size);
-        value = readValue(fileChannel, size);
-        return Record.of(key, value);
     }
 
     private ByteBuffer readValue(FileChannel fileChannel, ByteBuffer temp) throws IOException {
