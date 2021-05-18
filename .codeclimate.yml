@@ -35,6 +35,8 @@ plugins:
         enabled: false
       MethodArgumentCouldBeFinal:
         enabled: false
+      LocalVariableCouldBeFinal:
+        enabled: false
   sonar-java:
     enabled: true
     config:
