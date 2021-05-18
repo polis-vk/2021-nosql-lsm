@@ -1,20 +1,19 @@
 package ru.mail.polis.lsm;
 
-import jdk.dynalink.StandardOperation;
-
 import javax.annotation.Nullable;
-import java.io.*;
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.WritableByteChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
-import java.util.*;
+import java.util.Iterator;
+import java.util.NavigableMap;
+import java.util.SortedMap;
 import java.util.concurrent.ConcurrentSkipListMap;
-import java.util.stream.Collectors;
 
-public class DaoImpl implements DAO{
+public class DaoImpl implements DAO {
     private final DAOConfig config;
     private final NavigableMap<ByteBuffer, Record> map;
     private static final String SAVE_FILE_NAME = "save.dat";
@@ -24,7 +23,7 @@ public class DaoImpl implements DAO{
         this.map = new ConcurrentSkipListMap<>();
         Path resolve = config.getDir().resolve(SAVE_FILE_NAME);
         if (Files.exists(resolve)) {
-            try(FileChannel fileChannel = FileChannel.open(resolve, StandardOpenOption.READ)) {
+            try (FileChannel fileChannel = FileChannel.open(resolve, StandardOpenOption.READ)) {
                ByteBuffer buffer = ByteBuffer.allocate(Integer.BYTES);
                 while (fileChannel.position() < fileChannel.size()) {
                     ByteBuffer key = readBuffer(fileChannel, buffer);
@@ -49,20 +48,23 @@ public class DaoImpl implements DAO{
 
     @Override
     public Iterator<Record> range(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
-        return  map(fromKey, toKey).values().stream()
+        return map(fromKey, toKey).values().stream()
                 .filter(record -> record.getValue() != null)
                 .iterator();
     }
 
     private SortedMap<ByteBuffer, Record> map(@Nullable ByteBuffer fromKey,@Nullable ByteBuffer toKey) {
-        if ((fromKey == null) && (toKey == null))
-                return map;
+        if ((fromKey == null) && (toKey == null)) {
+            return map;
+        }
 
-        if (fromKey == null)
+        if (fromKey == null) {
             return map.headMap(toKey);
+        }
 
-        if (toKey == null)
+        if (toKey == null) {
             return map.tailMap(fromKey);
+        }
 
         return map.subMap(fromKey, toKey);
     }
@@ -76,7 +78,7 @@ public class DaoImpl implements DAO{
     public void close() throws IOException {
         Files.deleteIfExists(config.getDir().resolve(SAVE_FILE_NAME));
         Path file = config.getDir().resolve(SAVE_FILE_NAME);
-        try(FileChannel fileChannel = FileChannel.open(file, StandardOpenOption.WRITE, StandardOpenOption.CREATE_NEW)) {
+        try (FileChannel fileChannel = FileChannel.open(file, StandardOpenOption.WRITE, StandardOpenOption.CREATE_NEW)) {
             ByteBuffer size = ByteBuffer.allocate(Integer.BYTES);
             for (Record record : map.values()) {
                 if (record.getValue() != null) {
