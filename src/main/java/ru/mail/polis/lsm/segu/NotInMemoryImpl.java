@@ -45,8 +45,13 @@ public class NotInMemoryImpl implements DAO {
                 while (fileChannel.read(size) > 0) {
                     ByteBuffer key = readValue(fileChannel, size);
                     fileChannel.read(size.flip());
-                    ByteBuffer value = readValue(fileChannel, size);
-                    storage.put(key, Record.of(key, value));
+                    size.position(0);
+                    if (size.getInt() < 0) {
+                        storage.put(key, Record.tombstone(key));
+                    } else {
+                        ByteBuffer value = readValue(fileChannel, size);
+                        storage.put(key, Record.of(key, value));
+                    }
                 }
             }
         }
@@ -69,23 +74,29 @@ public class NotInMemoryImpl implements DAO {
         try (FileChannel fileChannel = FileChannel.open(filePath, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.CREATE, StandardOpenOption.WRITE)) {
             ByteBuffer size = ByteBuffer.allocate(Integer.BYTES);
             for (Record record : storage.values()) {
-                if (!isTombstone(record)) {
-                    writeValue(fileChannel, record.getKey(), size);
-                    writeValue(fileChannel, record.getValue(), size);
-                }
+                writeValue(fileChannel, record.getKey(), size);
+                writeValue(fileChannel, record.getValue(), size);
             }
         }
     }
 
-    private static void writeValue(FileChannel fileChannel, ByteBuffer value, ByteBuffer size) throws IOException {
-        size.position(0);
-        size.putInt(value.remaining());
-        size.position(0);
-        fileChannel.write(size);
-        fileChannel.write(value);
+    private void writeValue(FileChannel fileChannel, @Nullable ByteBuffer value, ByteBuffer size) throws IOException {
+        if (value == null) {
+            saveAndWriteSize(fileChannel, size, -1);
+        } else {
+            saveAndWriteSize(fileChannel, size, value.remaining());
+            fileChannel.write(value);
+        }
     }
 
-    private static ByteBuffer readValue(FileChannel fileChannel, ByteBuffer size) throws IOException {
+    private void saveAndWriteSize(FileChannel fileChannel, ByteBuffer sizeBuffer, int size) throws IOException {
+        sizeBuffer.position(0);
+        sizeBuffer.putInt(size);
+        sizeBuffer.position(0);
+        fileChannel.write(sizeBuffer);
+    }
+
+    private ByteBuffer readValue(FileChannel fileChannel, ByteBuffer size) throws IOException {
         size.flip();
         ByteBuffer value = ByteBuffer.allocate(size.getInt());
         fileChannel.read(value);
@@ -103,9 +114,5 @@ public class NotInMemoryImpl implements DAO {
             return storage.tailMap(fromKey);
         }
         return storage.subMap(fromKey, toKey);
-    }
-
-    public boolean isTombstone(Record record) {
-        return record.getValue() == null;
     }
 }
