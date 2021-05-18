@@ -24,11 +24,11 @@ public class SerializeDAO implements DAO {
     private final SortedMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
 
     /**
-     * Constructor SerializeDAO object, deserialize data from file
+     * Constructor SerializeDAO object, deserialize data from file.
      *
      * @param config DAOConfig
      */
-    public SerializeDAO(DAOConfig config) {
+    public SerializeDAO(DAOConfig config) throws IOException {
         this.config = config;
         Path resolve = config.getDir().resolve(FILE_TO_SAVE);
         if (!Files.exists(resolve)) {
@@ -44,7 +44,7 @@ public class SerializeDAO implements DAO {
                 storage.put(key, Record.of(key, value));
             }
         } catch (IOException e) {
-            e.getStackTrace();
+            throw new IOException("I/O error occurs", e);
         }
     }
 
