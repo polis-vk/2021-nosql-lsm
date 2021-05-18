@@ -29,4 +29,6 @@ public class Record {
     public ByteBuffer getValue() {
         return value == null ? null : value.asReadOnlyBuffer();
     }
+
+    public boolean isTombstone() { return value == null; }
 }

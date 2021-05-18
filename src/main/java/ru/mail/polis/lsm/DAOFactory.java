@@ -1,5 +1,6 @@
 package ru.mail.polis.lsm;
 
+import ru.mail.polis.lsm.danila_fedorov.FileMemoryDAO;
 import ru.mail.polis.lsm.danila_fedorov.InMemoryDAO;
 
 import java.io.IOException;
@@ -16,7 +17,7 @@ public final class DAOFactory {
     public static DAO create(DAOConfig config) throws IOException {
         assert config.getDir().toFile().exists();
 
-        return new InMemoryDAO();
+        return new FileMemoryDAO(config);
     }
 
 }
