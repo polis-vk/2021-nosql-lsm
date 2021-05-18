@@ -36,10 +36,10 @@ public class DaoImpl implements DAO {
     @Override
     public void upsert(Record record) {
 
-        if (record.getValue() != null) {
-            storage.put(record.getKey(), record);
-        } else {
+        if (record.getValue() == null) {
             storage.remove(record.getKey());
+        } else {
+            storage.put(record.getKey(), record);
         }
 
     }
@@ -65,7 +65,7 @@ public class DaoImpl implements DAO {
     private void save() {
         try (BufferedOutputStream bufferedOutputStream = new BufferedOutputStream(Files.newOutputStream(path))) {
 
-            for (Map.Entry<ByteBuffer, Record> byteBufferRecordEntry : storage.entrySet()) {
+            for (final Map.Entry<ByteBuffer, Record> byteBufferRecordEntry : storage.entrySet()) {
                 writeToFile(bufferedOutputStream, byteBufferRecordEntry.getKey());
                 writeToFile(bufferedOutputStream, byteBufferRecordEntry.getValue().getValue());
             }
@@ -79,8 +79,8 @@ public class DaoImpl implements DAO {
             try (BufferedInputStream bufferedInputStream = new BufferedInputStream(Files.newInputStream(path))) {
                 while (bufferedInputStream.available() > 0) {
 
-                    ByteBuffer keyByteBuffer = readFromFile(bufferedInputStream);
-                    ByteBuffer valueByteBuffer = readFromFile(bufferedInputStream);
+                    final ByteBuffer keyByteBuffer = readFromFile(bufferedInputStream);
+                    final ByteBuffer valueByteBuffer = readFromFile(bufferedInputStream);
 
                     storage.put(keyByteBuffer, Record.of(keyByteBuffer, valueByteBuffer));
                 }
@@ -91,14 +91,14 @@ public class DaoImpl implements DAO {
     }
 
     private ByteBuffer readFromFile(BufferedInputStream bufferedInputStream) throws IOException {
-        int length = bufferedInputStream.read();
+        final int length = bufferedInputStream.read();
         return ByteBuffer.wrap(bufferedInputStream.readNBytes(length));
     }
 
     private void writeToFile(BufferedOutputStream bufferedOutputStream, ByteBuffer byteBuffer) throws IOException {
-        int length = byteBuffer.remaining();
+        final int length = byteBuffer.remaining();
 
-        byte[] bytes = new byte[length];
+        final byte[] bytes = new byte[length];
         byteBuffer.get(bytes);
 
         bufferedOutputStream.write(length);
