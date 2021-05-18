@@ -74,10 +74,10 @@ public class FileMemoryDAO implements DAO {
         final Path tempPath = config.getDir().resolve(NEW_FILE_NAME);
 
         try (BufferedOutputStream stream = new BufferedOutputStream(Files.newOutputStream(tempPath))) {
-            var it = getStreamOfValidValues(null, null).iterator();
+            Iterator<Record> it = getStreamOfValidValues(null, null).iterator();
 
             while (it.hasNext()) {
-                var value = it.next();
+                Record value = it.next();
                 write(stream, value.getKey());
                 write(stream, value.getValue());
             }
