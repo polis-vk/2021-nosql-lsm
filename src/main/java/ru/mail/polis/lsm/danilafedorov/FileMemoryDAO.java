@@ -28,6 +28,12 @@ public class FileMemoryDAO implements DAO {
     private static final String DATA_FILE_NAME = "Data";
     private static final String TEMP_FILE_NAME = "Temp";
 
+    /**
+     * Class constructor identifying directory of DB location.
+     *
+     * @param config contains directory path of DB location
+     * @throws IOException If an input exception occured
+     */
     public FileMemoryDAO(final DAOConfig config) throws IOException {
         Path dir = config.getDir();
         backupFilePath = dir.resolve(BACKUP_FILE_NAME);
