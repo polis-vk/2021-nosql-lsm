@@ -1,6 +1,7 @@
 package ru.mail.polis.lsm;
 
 import javax.annotation.Nullable;
+import java.io.Serializable;
 import java.nio.ByteBuffer;
 
 @SuppressWarnings("JavaLangClash")
@@ -8,7 +9,6 @@ public class Record {
 
     private final ByteBuffer key;
     private final ByteBuffer value;
-    private boolean hidden = false;
 
     Record(ByteBuffer key, @Nullable ByteBuffer value) {
         this.key = key;
@@ -31,11 +31,4 @@ public class Record {
         return value == null ? null : value.asReadOnlyBuffer();
     }
 
-    public boolean isHidden(){
-        return hidden;
-    }
-
-    public void hide(){
-        hidden = true;
-    }
 }
