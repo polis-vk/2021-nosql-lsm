@@ -5,11 +5,9 @@ import ru.mail.polis.lsm.DAOConfig;
 import ru.mail.polis.lsm.Record;
 
 import javax.annotation.Nullable;
-import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
-import java.nio.channels.WritableByteChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
@@ -23,6 +21,11 @@ public class NotOnlyInMemoryDAO implements DAO {
     private final SortedMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
     private final Path filePath;
 
+
+    /**
+     * Create DAO in memory using data, that saved in file
+     * @param config contains path
+     */
     public NotOnlyInMemoryDAO(DAOConfig config) {
         this.filePath = config.getDir().resolve(DATA_FILE_NAME);
 
@@ -81,7 +84,7 @@ public class NotOnlyInMemoryDAO implements DAO {
     @Override
     public void close() throws IOException {
         Files.deleteIfExists(filePath);
-        try(FileChannel channel = FileChannel.open(filePath, StandardOpenOption.WRITE, StandardOpenOption.CREATE_NEW)) {
+        try (FileChannel channel = FileChannel.open(filePath, StandardOpenOption.WRITE, StandardOpenOption.CREATE_NEW)) {
             ByteBuffer buffer = ByteBuffer.allocate(Integer.BYTES);
 
             for (Record record: storage.values()) {
