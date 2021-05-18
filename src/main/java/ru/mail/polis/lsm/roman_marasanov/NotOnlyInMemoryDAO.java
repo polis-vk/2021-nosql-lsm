@@ -21,7 +21,6 @@ public class NotOnlyInMemoryDAO implements DAO {
     private final SortedMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
     private final Path filePath;
 
-
     /**
      * Create DAO in memory using data, that saved in file
      * @param config contains path
