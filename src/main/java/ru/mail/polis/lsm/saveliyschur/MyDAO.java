@@ -28,7 +28,7 @@ public class MyDAO implements DAO {
 
         Path file = config.getDir().resolve(FILE_SAVE);
 
-        if(Files.exists(file)){
+        if (Files.exists(file)) {
             final ByteBuffer size = ByteBuffer.allocate(Integer.BYTES);
             try (FileChannel fileChannel = FileChannel.open(file, StandardOpenOption.READ)) {
                 while (fileChannel.position() < fileChannel.size()) {
