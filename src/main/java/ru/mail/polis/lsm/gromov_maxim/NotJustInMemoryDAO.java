@@ -20,7 +20,7 @@ import java.util.concurrent.ConcurrentSkipListMap;
 public class NotJustInMemoryDAO implements DAO {
 
     private final SortedMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
-    static private final String DATA_BASE = "database.dat";
+    private static final String DATA_BASE = "database.dat";
     private final DAOConfig config;
 
     public NotJustInMemoryDAO(DAOConfig config) {
