@@ -14,9 +14,9 @@ import java.util.concurrent.ConcurrentSkipListMap;
 
 public class MyDAOImplementation implements DAO {
 
+    private static final String SAVE_FILE_NAME = "save_dao.data";
     private final SortedMap<ByteBuffer, Record> storage;
     private final DAOConfig config;
-    private static final String SAVE_FILE_NAME = "save_dao.data";
 
 
     /**
@@ -40,7 +40,10 @@ public class MyDAOImplementation implements DAO {
         }
     }
 
-    private Record readRecord(FileChannel fileChannel, ByteBuffer key, ByteBuffer value, ByteBuffer size) throws IOException {
+    private Record readRecord(FileChannel fileChannel,
+                              ByteBuffer key,
+                              ByteBuffer value,
+                              ByteBuffer size) throws IOException {
         key = readValue(fileChannel, size);
         value = readValue(fileChannel, size);
         return Record.of(key, value);
@@ -53,7 +56,7 @@ public class MyDAOImplementation implements DAO {
         }
         temp.position(0);
         ByteBuffer value = ByteBuffer.allocate(temp.getInt());
-        while(value.position() != value.capacity()) {
+        while (value.position() != value.capacity()) {
             fileChannel.read(value);
         }
         return value.position(0);
@@ -78,7 +81,8 @@ public class MyDAOImplementation implements DAO {
         Files.deleteIfExists(config.getDir().resolve(SAVE_FILE_NAME));
         Path path = config.getDir().resolve(SAVE_FILE_NAME);
 
-        try (FileChannel fileChannel = FileChannel.open(path, StandardOpenOption.WRITE, StandardOpenOption.CREATE_NEW)) {
+        try (FileChannel fileChannel =
+                     FileChannel.open(path, StandardOpenOption.WRITE, StandardOpenOption.CREATE_NEW)) {
             ByteBuffer size = ByteBuffer.allocate(Integer.BYTES);
             for (Record record : storage.values()) {
                 writeValueAndKey(record, fileChannel, size);
