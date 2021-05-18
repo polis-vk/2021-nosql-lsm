@@ -1,5 +1,7 @@
 package ru.mail.polis.lsm;
 
+import ru.mail.polis.lsm.roman_marasanov.InMemoryDAO;
+
 import java.io.IOException;
 
 public final class DAOFactory {
@@ -14,7 +16,7 @@ public final class DAOFactory {
     public static DAO create(DAOConfig config) throws IOException {
         assert config.getDir().toFile().exists();
 
-        throw new UnsupportedOperationException("Implement me");
+        return new InMemoryDAO();
     }
 
 }
