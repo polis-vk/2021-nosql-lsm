@@ -24,7 +24,7 @@ public class NotJustInMemoryDAO implements DAO {
     private static final String SAVE_FILE_NAME = "save1.dat";
 
     /**
-     * NotJustInMemoryDAO constructor
+     * NotJustInMemoryDAO constructor.
      *
      * @param config {@link DAOConfig}
      * @throws IOException raises an exception
