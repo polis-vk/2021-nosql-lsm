@@ -18,6 +18,10 @@ public class MyDAOImplementation implements DAO {
     private final DAOConfig config;
     private static final String SAVE_FILE_NAME = "save_dao.data";
 
+
+    /**
+     * Implementation of DAO that save data to the memory.
+     */
     public MyDAOImplementation(DAOConfig config) throws IOException {
         this.config = config;
         this.storage = new ConcurrentSkipListMap<>();
