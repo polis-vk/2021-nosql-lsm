@@ -20,13 +20,13 @@ import java.util.concurrent.ConcurrentSkipListMap;
 public class NotJustInMemoryDAO implements DAO {
 
     private final SortedMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
-    private final String DATABASE = "database.dat";
+    static private final String DATA_BASE = "database.dat";
     private final DAOConfig config;
 
     public NotJustInMemoryDAO(DAOConfig config) {
         this.config = config;
 
-        final Path path = config.getDir().resolve(DATABASE);
+        final Path path = config.getDir().resolve(DATA_BASE);
 
         if (Files.exists(path)) {
             try (FileChannel fileChannel =
@@ -62,9 +62,9 @@ public class NotJustInMemoryDAO implements DAO {
 
     @Override
     public void close() throws IOException {
-        Files.deleteIfExists(config.getDir().resolve(DATABASE));
+        Files.deleteIfExists(config.getDir().resolve(DATA_BASE));
 
-        final Path file = config.getDir().resolve(DATABASE);
+        final Path file = config.getDir().resolve(DATA_BASE);
 
         try (FileChannel fileChannel =
                      FileChannel.open(file, StandardOpenOption.WRITE, StandardOpenOption.CREATE_NEW)) {
