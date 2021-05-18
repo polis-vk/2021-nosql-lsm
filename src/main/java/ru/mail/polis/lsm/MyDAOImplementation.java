@@ -34,8 +34,7 @@ public class MyDAOImplementation implements DAO {
                 while (fileChannel.position() != fileChannel.size()) {
                     key = readValue(fileChannel, size);
                     value = readValue(fileChannel, size);
-                    Record record = Record.of(key, value);
-                    storage.put(record.getKey(), record);
+                    storage.put(key, Record.of(key, value));
                 }
             }
         }
