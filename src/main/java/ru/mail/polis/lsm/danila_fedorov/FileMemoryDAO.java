@@ -11,6 +11,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.Iterator;
 import java.util.SortedMap;
 import java.util.concurrent.ConcurrentSkipListMap;
@@ -21,8 +22,8 @@ public class FileMemoryDAO implements DAO {
     private final SortedMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
     private final DAOConfig config;
 
-    private final String SAVED_FILE_NAME = "Data";
-    private final String NEW_FILE_NAME = "Temp";
+    private static final String SAVED_FILE_NAME = "Data";
+    private static final String NEW_FILE_NAME = "Temp";
 
     public FileMemoryDAO(final DAOConfig config) throws IOException {
         this.config = config;
@@ -60,7 +61,10 @@ public class FileMemoryDAO implements DAO {
         return storage.subMap(fromKey, toKey);
     }
 
-    private Stream<Record> getStreamOfValidValues(@Nullable final ByteBuffer fromKey, @Nullable final ByteBuffer toKey) {
+    private Stream<Record> getStreamOfValidValues(
+            @Nullable final ByteBuffer fromKey,
+            @Nullable final ByteBuffer toKey
+    ) {
         return map(fromKey, toKey).values()
                 .stream()
                 .filter(record -> !record.isTombstone());
@@ -69,7 +73,7 @@ public class FileMemoryDAO implements DAO {
     private void save() throws IOException {
         final Path tempPath = config.getDir().resolve(NEW_FILE_NAME);
 
-        try(BufferedOutputStream stream = new BufferedOutputStream(Files.newOutputStream(tempPath))) {
+        try (BufferedOutputStream stream = new BufferedOutputStream(Files.newOutputStream(tempPath))) {
             var it = getStreamOfValidValues(null, null).iterator();
 
             while (it.hasNext()) {
@@ -80,8 +84,8 @@ public class FileMemoryDAO implements DAO {
         }
 
         final Path mainPath = tempPath.resolveSibling(SAVED_FILE_NAME);
-        Files.deleteIfExists(mainPath);
-        Files.move(tempPath, mainPath);
+
+        Files.copy(tempPath, mainPath, StandardCopyOption.REPLACE_EXISTING);
     }
 
     private void restore() throws IOException {
@@ -92,7 +96,7 @@ public class FileMemoryDAO implements DAO {
                     final ByteBuffer key = read(stream);
                     final ByteBuffer value = read(stream);
 
-                    upsert(Record.of(key, value));
+                    storage.put(key, Record.of(key, value));
                 }
             }
         }

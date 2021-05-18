@@ -30,5 +30,7 @@ public class Record {
         return value == null ? null : value.asReadOnlyBuffer();
     }
 
-    public boolean isTombstone() { return value == null; }
+    public boolean isTombstone() {
+        return value == null;
+    }
 }
