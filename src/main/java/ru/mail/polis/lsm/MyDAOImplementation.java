@@ -18,7 +18,6 @@ public class MyDAOImplementation implements DAO {
     private final SortedMap<ByteBuffer, Record> storage;
     private final DAOConfig config;
 
-
     /**
      * Implementation of DAO that save data to the memory.
      */
