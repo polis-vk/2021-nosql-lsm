@@ -7,7 +7,8 @@ import java.io.IOException;
 public class DAOFactory {
 
     public static DAO create(DAOConfig config) throws IOException {
-        return new InMemoryDAO();
+        assert config.getDir().toFile().exists();
+        return new InMemoryDAO(config);
     }
 
 }

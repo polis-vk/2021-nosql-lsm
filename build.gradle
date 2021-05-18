@@ -1,5 +1,8 @@
 plugins {
     id 'java'
+    id("net.ltgt.errorprone") version "0.8.1"
+    id("checkstyle")
+    id("pmd")
 }
 
 java {
@@ -12,6 +15,10 @@ repositories {
 }
 
 dependencies {
+    // Checks
+    errorprone("com.google.errorprone:error_prone_core:2.3.3")
+    checkstyle("com.puppycrawl.tools:checkstyle:8.42")
+
     // Logging
     implementation("org.slf4j:slf4j-api:1.7.26")
     implementation("ch.qos.logback:logback-classic:1.2.3")
@@ -27,4 +34,17 @@ dependencies {
 test {
     maxHeapSize = "128m"
     useJUnitPlatform()
+}
+
+checkstyle {
+    configFile = new File("checkstyle.xml")
+    checkstyleTest.enabled = false
+}
+
+pmd {
+    consoleOutput = true
+    toolVersion = "6.21.0"
+    ruleSets = []
+    ruleSetConfig = project.resources.text.fromFile("pmd.xml")
+    sourceSets = [sourceSets.main]
 }
