@@ -31,6 +31,11 @@ public class NotInMemoryImpl implements DAO {
     private static final String FILE_NAME = "data.dat";
     private Path filePath;
 
+    /**
+     * Constructor.
+     * @param config - конфиг
+     */
+
     public NotInMemoryImpl(DAOConfig config) {
         this.config = config;
         try {
@@ -104,7 +109,7 @@ public class NotInMemoryImpl implements DAO {
 
     private ByteBuffer readValue(FileChannel fileChannel, ByteBuffer size) throws IOException {
         size.flip();
-        ByteBuffer value = ByteBuffer.allocate(size.getInt());
+        final ByteBuffer value = ByteBuffer.allocate(size.getInt());
         fileChannel.read(value);
         return value.flip();
     }
