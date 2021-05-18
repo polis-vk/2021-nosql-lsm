@@ -17,6 +17,10 @@ import java.util.Iterator;
 import java.util.SortedMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 
+/**
+ * Implementation of NotInMemory DAO
+ */
+
 public class NotInMemoryImpl implements DAO {
 
     private final Logger logger = LoggerFactory.getLogger(getClass().getName());
@@ -36,20 +40,19 @@ public class NotInMemoryImpl implements DAO {
         }
     }
 
-
     private void initStorage() throws IOException {
         filePath = config.getDir().resolve(FILE_NAME);
         if (Files.exists(filePath)) {
             try (FileChannel fileChannel = FileChannel.open(filePath, StandardOpenOption.READ)) {
-                ByteBuffer size = ByteBuffer.allocate(Integer.BYTES);
+                final ByteBuffer size = ByteBuffer.allocate(Integer.BYTES);
                 while (fileChannel.read(size) > 0) {
-                    ByteBuffer key = readValue(fileChannel, size);
+                    final ByteBuffer key = readValue(fileChannel, size);
                     fileChannel.read(size.flip());
                     size.position(0);
                     if (size.getInt() < 0) {
                         storage.put(key, Record.tombstone(key));
                     } else {
-                        ByteBuffer value = readValue(fileChannel, size);
+                        final ByteBuffer value = readValue(fileChannel, size);
                         storage.put(key, Record.of(key, value));
                     }
                 }
@@ -71,9 +74,12 @@ public class NotInMemoryImpl implements DAO {
 
     @Override
     public void close() throws IOException {
-        try (FileChannel fileChannel = FileChannel.open(filePath, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.CREATE, StandardOpenOption.WRITE)) {
-            ByteBuffer size = ByteBuffer.allocate(Integer.BYTES);
-            for (Record record : storage.values()) {
+        try (FileChannel fileChannel = FileChannel.open(filePath,
+                StandardOpenOption.TRUNCATE_EXISTING,
+                StandardOpenOption.CREATE,
+                StandardOpenOption.WRITE)) {
+            final ByteBuffer size = ByteBuffer.allocate(Integer.BYTES);
+            for (final Record record : storage.values()) {
                 writeValue(fileChannel, record.getKey(), size);
                 writeValue(fileChannel, record.getValue(), size);
             }
