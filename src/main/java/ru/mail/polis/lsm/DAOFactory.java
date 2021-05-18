@@ -11,7 +11,7 @@ public final class DAOFactory {
     }
 
     /**
-     * Create an instance of {@link DAO} with supplied {@link DAOConfig}.
+     * Create an instance of {@link DAO} with supplied {@link DAOConfig} (unused yet).
      */
     public static DAO create(DAOConfig config) throws IOException {
         assert config.getDir().toFile().exists();
