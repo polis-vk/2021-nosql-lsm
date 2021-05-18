@@ -17,6 +17,10 @@ import java.util.Iterator;
 import java.util.SortedMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 
+/**
+ * Simple database that store data on disk
+ */
+
 public class NotJustInMemoryDAO implements DAO {
 
     private final SortedMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
