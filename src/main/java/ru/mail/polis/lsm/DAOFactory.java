@@ -1,6 +1,6 @@
 package ru.mail.polis.lsm;
 
-import ru.mail.polis.lsm.danila_fedorov.FileMemoryDAO;
+import ru.mail.polis.lsm.danilafedorov.FileMemoryDAO;
 
 import java.io.IOException;
 

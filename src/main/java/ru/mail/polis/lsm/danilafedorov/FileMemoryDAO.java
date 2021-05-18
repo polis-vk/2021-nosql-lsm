@@ -1,4 +1,4 @@
-package ru.mail.polis.lsm.danila_fedorov;
+package ru.mail.polis.lsm.danilafedorov;
 
 import ru.mail.polis.lsm.DAO;
 import ru.mail.polis.lsm.DAOConfig;
