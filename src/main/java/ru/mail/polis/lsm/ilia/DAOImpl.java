@@ -24,6 +24,11 @@ public class DAOImpl implements DAO {
     private final DAOConfig config;
     private static final String SAVE_FILE_NAME = "save.dat";
 
+    /**
+     * Create DAOImpl constructor.
+     *
+     * @param config contains directory with file
+     */
     public DAOImpl(DAOConfig config) {
         this.config = config;
 
