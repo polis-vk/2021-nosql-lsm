@@ -25,7 +25,7 @@ public class NotJustInMemoryDAO implements DAO {
 
     /**
      * Restore data if the file exists.
-     * 
+     *
      * @param config is used to get the file directory
      * @throws IOException if an I/O error occurs while opening FileChannel
      */
@@ -37,9 +37,8 @@ public class NotJustInMemoryDAO implements DAO {
         if (Files.exists(path)) {
             try (FileChannel fileChannel = FileChannel.open(path, StandardOpenOption.READ)) {
                 final ByteBuffer size = ByteBuffer.allocate(Integer.BYTES);
-                while (fileChannel.read(size) > 0) {
+                while (fileChannel.position() < fileChannel.size()) {
                     final ByteBuffer key = readValue(fileChannel, size);
-                    fileChannel.read(size.flip());
                     final ByteBuffer value = readValue(fileChannel, size);
                     storage.put(key, Record.of(key, value));
                 }
@@ -101,9 +100,15 @@ public class NotJustInMemoryDAO implements DAO {
     }
 
     private static ByteBuffer readValue(ReadableByteChannel channel, ByteBuffer size) throws IOException {
+        while (size.hasRemaining()) {
+            channel.read(size);
+        }
         size.flip();
         final ByteBuffer value = ByteBuffer.allocate(size.getInt());
-        channel.read(value);
+        size.flip();
+        while (value.hasRemaining()) {
+            channel.read(value);
+        }
         return value.flip();
     }
 }
