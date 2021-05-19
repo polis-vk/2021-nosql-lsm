@@ -22,21 +22,28 @@ public class MyDAO implements DAO {
     private volatile ConcurrentSkipListMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
     private final DAOConfig config;
     private static final String FILE_SAVE = "save.dat";
+    private static final String LOG_FILE = "log_db.log";
+    private static Path fileLog;
 
     public MyDAO(DAOConfig config) throws IOException {
         this.config = config;
+        fileLog = config.getDir().resolve(LOG_FILE);
 
         Path file = config.getDir().resolve(FILE_SAVE);
 
         if (Files.exists(file)) {
-            final ByteBuffer size = ByteBuffer.allocate(Integer.BYTES);
-            try (FileChannel fileChannel = FileChannel.open(file, StandardOpenOption.READ)) {
-                while (fileChannel.position() < fileChannel.size()) {
-                    ByteBuffer key = readValue(fileChannel, size);
-                    storage.put(key, Record.of(key, readValue(fileChannel, size)));
-                }
-            }
+            readFileAndAddCollection(file);
         }
+
+        //Create a log file if it does not exist
+        //Read data from the log file, if any
+        File logFileCreate = new File(String.valueOf(fileLog.toFile()));
+        if (!logFileCreate.exists()){
+            logFileCreate.createNewFile();
+        } else {
+            readFileAndAddCollection(fileLog);
+        }
+
     }
 
     @Override
@@ -48,6 +55,15 @@ public class MyDAO implements DAO {
     @Override
     public void upsert(Record record) {
         storage.put(record.getKey(), record);
+
+        //We write the entry to the log so that in case of a failure we can recover
+        try (FileChannel fileChannel = FileChannel.open(fileLog, StandardOpenOption.WRITE)){
+            ByteBuffer size = ByteBuffer.allocate(Integer.BYTES);
+            writeInt(record.getKey(), fileChannel, size);
+            writeInt(record.getValue(), fileChannel, size);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     @Override
@@ -59,13 +75,12 @@ public class MyDAO implements DAO {
         try (FileChannel fileChannel = FileChannel.open(file, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE)) {
             ByteBuffer size = ByteBuffer.allocate(Integer.BYTES);
             for (Record record : storage.values()) {
-                if (record.getValue() == null) {
-                    continue;
-                }
                 writeInt(record.getKey(), fileChannel, size);
                 writeInt(record.getValue(), fileChannel, size);
             }
         }
+        File logFileCreate = new File(String.valueOf(fileLog.toFile()));
+        logFileCreate.delete();
     }
 
     public DAOConfig getConfig() {
@@ -85,11 +100,35 @@ public class MyDAO implements DAO {
             return map.subMap(fromKey, toKey);
     }
 
+    /**
+     *
+     * @param file
+     * @throws IOException
+     */
+    private void readFileAndAddCollection(Path file) throws IOException {
+        final ByteBuffer size = ByteBuffer.allocate(Integer.BYTES);
+        try (FileChannel fileChannel = FileChannel.open(file, StandardOpenOption.READ)) {
+            while (fileChannel.position() < fileChannel.size()) {
+                ByteBuffer key = readValue(fileChannel, size);
+                ByteBuffer value = readValue(fileChannel, size);
+                if (value == null){
+                    storage.put(key, Record.tombstone(key));
+                    continue;
+                }
+                storage.put(key, Record.of(key, value));
+            }
+        }
+    }
+
     private static ByteBuffer readValue(ReadableByteChannel channel, ByteBuffer tmp) throws IOException {
         tmp.position(0);
         channel.read(tmp);
         tmp.position(0);
-        ByteBuffer byteBuffer = ByteBuffer.allocate(tmp.getInt());
+        int num = tmp.getInt();
+        if(num == -1){
+            return null;
+        }
+        ByteBuffer byteBuffer = ByteBuffer.allocate(num);
         channel.read(byteBuffer);
         byteBuffer.position(0);
         return byteBuffer;
@@ -97,9 +136,15 @@ public class MyDAO implements DAO {
 
     private static void writeInt(ByteBuffer value, WritableByteChannel channel, ByteBuffer tmp) throws IOException {
         tmp.position(0);
-        tmp.putInt(value.remaining());
-        tmp.position(0);
-        channel.write(tmp);
-        channel.write(value);
+        if(value == null){
+            tmp.putInt(-1);
+            tmp.position(0);
+            channel.write(tmp);
+        } else {
+            tmp.putInt(value.remaining());
+            tmp.position(0);
+            channel.write(tmp);
+            channel.write(value);
+        }
     }
 }
