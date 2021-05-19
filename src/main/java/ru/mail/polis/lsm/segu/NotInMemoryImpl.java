@@ -22,9 +22,6 @@ import java.util.concurrent.ConcurrentSkipListMap;
  */
 
 public class NotInMemoryImpl implements DAO {
-
-    private final Logger logger = LoggerFactory.getLogger(getClass().getName());
-
     private final SortedMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
 
     private final DAOConfig config;
@@ -36,13 +33,9 @@ public class NotInMemoryImpl implements DAO {
      * @param config - конфиг
      */
 
-    public NotInMemoryImpl(DAOConfig config) {
+    public NotInMemoryImpl(DAOConfig config) throws IOException {
         this.config = config;
-        try {
-            initStorage();
-        } catch (IOException e) {
-            logger.error("Failed to init file");
-        }
+        initStorage();
     }
 
     private void initStorage() throws IOException {
