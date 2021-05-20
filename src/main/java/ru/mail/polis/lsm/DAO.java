@@ -4,6 +4,7 @@ import javax.annotation.Nullable;
 import java.io.Closeable;
 import java.nio.ByteBuffer;
 import java.util.Iterator;
+import java.util.List;
 
 /**
  * Minimal database API.
@@ -32,4 +33,9 @@ public interface DAO extends Closeable {
 
         return result;
     }
+
+    static Iterator<Record> merge(List<Iterator<Record>> iterators) {
+        throw new UnsupportedOperationException("Implement me");
+    }
+
 }
