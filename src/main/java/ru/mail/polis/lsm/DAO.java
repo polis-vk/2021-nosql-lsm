@@ -78,10 +78,18 @@ public interface DAO extends Closeable {
         while (leftRecord != null || rightRecord != null) {
             if (leftRecord == null) {
                 records.put(rightRecord.getKey(), rightRecord);
-                rightRecord = right.hasNext() ? right.next() : null;
+                rightRecord = null;
+                while (right.hasNext()) {
+                    rightRecord = right.next();
+                    records.put(rightRecord.getKey(), rightRecord);
+                }
             } else if (rightRecord == null) {
                 records.put(leftRecord.getKey(), leftRecord);
-                leftRecord = left.hasNext() ? left.next() : null;
+                leftRecord = null;
+                while (left.hasNext()) {
+                    leftRecord = left.next();
+                    records.put(leftRecord.getKey(), leftRecord);
+                }
             } else {
                 int compareResult = leftRecord.getKey().compareTo(rightRecord.getKey());
                 if (compareResult < 0) {
