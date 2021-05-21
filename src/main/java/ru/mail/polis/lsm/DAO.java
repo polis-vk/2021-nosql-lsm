@@ -66,48 +66,34 @@ public interface DAO extends Closeable {
      * @return merged iterator
      */
     static Iterator<Record> mergeTwoIterators(Iterator<Record> left, Iterator<Record> right) {
+        if (!left.hasNext()) {
+            return right;
+        }
+        if (!right.hasNext()) {
+            return left;
+        }
         SortedMap<ByteBuffer, Record> records = new ConcurrentSkipListMap<>();
-        Record leftRecord = null;
-        boolean leftAdded = true;
-        Record rightRecord = null;
-        boolean rightAdded = true;
-        while (left.hasNext() || right.hasNext() || !leftAdded || !rightAdded) {
-            if (!left.hasNext() && leftAdded) {
-                if (rightAdded) {
-                    rightRecord = right.next();
-                    records.put(rightRecord.getKey(), rightRecord);
-                } else {
-                    records.put(rightRecord.getKey(), rightRecord);
-                    rightAdded = true;
-                }
-            } else if (!right.hasNext() && rightAdded) {
-                if (leftAdded) {
-                    leftRecord = left.next();
-                    records.put(leftRecord.getKey(), leftRecord);
-                } else {
-                    records.put(leftRecord.getKey(), leftRecord);
-                    leftAdded = true;
-                }
+        Record leftRecord = left.next();
+        Record rightRecord = right.next();
+        while (leftRecord != null || rightRecord != null) {
+            if (leftRecord == null) {
+                records.put(rightRecord.getKey(), rightRecord);
+                rightRecord = right.hasNext() ? right.next() : null;
+            } else if (rightRecord == null) {
+                records.put(leftRecord.getKey(), leftRecord);
+                leftRecord = left.hasNext() ? left.next() : null;
             } else {
-                if (leftAdded) {
-                    leftRecord = left.next();
-                }
-                if (rightAdded) {
-                    rightRecord = right.next();
-                }
                 int compareResult = leftRecord.getKey().compareTo(rightRecord.getKey());
                 if (compareResult < 0) {
                     records.put(leftRecord.getKey(), leftRecord);
-                    leftAdded = true;
-                    rightAdded = false;
+                    leftRecord = left.hasNext() ? left.next() : null;
                 } else if (compareResult > 0) {
                     records.put(rightRecord.getKey(), rightRecord);
-                    leftAdded = false;
-                    rightAdded = true;
+                    rightRecord = right.hasNext() ? right.next() : null;
                 } else {
                     records.put(rightRecord.getKey(), rightRecord);
-                    leftAdded = true;
-                    rightAdded = true;
+                    leftRecord = left.hasNext() ? left.next() : null;
+                    rightRecord = right.hasNext() ? right.next() : null;
                 }
             }
         }
