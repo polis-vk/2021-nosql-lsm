@@ -7,12 +7,17 @@ import ru.mail.polis.lsm.Record;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.io.IOException;
+import java.lang.ref.Cleaner;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
+import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.util.Iterator;
 import java.util.SortedMap;
@@ -23,42 +28,61 @@ import java.util.concurrent.ConcurrentSkipListMap;
  */
 public class PersistenceDAO implements DAO {
 
+    private static final Method CLEAN;
+    static {
+        try {
+            Class<?> clazz = Class.forName("sun.nio.ch.FileChannelImpl");
+            CLEAN = clazz.getDeclaredMethod("unmap", MappedByteBuffer.class);
+            CLEAN.setAccessible(true);
+        } catch (ClassNotFoundException | NoSuchMethodException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
     private static final String SAVE_FILE_NAME = "save.dat";
+    private static final String TMP_FILE_NAME = "tmp.dat";
     private final SortedMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
+    @SuppressWarnings({"FieldCanBeLocal", "unused"})
     private final DAOConfig config;
+
+    private final Path saveFileName;
+    private final Path tmpFileName;
+
+    private final MappedByteBuffer mappedByteBuffer;
 
     /**
      * Constructs a Persistent DAO object, getting data from the save file.
      *
      * @param config DAO config
      */
-    public PersistenceDAO(DAOConfig config) {
+    public PersistenceDAO(DAOConfig config) throws IOException {
         this.config = config;
 
-        final Path resolve = config.getDir().resolve(SAVE_FILE_NAME);
-        if (Files.exists(resolve)) {
-            try (FileChannel fileChannel = FileChannel.open(resolve, StandardOpenOption.READ,
-                    StandardOpenOption.CREATE_NEW)) {
-                final ByteBuffer size = ByteBuffer.allocate(Integer.BYTES);
-                while (fileChannel.position() < fileChannel.size()) {
-                    final ByteBuffer key = readValue(fileChannel, size);
-                    final ByteBuffer value = readValue(fileChannel, size);
+        saveFileName = config.getDir().resolve(SAVE_FILE_NAME);
+        tmpFileName = config.getDir().resolve(TMP_FILE_NAME);
+        if (!Files.exists(saveFileName)) {
+            if (Files.exists(tmpFileName)) {
+                Files.move(tmpFileName, saveFileName, StandardCopyOption.ATOMIC_MOVE);
+            }
+            mappedByteBuffer = null;
+        } else {
+            try (FileChannel fileChannel = FileChannel.open(saveFileName, StandardOpenOption.READ)) {
+                mappedByteBuffer = fileChannel.map(FileChannel.MapMode.READ_ONLY, 0, fileChannel.size());
+                while (mappedByteBuffer.hasRemaining()) {
+                    int keySize = mappedByteBuffer.getInt();
+                    ByteBuffer key = mappedByteBuffer.slice().limit(keySize).asReadOnlyBuffer();
+
+                    mappedByteBuffer.position(mappedByteBuffer.position() + keySize);
+
+                    int valueSize = mappedByteBuffer.getInt();
+                    ByteBuffer value = mappedByteBuffer.slice().limit(valueSize).asReadOnlyBuffer();
+
+                    mappedByteBuffer.position(mappedByteBuffer.position() + valueSize);
+
                     storage.put(key, Record.of(key, value));
                 }
-            } catch (IOException e) {
-                e.printStackTrace();
             }
         }
-    }
-
-    private ByteBuffer readValue(ReadableByteChannel channel, ByteBuffer tmp) throws IOException {
-        tmp.position(0);
-        channel.read(tmp);
-        tmp.position(0);
-        final ByteBuffer byteBuffer = ByteBuffer.allocate(tmp.getInt());
-        channel.read(byteBuffer);
-        byteBuffer.position(0);
-        return byteBuffer;
     }
 
     @Override
@@ -91,21 +115,30 @@ public class PersistenceDAO implements DAO {
 
     @Override
     public void close() throws IOException {
-        Files.deleteIfExists(config.getDir().resolve(SAVE_FILE_NAME));
-
-        final Path file = config.getDir().resolve(SAVE_FILE_NAME);
-
-        if (!file.toFile().exists()) {
-            Files.createFile(file);
-        }
-
-        try (FileChannel fileChannel = FileChannel.open(file, StandardOpenOption.WRITE)) {
+        try (FileChannel fileChannel = FileChannel.open(
+                tmpFileName,
+                StandardOpenOption.CREATE_NEW,
+                StandardOpenOption.WRITE,
+                StandardOpenOption.TRUNCATE_EXISTING
+        )) {
             final ByteBuffer size = ByteBuffer.allocate(Integer.BYTES);
             for (final Record record : storage.values()) {
                 writeInt(record.getKey(), fileChannel, size);
                 writeInt(record.getValue(), fileChannel, size);
             }
+            fileChannel.force(false);
         }
+
+        if (mappedByteBuffer != null) {
+            try {
+                CLEAN.invoke(null, mappedByteBuffer);
+            } catch (InvocationTargetException | IllegalAccessException e) {
+                throw new IllegalStateException(e);
+            }
+        }
+
+        Files.deleteIfExists(saveFileName);
+        Files.move(tmpFileName, saveFileName, StandardCopyOption.ATOMIC_MOVE);
     }
 
     private void writeInt(ByteBuffer value, WritableByteChannel channel, ByteBuffer tmp) throws IOException {
