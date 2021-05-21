@@ -7,13 +7,11 @@ import ru.mail.polis.lsm.Record;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.io.IOException;
-import java.lang.ref.Cleaner;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
-import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -42,8 +40,6 @@ public class PersistenceDAO implements DAO {
     private static final String SAVE_FILE_NAME = "save.dat";
     private static final String TMP_FILE_NAME = "tmp.dat";
     private final SortedMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
-    @SuppressWarnings({"FieldCanBeLocal", "unused"})
-    private final DAOConfig config;
 
     private final Path saveFileName;
     private final Path tmpFileName;
@@ -56,16 +52,10 @@ public class PersistenceDAO implements DAO {
      * @param config DAO config
      */
     public PersistenceDAO(DAOConfig config) throws IOException {
-        this.config = config;
 
         saveFileName = config.getDir().resolve(SAVE_FILE_NAME);
         tmpFileName = config.getDir().resolve(TMP_FILE_NAME);
-        if (!Files.exists(saveFileName)) {
-            if (Files.exists(tmpFileName)) {
-                Files.move(tmpFileName, saveFileName, StandardCopyOption.ATOMIC_MOVE);
-            }
-            mappedByteBuffer = null;
-        } else {
+        if (Files.exists(saveFileName)) {
             try (FileChannel fileChannel = FileChannel.open(saveFileName, StandardOpenOption.READ)) {
                 mappedByteBuffer = fileChannel.map(FileChannel.MapMode.READ_ONLY, 0, fileChannel.size());
                 while (mappedByteBuffer.hasRemaining()) {
@@ -82,6 +72,11 @@ public class PersistenceDAO implements DAO {
                     storage.put(key, Record.of(key, value));
                 }
             }
+        } else {
+            if (Files.exists(tmpFileName)) {
+                Files.move(tmpFileName, saveFileName, StandardCopyOption.ATOMIC_MOVE);
+            }
+            mappedByteBuffer = null;
         }
     }
 
