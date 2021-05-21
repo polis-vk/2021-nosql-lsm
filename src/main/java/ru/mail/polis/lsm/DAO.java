@@ -37,6 +37,12 @@ public interface DAO extends Closeable {
         return result;
     }
 
+    /**
+     * Merges iterators.
+     *
+     * @param iterators iterators to merge
+     * @return merged iterator
+     */
     static Iterator<Record> merge(List<Iterator<Record>> iterators) {
         switch (iterators.size()) {
             case 0:
@@ -57,7 +63,7 @@ public interface DAO extends Closeable {
      *
      * @param left the first iterator
      * @param right the second iterator
-     * @return the merged iterator
+     * @return merged iterator
      */
     static Iterator<Record> mergeTwoIterators(Iterator<Record> left, Iterator<Record> right) {
         SortedMap<ByteBuffer, Record> records = new ConcurrentSkipListMap<>();
