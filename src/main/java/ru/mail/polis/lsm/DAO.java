@@ -52,7 +52,14 @@ public interface DAO extends Closeable {
         }
     }
 
-    static private Iterator<Record> mergeTwoIterators(Iterator<Record> left, Iterator<Record> right) {
+    /**
+     * Merges two iterators together.
+     *
+     * @param left the first iterator
+     * @param right the second iterator
+     * @return the merged iterator
+     */
+    static Iterator<Record> mergeTwoIterators(Iterator<Record> left, Iterator<Record> right) {
         SortedMap<ByteBuffer, Record> records = new ConcurrentSkipListMap<>();
         Record leftRecord = null;
         boolean leftAdded = true;
@@ -78,13 +85,9 @@ public interface DAO extends Closeable {
             } else {
                 if (leftAdded) {
                     leftRecord = left.next();
-                    //noinspection UnusedAssignment
-                    leftAdded = false;
                 }
                 if (rightAdded) {
                     rightRecord = right.next();
-                    //noinspection UnusedAssignment
-                    rightAdded = false;
                 }
                 int compareResult = leftRecord.getKey().compareTo(rightRecord.getKey());
                 if (compareResult < 0) {
