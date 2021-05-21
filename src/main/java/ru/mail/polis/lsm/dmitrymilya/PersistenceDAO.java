@@ -27,6 +27,7 @@ import java.util.concurrent.ConcurrentSkipListMap;
 public class PersistenceDAO implements DAO {
 
     private static final Method CLEAN;
+
     static {
         try {
             Class<?> clazz = Class.forName("sun.nio.ch.FileChannelImpl");

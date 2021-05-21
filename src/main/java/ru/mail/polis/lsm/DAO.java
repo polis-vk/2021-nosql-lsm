@@ -3,7 +3,10 @@ package ru.mail.polis.lsm;
 import javax.annotation.Nullable;
 import java.io.Closeable;
 import java.nio.ByteBuffer;
-import java.util.*;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.List;
+import java.util.SortedMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 
 /**
@@ -49,7 +52,7 @@ public interface DAO extends Closeable {
         }
     }
 
-    static Iterator<Record> mergeTwoIterators(Iterator<Record> left, Iterator<Record> right) {
+    static private Iterator<Record> mergeTwoIterators(Iterator<Record> left, Iterator<Record> right) {
         SortedMap<ByteBuffer, Record> records = new ConcurrentSkipListMap<>();
         Record leftRecord = null;
         boolean leftAdded = true;
