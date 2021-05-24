@@ -3,7 +3,11 @@ package ru.mail.polis.lsm;
 import javax.annotation.Nullable;
 import java.io.Closeable;
 import java.nio.ByteBuffer;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.List;
+
 
 /**
  * Minimal database API.
@@ -33,8 +37,15 @@ public interface DAO extends Closeable {
         return result;
     }
 
+    /**
+     * Adds last records to the list.
+     *
+     * @param leftRecord
+     * @param rightRecord
+     * @param list
+     */
     private static void addLast(Record leftRecord, Record rightRecord,
-                                ArrayList<Record> list) {
+                                List<Record> list) {
         int comparisonResult = leftRecord.getKey().compareTo(rightRecord.getKey());
         if (comparisonResult < 0) {
             list.add(leftRecord);
@@ -47,8 +58,15 @@ public interface DAO extends Closeable {
         }
     }
 
+    /**
+     * Merges two sorted iterators.
+     *
+     * @param left has lower priority
+     * @param right has higher priority
+     * @return iterator over merged sorted records
+     */
     static Iterator<Record> mergeTwo(Iterator<Record> left, Iterator<Record> right) {
-        ArrayList<Record> list = new ArrayList<>();
+        List<Record> list = new ArrayList<>();
 
         Record leftRecord = left.next();
         Record rightRecord = right.next();
@@ -103,10 +121,6 @@ public interface DAO extends Closeable {
                 if (comparisonResult < 0) {
                     list.add(leftRecord);
                     leftRecord = left.next();
-                } else if (comparisonResult > 0) {
-                    list.add(rightRecord);
-                    rightWasUsed = true;
-                    break;
                 } else {
                     list.add(rightRecord);
                     rightWasUsed = true;
@@ -127,6 +141,12 @@ public interface DAO extends Closeable {
         return list.iterator();
     }
 
+    /**
+     * Merges list of sorted iterators.
+     *
+     * @param iterators is list of sorted iterators
+     * @return iterator over sorted records
+     */
     static Iterator<Record> merge(List<Iterator<Record>> iterators) {
         int size = iterators.size();
         if (size == 0) {

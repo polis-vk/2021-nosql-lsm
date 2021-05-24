@@ -6,14 +6,11 @@ import ru.mail.polis.lsm.Record;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
-import java.lang.ref.Cleaner;
-import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
-import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -26,12 +23,13 @@ import java.util.concurrent.ConcurrentSkipListMap;
 public class NotJustInMemoryDAO implements DAO {
 
     private static final Method CLEAN;
+
     static {
         try {
             Class<?> aClass = Class.forName("sun.nio.ch.FileChannelImpl");
             CLEAN = aClass.getDeclaredMethod("unmap", MappedByteBuffer.class);
             CLEAN.setAccessible(true);
-        } catch (Exception e) {
+        } catch (ClassNotFoundException | NoSuchMethodException e) {
             throw new IllegalStateException();
         }
     }
@@ -72,22 +70,11 @@ public class NotJustInMemoryDAO implements DAO {
                 ByteBuffer key = mmap.slice().limit(keySize).asReadOnlyBuffer();
                 mmap.position(mmap.position() + keySize);
                 int valueSize = mmap.getInt();
-                ByteBuffer value =mmap.slice().limit(valueSize).asReadOnlyBuffer();
+                ByteBuffer value = mmap.slice().limit(valueSize).asReadOnlyBuffer();
                 mmap.position(mmap.position() + valueSize);
                 storage.put(key, Record.of(key, value));
             }
         }
-
-//        if (Files.exists(saveFileName)) {
-//            try (FileChannel fileChannel = FileChannel.open(saveFileName, StandardOpenOption.READ)) {
-//                final ByteBuffer size = ByteBuffer.allocate(Integer.BYTES);
-//                while (fileChannel.position() < fileChannel.size()) {
-//                    final ByteBuffer key = readValue(fileChannel, size);
-//                    final ByteBuffer value = readValue(fileChannel, size);
-//                    storage.put(key, Record.of(key, value));
-//                }
-//            }
-//        }
     }
 
     @Override
@@ -122,7 +109,7 @@ public class NotJustInMemoryDAO implements DAO {
             try {
                 CLEAN.invoke(null, mmap);
             } catch (IllegalAccessException | InvocationTargetException e) {
-                throw new IllegalStateException();
+                throw new IllegalStateException(e);
             }
         }
 
@@ -151,17 +138,4 @@ public class NotJustInMemoryDAO implements DAO {
         channel.write(size);
         channel.write(value);
     }
-
-//    private static ByteBuffer readValue(ReadableByteChannel channel, ByteBuffer size) throws IOException {
-//        while (size.hasRemaining()) {
-//            channel.read(size);
-//        }
-//        size.flip();
-//        final ByteBuffer value = ByteBuffer.allocate(size.getInt());
-//        size.flip();
-//        while (value.hasRemaining()) {
-//            channel.read(value);
-//        }
-//        return value.flip();
-//    }
 }
