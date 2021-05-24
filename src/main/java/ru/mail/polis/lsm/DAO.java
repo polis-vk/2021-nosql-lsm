@@ -38,110 +38,6 @@ public interface DAO extends Closeable {
     }
 
     /**
-     * Adds last records to the list.
-     *
-     * @param leftRecord
-     * @param rightRecord
-     * @param list
-     */
-    private static void addLast(Record leftRecord, Record rightRecord,
-                                List<Record> list) {
-        int comparisonResult = leftRecord.getKey().compareTo(rightRecord.getKey());
-        if (comparisonResult < 0) {
-            list.add(leftRecord);
-            list.add(rightRecord);
-        } else if (comparisonResult > 0) {
-            list.add(rightRecord);
-            list.add(leftRecord);
-        } else {
-            list.add(rightRecord);
-        }
-    }
-
-    /**
-     * Merges two sorted iterators.
-     *
-     * @param left has lower priority
-     * @param right has higher priority
-     * @return iterator over merged sorted records
-     */
-    static Iterator<Record> mergeTwo(Iterator<Record> left, Iterator<Record> right) {
-        List<Record> list = new ArrayList<>();
-
-        Record leftRecord = left.next();
-        Record rightRecord = right.next();
-
-        int comparisonResult;
-
-        while (left.hasNext() && right.hasNext()) {
-            comparisonResult = leftRecord.getKey().compareTo(rightRecord.getKey());
-            if (comparisonResult < 0) {
-                list.add(leftRecord);
-                leftRecord = left.next();
-            } else if (comparisonResult > 0) {
-                list.add(rightRecord);
-                rightRecord = right.next();
-            } else {
-                list.add(rightRecord);
-                leftRecord = left.next();
-                rightRecord = right.next();
-            }
-        }
-        if (!left.hasNext()) {
-            boolean leftWasUsed = false;
-            while (right.hasNext()) {
-                comparisonResult = leftRecord.getKey().compareTo(rightRecord.getKey());
-                if (comparisonResult < 0) {
-                    list.add(leftRecord);
-                    leftWasUsed = true;
-                    break;
-                } else if (comparisonResult > 0) {
-                    list.add(rightRecord);
-                    rightRecord = right.next();
-                } else {
-                    list.add(rightRecord);
-                    rightRecord = right.next();
-                    leftWasUsed = true;
-                    break;
-                }
-            }
-            if (leftWasUsed) {
-                while (right.hasNext()) {
-                    list.add(rightRecord);
-                    rightRecord = right.next();
-                }
-                list.add(rightRecord);
-            } else {
-                addLast(leftRecord, rightRecord, list);
-            }
-        } else {
-            boolean rightWasUsed = false;
-            while (left.hasNext()) {
-                comparisonResult = leftRecord.getKey().compareTo(rightRecord.getKey());
-                if (comparisonResult < 0) {
-                    list.add(leftRecord);
-                    leftRecord = left.next();
-                } else {
-                    list.add(rightRecord);
-                    rightWasUsed = true;
-                    break;
-                }
-            }
-            if (rightWasUsed) {
-                while (left.hasNext()) {
-                    list.add(leftRecord);
-                    leftRecord = left.next();
-                }
-                list.add(leftRecord);
-            } else {
-                addLast(leftRecord, rightRecord, list);
-            }
-        }
-
-        return list.iterator();
-    }
-
-    /**
      * Merges list of sorted iterators.
      *
      * @param iterators is list of sorted iterators
@@ -160,6 +56,61 @@ public interface DAO extends Closeable {
             Iterator<Record> left = merge(iterators.subList(0, middle));
             Iterator<Record> right = merge(iterators.subList(middle, size));
             return mergeTwo(left, right);
+        }
+    }
+
+    /**
+     * Merges two sorted iterators.
+     *
+     * @param left has lower priority
+     * @param right has higher priority
+     * @return iterator over merged sorted records
+     */
+    static Iterator<Record> mergeTwo(Iterator<Record> left, Iterator<Record> right) {
+        List<Record> list = new ArrayList<>();
+
+        Record leftRecord = nextOf(left);
+        Record rightRecord = nextOf(right);
+
+        int comparisonResult;
+
+        while (leftRecord != null && rightRecord != null) {
+            comparisonResult = leftRecord.getKey().compareTo(rightRecord.getKey());
+            if (comparisonResult < 0) {
+                list.add(leftRecord);
+                leftRecord = nextOf(left);
+            } else if (comparisonResult > 0) {
+                list.add(rightRecord);
+                rightRecord = nextOf(right);
+            } else {
+                list.add(rightRecord);
+                leftRecord = nextOf(left);
+                rightRecord = nextOf(right);
+            }
+        }
+        while (leftRecord != null) {
+            list.add(leftRecord);
+            leftRecord = nextOf(left);
+        }
+        while (rightRecord != null) {
+            list.add(rightRecord);
+            rightRecord = nextOf(right);
+        }
+
+        return list.iterator();
+    }
+
+    /**
+     * Gets next record if it exists.
+     *
+     * @param iterator is an Iterator over sorted records
+     * @return next record or null
+     */
+    private static Record nextOf(Iterator<Record> iterator) {
+        if (iterator.hasNext()) {
+            return iterator.next();
+        } else {
+            return null;
         }
     }
 }
