@@ -6,8 +6,6 @@ import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
-import java.util.SortedMap;
-import java.util.concurrent.ConcurrentSkipListMap;
 
 /**
  * Minimal database API.
@@ -72,41 +70,58 @@ public interface DAO extends Closeable {
         if (!right.hasNext()) {
             return left;
         }
-        SortedMap<ByteBuffer, Record> records = new ConcurrentSkipListMap<>();
-        Record leftRecord = left.next();
-        Record rightRecord = right.next();
-        while (leftRecord != null || rightRecord != null) {
-            if (leftRecord == null) {
-                records.put(rightRecord.getKey(), rightRecord);
-                rightRecord = null;
-                while (right.hasNext()) {
-                    rightRecord = right.next();
-                    records.put(rightRecord.getKey(), rightRecord);
-                }
-            } else if (rightRecord == null) {
-                records.put(leftRecord.getKey(), leftRecord);
-                leftRecord = null;
-                while (left.hasNext()) {
-                    leftRecord = left.next();
-                    records.put(leftRecord.getKey(), leftRecord);
-                }
-            } else {
-                int compareResult = leftRecord.getKey().compareTo(rightRecord.getKey());
-                if (compareResult < 0) {
-                    records.put(leftRecord.getKey(), leftRecord);
-                    leftRecord = left.hasNext() ? left.next() : null;
-                } else if (compareResult > 0) {
-                    records.put(rightRecord.getKey(), rightRecord);
-                    rightRecord = right.hasNext() ? right.next() : null;
-                } else {
-                    records.put(rightRecord.getKey(), rightRecord);
-                    leftRecord = left.hasNext() ? left.next() : null;
-                    rightRecord = right.hasNext() ? right.next() : null;
-                }
-            }
+
+        return new MergedRecordIterator<>(left, right);
+    }
+
+    class MergedRecordIterator<E extends Record> implements Iterator<E> {
+
+        private final Iterator<E> left;
+        private final Iterator<E> right;
+
+        private E leftNext;
+        private E rightNext;
+
+        public MergedRecordIterator(Iterator<E> left, Iterator<E> right) {
+            this.left = left;
+            this.right = right;
+            leftNext = left.hasNext() ? left.next() : null;
+            rightNext = right.hasNext() ? right.next() : null;
         }
 
-        return records.values().iterator();
+        @Override
+        public boolean hasNext() {
+            return leftNext != null || rightNext != null;
+        }
+
+        @Override
+        public E next() {
+            if (leftNext != null && rightNext != null) {
+                int compareResult = leftNext.getKey().compareTo(rightNext.getKey());
+                if (compareResult < 0) {
+                    E toReturn = leftNext;
+                    leftNext = left.hasNext() ? left.next() : null;
+                    return toReturn;
+                } else if (compareResult > 0) {
+                    E toReturn = rightNext;
+                    rightNext = right.hasNext() ? right.next() : null;
+                    return toReturn;
+                } else {
+                    E toReturn = rightNext;
+                    leftNext = left.hasNext() ? left.next() : null;
+                    rightNext = right.hasNext() ? right.next() : null;
+                    return toReturn;
+                }
+            } else if (leftNext == null) {
+                E toReturn = rightNext;
+                rightNext = right.hasNext() ? right.next() : null;
+                return toReturn;
+            } else {
+                E toReturn = leftNext;
+                leftNext = left.hasNext() ? left.next() : null;
+                return toReturn;
+            }
+        }
     }
 
 }
