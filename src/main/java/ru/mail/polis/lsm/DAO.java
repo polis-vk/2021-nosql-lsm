@@ -47,7 +47,6 @@ public interface DAO extends Closeable {
                 this.source = source;
             }
 
-
             public Record getData() {
                 return data;
             }
@@ -79,7 +78,6 @@ public interface DAO extends Closeable {
 
         while (!queue.isEmpty()) {
             QueueUnit current = queue.poll();
-
 
             Iterator<Record> currentIter = iterators.get(current.getSourceNumber());
             if (result.isEmpty() || !current.getData().getKey().equals(result.get(result.size() - 1).getKey())) {

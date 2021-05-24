@@ -21,7 +21,6 @@ public class DaoImpl implements DAO {
 
     private static final Method CLEAN;
 
-
     static {
         try {
             Class<?> aClass = Class.forName("sun.nio.ch.FileChannelImpl");
@@ -74,16 +73,6 @@ public class DaoImpl implements DAO {
                 map.put(key, Record.of(key, value));
             }
         }
-    }
-
-    private ByteBuffer readBuffer(FileChannel fileChannel, ByteBuffer buffer) throws IOException {
-        buffer.position(0);
-        fileChannel.read(buffer);
-        buffer.position(0);
-        final ByteBuffer tmp = ByteBuffer.allocate(buffer.getInt());
-        fileChannel.read(tmp);
-        tmp.position(0);
-        return tmp;
     }
 
     @Override

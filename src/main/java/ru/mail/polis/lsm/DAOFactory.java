@@ -1,8 +1,6 @@
 package ru.mail.polis.lsm;
 
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.TreeMap;
 
 public final class DAOFactory {
 
