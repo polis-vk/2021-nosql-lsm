@@ -6,12 +6,18 @@ import ru.mail.polis.lsm.Record;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
+import java.lang.ref.Cleaner;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
+import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.util.Iterator;
 import java.util.SortedMap;
@@ -19,9 +25,24 @@ import java.util.concurrent.ConcurrentSkipListMap;
 
 public class NotJustInMemoryDAO implements DAO {
 
+    private static final Method CLEAN;
+    static {
+        try {
+            Class<?> aClass = Class.forName("sun.nio.ch.FileChannelImpl");
+            CLEAN = aClass.getDeclaredMethod("unmap", MappedByteBuffer.class);
+            CLEAN.setAccessible(true);
+        } catch (Exception e) {
+            throw new IllegalStateException();
+        }
+    }
+
     private final SortedMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
+    @SuppressWarnings("unused")
     private final DAOConfig config;
-    private static final String SAVE_FILE_NAME = "save.dat";
+
+    private final Path saveFileName;
+    private final Path tmpFileName;
+    private final MappedByteBuffer mmap;
 
     /**
      * Restore data if the file exists.
@@ -32,18 +53,41 @@ public class NotJustInMemoryDAO implements DAO {
     public NotJustInMemoryDAO(DAOConfig config) throws IOException {
         this.config = config;
 
-        final Path path = config.getDir().resolve(SAVE_FILE_NAME);
+        saveFileName = config.getDir().resolve("save.dat");
+        tmpFileName = config.getDir().resolve("tmp.dat");
 
-        if (Files.exists(path)) {
-            try (FileChannel fileChannel = FileChannel.open(path, StandardOpenOption.READ)) {
-                final ByteBuffer size = ByteBuffer.allocate(Integer.BYTES);
-                while (fileChannel.position() < fileChannel.size()) {
-                    final ByteBuffer key = readValue(fileChannel, size);
-                    final ByteBuffer value = readValue(fileChannel, size);
-                    storage.put(key, Record.of(key, value));
-                }
+        if (!Files.exists(saveFileName)) {
+            if (Files.exists(tmpFileName)) {
+                Files.move(tmpFileName, saveFileName, StandardCopyOption.ATOMIC_MOVE);
+            } else {
+                mmap = null;
+                return;
             }
         }
+
+        try (FileChannel channel = FileChannel.open(saveFileName, StandardOpenOption.READ)) {
+            mmap = channel.map(FileChannel.MapMode.READ_ONLY, 0, channel.size());
+            while (mmap.hasRemaining()) {
+                int keySize = mmap.getInt();
+                ByteBuffer key = mmap.slice().limit(keySize).asReadOnlyBuffer();
+                mmap.position(mmap.position() + keySize);
+                int valueSize = mmap.getInt();
+                ByteBuffer value =mmap.slice().limit(valueSize).asReadOnlyBuffer();
+                mmap.position(mmap.position() + valueSize);
+                storage.put(key, Record.of(key, value));
+            }
+        }
+
+//        if (Files.exists(saveFileName)) {
+//            try (FileChannel fileChannel = FileChannel.open(saveFileName, StandardOpenOption.READ)) {
+//                final ByteBuffer size = ByteBuffer.allocate(Integer.BYTES);
+//                while (fileChannel.position() < fileChannel.size()) {
+//                    final ByteBuffer key = readValue(fileChannel, size);
+//                    final ByteBuffer value = readValue(fileChannel, size);
+//                    storage.put(key, Record.of(key, value));
+//                }
+//            }
+//        }
     }
 
     @Override
@@ -63,9 +107,7 @@ public class NotJustInMemoryDAO implements DAO {
 
     @Override
     public void close() throws IOException {
-        final Path path = config.getDir().resolve(SAVE_FILE_NAME);
-
-        try (FileChannel fileChannel = FileChannel.open(path, StandardOpenOption.WRITE,
+        try (FileChannel fileChannel = FileChannel.open(tmpFileName, StandardOpenOption.WRITE,
                 StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
 
             final ByteBuffer size = ByteBuffer.allocate(Integer.BYTES);
@@ -75,6 +117,17 @@ public class NotJustInMemoryDAO implements DAO {
                 writeValue(record.getValue(), fileChannel, size);
             }
         }
+
+        if (mmap != null) {
+            try {
+                CLEAN.invoke(null, mmap);
+            } catch (IllegalAccessException | InvocationTargetException e) {
+                throw new IllegalStateException();
+            }
+        }
+
+        Files.deleteIfExists(saveFileName);
+        Files.move(tmpFileName, saveFileName, StandardCopyOption.ATOMIC_MOVE);
     }
 
     private SortedMap<ByteBuffer, Record> map(@Nullable final ByteBuffer fromKey,
@@ -99,16 +152,16 @@ public class NotJustInMemoryDAO implements DAO {
         channel.write(value);
     }
 
-    private static ByteBuffer readValue(ReadableByteChannel channel, ByteBuffer size) throws IOException {
-        while (size.hasRemaining()) {
-            channel.read(size);
-        }
-        size.flip();
-        final ByteBuffer value = ByteBuffer.allocate(size.getInt());
-        size.flip();
-        while (value.hasRemaining()) {
-            channel.read(value);
-        }
-        return value.flip();
-    }
+//    private static ByteBuffer readValue(ReadableByteChannel channel, ByteBuffer size) throws IOException {
+//        while (size.hasRemaining()) {
+//            channel.read(size);
+//        }
+//        size.flip();
+//        final ByteBuffer value = ByteBuffer.allocate(size.getInt());
+//        size.flip();
+//        while (value.hasRemaining()) {
+//            channel.read(value);
+//        }
+//        return value.flip();
+//    }
 }
