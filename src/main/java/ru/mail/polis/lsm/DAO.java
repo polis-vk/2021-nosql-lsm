@@ -4,9 +4,11 @@ import javax.annotation.Nullable;
 import java.io.Closeable;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.PriorityQueue;
+import java.util.Set;
 
 /**
  * Minimal database API.
@@ -73,17 +75,26 @@ public interface DAO extends Closeable {
 
         PriorityQueue<QueueUnit> queue = new PriorityQueue<>();
 
+        List<Set<ByteBuffer>> visited = new ArrayList<>();
+
         for (int iterNumber = 0; iterNumber < iterators.size(); iterNumber++) {
             Iterator<Record> iterator = iterators.get(iterNumber);
             if (iterator.hasNext()) {
                 queue.add(new QueueUnit(iterator.next(), iterNumber));
             }
+            visited.add(new HashSet<ByteBuffer>());
         }
 
-        ArrayList<Record> result = new ArrayList<Record>();
+        ArrayList<Record> result = new ArrayList<>();
 
         while (!queue.isEmpty()) {
             QueueUnit current = queue.poll();
+
+            if (visited.get(current.getSourceNumber()).contains(current.getData().getKey())) {
+                continue;
+            }
+
+            visited.get(current.getSourceNumber()).add(current.getData().getKey());
 
             Iterator<Record> currentIter = iterators.get(current.getSourceNumber());
             if (result.isEmpty() || !current.getData().getKey().equals(result.get(result.size() - 1).getKey())) {

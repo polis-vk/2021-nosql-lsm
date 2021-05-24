@@ -59,13 +59,14 @@ class MergeTest {
 
             List<Iterator<Record>> iterators = dao.stream().map(d -> d.range(null, null)).collect(Collectors.toList());
             List<Iterator<Record>> cycledIterators = dao.stream().map(d -> {
-                List<Record> list = new ArrayList<Record>();
+                List<Record> list = new ArrayList<>();
                 d.range(null, null).forEachRemaining(list::add);
                 return new CycledIterator(list);
             }).collect(Collectors.toList());
 
             Iterator<Record> iterator = DAO.merge(iterators);
             Iterator<Record> cycledIterator = DAO.merge(cycledIterators);
+
             for (Map.Entry<String, Integer> entry : expected.entrySet()) {
                 if (!iterator.hasNext()) {
                     throw new AssertionFailedError("Iterator ended on key " + entry.getKey());
