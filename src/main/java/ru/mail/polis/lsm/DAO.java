@@ -36,6 +36,12 @@ public interface DAO extends Closeable {
         return result;
     }
 
+    /**
+     * Merge iterators.
+     *
+     * @param iterators list of iterators
+     * @return merged iterator
+     */
     static Iterator<Record> merge(List<Iterator<Record>> iterators) {
 
         class QueueUnit implements Comparable<QueueUnit> {
