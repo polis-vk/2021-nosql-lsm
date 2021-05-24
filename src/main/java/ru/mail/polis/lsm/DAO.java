@@ -43,83 +43,84 @@ public interface DAO extends Closeable {
      * @return merged iterator
      */
     static Iterator<Record> merge(List<Iterator<Record>> iterators) {
-        class QueueUnit implements Comparable<QueueUnit> {
-            private final Record data;
-            private final int source;
-
-            public QueueUnit(Record data, int source) {
-                this.data = data;
-                this.source = source;
-            }
-
-            public Record getData() {
-                return data;
-            }
-
-            public int getSourceNumber() {
-                return source;
-            }
-
-            @Override
-            public int compareTo(QueueUnit o) {
-                int keyCompare = data.getKey().compareTo(o.getData().getKey());
-                if (keyCompare == 0) {
-                    return o.getSourceNumber() - source;
-                }
-                return keyCompare;
-            }
-        }
-
-        class MergeIterator implements Iterator<Record> {
-            private final PriorityQueue<QueueUnit> queue = new PriorityQueue<>();
-            private final List<Iterator<Record>> iterators;
-            private Record lastReturned;
-
-            public MergeIterator(List<Iterator<Record>> iterators) {
-                this.iterators = iterators;
-                initQueue(iterators);
-            }
-
-            private void initQueue(List<Iterator<Record>> iterators) {
-                for (int iterNumber = 0; iterNumber < iterators.size(); iterNumber++) {
-                    Iterator<Record> iterator = iterators.get(iterNumber);
-                    if (iterator.hasNext()) {
-                        queue.add(new QueueUnit(iterator.next(), iterNumber));
-                    }
-                }
-            }
-
-            @Override
-            public boolean hasNext() {
-                return queue.size() > 1;
-            }
-
-            @Override
-            public Record next() {
-                if (queue.isEmpty()) {
-                    throw new NoSuchElementException();
-                }
-
-                Record result = null;
-
-                while (!queue.isEmpty() && result == null) {
-                    QueueUnit current = queue.poll();
-
-                    Iterator<Record> currentIter = iterators.get(current.getSourceNumber());
-                    if (lastReturned == null || !current.getData().getKey().equals(lastReturned.getKey())) {
-                        result = current.getData();
-                        lastReturned = result;
-                    }
-
-                    if (currentIter.hasNext()) {
-                        queue.add(new QueueUnit(currentIter.next(), current.getSourceNumber()));
-                    }
-                }
-
-                return result;
-            }
-        }
-
         return new MergeIterator(iterators);
     }
+
+    class QueueUnit implements Comparable<QueueUnit> {
+        private final Record data;
+        private final int source;
+
+        public QueueUnit(Record data, int source) {
+            this.data = data;
+            this.source = source;
+        }
+
+        public Record getData() {
+            return data;
+        }
+
+        public int getSourceNumber() {
+            return source;
+        }
+
+        @Override
+        public int compareTo(QueueUnit o) {
+            int keyCompare = data.getKey().compareTo(o.getData().getKey());
+            if (keyCompare == 0) {
+                return o.getSourceNumber() - source;
+            }
+            return keyCompare;
+        }
+    }
+
+    class MergeIterator implements Iterator<Record> {
+        private final PriorityQueue<QueueUnit> queue = new PriorityQueue<>();
+        private final List<Iterator<Record>> iterators;
+        private Record lastReturned;
+
+        public MergeIterator(List<Iterator<Record>> iterators) {
+            this.iterators = iterators;
+            initQueue(iterators);
+        }
+
+        private void initQueue(List<Iterator<Record>> iterators) {
+            for (int iterNumber = 0; iterNumber < iterators.size(); iterNumber++) {
+                Iterator<Record> iterator = iterators.get(iterNumber);
+                if (iterator.hasNext()) {
+                    queue.add(new QueueUnit(iterator.next(), iterNumber));
+                }
+            }
+        }
+
+        @Override
+        public boolean hasNext() {
+            return queue.size() > 1;
+        }
+
+        @Override
+        public Record next() {
+            if (queue.isEmpty()) {
+                throw new NoSuchElementException();
+            }
+
+            Record result = null;
+
+            while (!queue.isEmpty() && result == null) {
+                QueueUnit current = queue.poll();
+
+                Iterator<Record> currentIter = iterators.get(current.getSourceNumber());
+                if (lastReturned == null || !current.getData().getKey().equals(lastReturned.getKey())) {
+                    result = current.getData();
+                    lastReturned = result;
+                }
+
+                if (currentIter.hasNext()) {
+                    queue.add(new QueueUnit(currentIter.next(), current.getSourceNumber()));
+                }
+            }
+
+            return result;
+        }
+    }
+
 }
