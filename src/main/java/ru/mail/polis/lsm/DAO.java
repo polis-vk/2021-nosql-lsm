@@ -34,6 +34,10 @@ public interface DAO extends Closeable {
         return result;
     }
 
+    /**
+     * Function that merge k iterators to one.
+     */
+
     static Iterator<Record> merge(List<Iterator<Record>> iterators) {
         if (iterators.isEmpty()) {
             return Collections.emptyIterator();
@@ -68,6 +72,7 @@ public interface DAO extends Closeable {
     /**
      * Function that merge two iterators to one.
      */
+
     static Iterator<Record> mergeTwo(Iterator<Record> left, Iterator<Record> right) {
         if (!left.hasNext() && !right.hasNext()) {
             return Collections.emptyIterator();
