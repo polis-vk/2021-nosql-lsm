@@ -9,7 +9,6 @@ import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -59,17 +58,34 @@ class MergeTest {
             }
 
             List<Iterator<Record>> iterators = dao.stream().map(d -> d.range(null, null)).collect(Collectors.toList());
+            List<Iterator<Record>> cycledIterators = dao.stream().map(d -> {
+                List<Record> list = new ArrayList<Record>();
+                d.range(null, null).forEachRemaining(list::add);
+                return new CycledIterator(list);
+            }).collect(Collectors.toList());
+
             Iterator<Record> iterator = DAO.merge(iterators);
+            Iterator<Record> cycledIterator = DAO.merge(cycledIterators);
             for (Map.Entry<String, Integer> entry : expected.entrySet()) {
                 if (!iterator.hasNext()) {
                     throw new AssertionFailedError("Iterator ended on key " + entry.getKey());
                 }
+                if (!cycledIterator.hasNext()) {
+                    throw new AssertionFailedError("Cycled iterator ended on key " + entry.getKey());
+                }
                 Record next = iterator.next();
+                Record cycledNext = cycledIterator.next();
                 assertEquals(Utils.toString(key(Integer.parseInt(entry.getKey()))), Utils.toString(next.getKey()));
                 assertEquals(Utils.toString(valueWithSuffix(entry.getValue(), suffix)), Utils.toString(next.getValue()));
+
+                assertEquals(Utils.toString(key(Integer.parseInt(entry.getKey()))), Utils.toString(cycledNext.getKey()));
+                assertEquals(Utils.toString(valueWithSuffix(entry.getValue(), suffix)), Utils.toString(cycledNext.getValue()));
             }
             if (iterator.hasNext()) {
                 throw new AssertionFailedError("Iterator has extra record with key " + iterator.next().getKey());
+            }
+            if (cycledIterator.hasNext()) {
+                throw new AssertionFailedError("Cycled iterator has extra record with key " + iterator.next().getKey());
             }
         } catch (OutOfMemoryError ez) {
             throw new RuntimeException(ez);  // NEVER DO IT IN PRODUCTION CODE!!!
@@ -95,5 +111,34 @@ class MergeTest {
         Path child = data.resolve("child_" + prefix);
         Files.createDirectories(child);
         return TestDaoWrapper.create(new DAOConfig(child));
+    }
+
+    /**
+     * Cycled iterator class for infinite iterator test.
+     */
+    private static class CycledIterator implements Iterator<Record> {
+        private final List<Record> data;
+        private int current;
+        public CycledIterator(List<Record> data) {
+            this.data = data;
+        }
+        @Override
+        public boolean hasNext() {
+            return data.size() > 0;
+        }
+
+        @Override
+        public Record next() {
+            return data.get((current++) % data.size());
+        }
+
+        @Override
+        public void remove() {
+            if (current - 1 < 0) {
+                data.remove(data.size() - 1);
+            } else {
+                data.remove(current - 1);
+            }
+        }
     }
 }
