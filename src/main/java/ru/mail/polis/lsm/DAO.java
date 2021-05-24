@@ -3,7 +3,10 @@ package ru.mail.polis.lsm;
 import javax.annotation.Nullable;
 import java.io.Closeable;
 import java.nio.ByteBuffer;
-import java.util.*;
+import java.util.Iterator;
+import java.util.List;
+import java.util.NoSuchElementException;
+import java.util.PriorityQueue;
 
 /**
  * Minimal database API.
@@ -70,7 +73,7 @@ public interface DAO extends Closeable {
         class MergeIterator implements Iterator<Record> {
             private final PriorityQueue<QueueUnit> queue = new PriorityQueue<>();
             private final List<Iterator<Record>> iterators;
-            private Record lastReturned = null;
+            private Record lastReturned;
 
             public MergeIterator(List<Iterator<Record>> iterators) {
                 this.iterators = iterators;
@@ -104,7 +107,7 @@ public interface DAO extends Closeable {
 
                     Iterator<Record> currentIter = iterators.get(current.getSourceNumber());
                     if (lastReturned == null || !current.getData().getKey().equals(lastReturned.getKey())) {
-                        result =  current.getData();
+                        result = current.getData();
                         lastReturned = result;
                     }
 
