@@ -68,6 +68,7 @@ public interface DAO extends Closeable {
     /**
      * Function that merge two iterators to one.
      */
+
     static Iterator<Record> mergeTwo(Iterator<Record> left, Iterator<Record> right) {
 
         if (!left.hasNext() && !right.hasNext()) {
