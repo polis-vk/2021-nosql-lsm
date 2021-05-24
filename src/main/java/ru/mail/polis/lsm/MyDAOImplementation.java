@@ -22,10 +22,10 @@ public class MyDAOImplementation implements DAO {
 
     static {
         try {
-            Class<?> aClass = Class.forName("sun.nio.ch.FileChannelImpl");
-            CLEAN = aClass.getDeclaredMethod("unmap", MappedByteBuffer.class);
+            Class<?> fileChannelImplClass = Class.forName("sun.nio.ch.FileChannelImpl");
+            CLEAN = fileChannelImplClass.getDeclaredMethod("unmap", MappedByteBuffer.class);
             CLEAN.setAccessible(true);
-        } catch (Exception e) {
+        } catch (ClassNotFoundException | NoSuchMethodException e) {
             throw new IllegalStateException(e);
         }
     }

@@ -35,7 +35,7 @@ public interface DAO extends Closeable {
     }
 
     static Iterator<Record> merge(List<Iterator<Record>> iterators) {
-        if (iterators.size() == 0) {
+        if (iterators.isEmpty()) {
             return Collections.emptyIterator();
         }
         if (iterators.size() == 1) {
@@ -65,7 +65,9 @@ public interface DAO extends Closeable {
             return null;
         }
     }
-
+    /**
+     * Function that merge two iterators to one.
+     */
     static Iterator<Record> mergeTwo(Iterator<Record> left, Iterator<Record> right) {
 
         if (!left.hasNext() && !right.hasNext()) {
