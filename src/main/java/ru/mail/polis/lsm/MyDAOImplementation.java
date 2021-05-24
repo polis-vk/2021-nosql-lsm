@@ -2,11 +2,15 @@ package ru.mail.polis.lsm;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
+import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.WritableByteChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.util.Iterator;
 import java.util.SortedMap;
@@ -14,45 +18,61 @@ import java.util.concurrent.ConcurrentSkipListMap;
 
 public class MyDAOImplementation implements DAO {
 
-    private static final String SAVE_FILE_NAME = "save_dao.data";
-    private final SortedMap<ByteBuffer, Record> storage;
+    private static final Method CLEAN;
+
+    static {
+        try {
+            Class<?> aClass = Class.forName("sun.nio.ch.FileChannelImpl");
+            CLEAN = aClass.getDeclaredMethod("unmap", MappedByteBuffer.class);
+            CLEAN.setAccessible(true);
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    private final SortedMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
     private final DAOConfig config;
+
+    private final Path saveFileName;
+    private final Path tempFileName;
+
+    private final MappedByteBuffer mmap;
 
     /**
      * Implementation of DAO that save data to the memory.
      */
     public MyDAOImplementation(DAOConfig config) throws IOException {
         this.config = config;
-        this.storage = new ConcurrentSkipListMap<>();
-        Path path = config.getDir().resolve(SAVE_FILE_NAME);
 
-        if (Files.exists(path)) {
-            try (FileChannel fileChannel = FileChannel.open(path, StandardOpenOption.READ)) {
-                ByteBuffer size = ByteBuffer.allocate(Integer.BYTES);
-                ByteBuffer key;
-                ByteBuffer value;
-                while (fileChannel.position() != fileChannel.size()) {
-                    key = readValue(fileChannel, size);
-                    value = readValue(fileChannel, size);
-                    storage.put(key, Record.of(key, value));
-                }
+        Path dir = config.getDir();
+        saveFileName = dir.resolve("save.data");
+        tempFileName = dir.resolve("temp.data");
+
+        if (!Files.exists(saveFileName)) {
+            if (Files.exists(tempFileName)) {
+                Files.move(tempFileName, saveFileName, StandardCopyOption.ATOMIC_MOVE);
+            } else {
+                mmap = null;
+                return;
             }
         }
-    }
 
-    private ByteBuffer readValue(FileChannel fileChannel, ByteBuffer temp) throws IOException {
-        fullRead(temp, fileChannel);
-        ByteBuffer value = ByteBuffer.allocate(temp.getInt());
-        fullRead(value, fileChannel);
-        return value;
-    }
+        try (FileChannel fileChannel = FileChannel.open(saveFileName, StandardOpenOption.READ)) {
+            mmap = fileChannel.map(FileChannel.MapMode.READ_ONLY, 0, fileChannel.size());
+            while (mmap.hasRemaining()) {
+                int keySize = mmap.getInt();
+                ByteBuffer key = mmap.slice().limit(keySize).slice();
 
-    private void fullRead(ByteBuffer temp, FileChannel fileChannel) throws IOException {
-        temp.position(0);
-        while (temp.position() != temp.capacity()) {
-            fileChannel.read(temp);
+                mmap.position(mmap.position() + keySize);
+
+                int valueSize = mmap.getInt();
+                ByteBuffer value = mmap.slice().limit(valueSize).slice();
+
+                mmap.position(mmap.position() + valueSize);
+
+                storage.put(key, Record.of(key, value));
+            }
         }
-        temp.position(0);
     }
 
     @Override
@@ -71,16 +91,30 @@ public class MyDAOImplementation implements DAO {
 
     @Override
     public void close() throws IOException {
-        Files.deleteIfExists(config.getDir().resolve(SAVE_FILE_NAME));
-        Path path = config.getDir().resolve(SAVE_FILE_NAME);
 
-        try (FileChannel fileChannel =
-                     FileChannel.open(path, StandardOpenOption.WRITE, StandardOpenOption.CREATE_NEW)) {
+        try (FileChannel fileChannel = FileChannel.open(
+                tempFileName,
+                StandardOpenOption.CREATE_NEW,
+                StandardOpenOption.WRITE,
+                StandardOpenOption.TRUNCATE_EXISTING
+        )) {
             ByteBuffer size = ByteBuffer.allocate(Integer.BYTES);
             for (Record record : storage.values()) {
                 writeValueAndKey(record, fileChannel, size);
             }
+            fileChannel.force(false);
         }
+
+        if (mmap != null) {
+            try {
+                CLEAN.invoke(null, mmap);
+            } catch (IllegalAccessError | InvocationTargetException | IllegalAccessException e) {
+                throw new IOException(e);
+            }
+        }
+
+        Files.deleteIfExists(saveFileName);
+        Files.move(tempFileName, saveFileName, StandardCopyOption.ATOMIC_MOVE);
     }
 
     private void writeValueAndKey(Record record, FileChannel fileChannel, ByteBuffer size) throws IOException {
