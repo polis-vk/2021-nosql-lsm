@@ -3,12 +3,7 @@ package ru.mail.polis.lsm;
 import javax.annotation.Nullable;
 import java.io.Closeable;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.PriorityQueue;
-import java.util.Set;
+import java.util.*;
 
 /**
  * Minimal database API.
@@ -45,7 +40,6 @@ public interface DAO extends Closeable {
      * @return merged iterator
      */
     static Iterator<Record> merge(List<Iterator<Record>> iterators) {
-
         class QueueUnit implements Comparable<QueueUnit> {
             private final Record data;
             private final int source;
@@ -73,41 +67,56 @@ public interface DAO extends Closeable {
             }
         }
 
-        PriorityQueue<QueueUnit> queue = new PriorityQueue<>();
+        class MergeIterator implements Iterator<Record> {
+            private final PriorityQueue<QueueUnit> queue = new PriorityQueue<>();
+            private final List<Iterator<Record>> iterators;
+            private Record lastReturned = null;
 
-        List<Set<ByteBuffer>> visited = new ArrayList<>();
-
-        for (int iterNumber = 0; iterNumber < iterators.size(); iterNumber++) {
-            Iterator<Record> iterator = iterators.get(iterNumber);
-            if (iterator.hasNext()) {
-                queue.add(new QueueUnit(iterator.next(), iterNumber));
+            public MergeIterator(List<Iterator<Record>> iterators) {
+                this.iterators = iterators;
+                initQueue(iterators);
             }
-            visited.add(new HashSet<ByteBuffer>());
+
+            private void initQueue(List<Iterator<Record>> iterators) {
+                for (int iterNumber = 0; iterNumber < iterators.size(); iterNumber++) {
+                    Iterator<Record> iterator = iterators.get(iterNumber);
+                    if (iterator.hasNext()) {
+                        queue.add(new QueueUnit(iterator.next(), iterNumber));
+                    }
+                }
+            }
+
+            @Override
+            public boolean hasNext() {
+                return queue.size() > 1;
+            }
+
+            @Override
+            public Record next() {
+                if (queue.isEmpty()) {
+                    throw new NoSuchElementException();
+                }
+
+                Record result = null;
+
+                while (!queue.isEmpty() && result == null) {
+                    QueueUnit current = queue.poll();
+
+                    Iterator<Record> currentIter = iterators.get(current.getSourceNumber());
+                    if (lastReturned == null || !current.getData().getKey().equals(lastReturned.getKey())) {
+                        result =  current.getData();
+                        lastReturned = result;
+                    }
+
+                    if (currentIter.hasNext()) {
+                        queue.add(new QueueUnit(currentIter.next(), current.getSourceNumber()));
+                    }
+                }
+
+                return result;
+            }
         }
 
-        ArrayList<Record> result = new ArrayList<>();
-
-        while (!queue.isEmpty()) {
-            QueueUnit current = queue.poll();
-
-            if (visited.get(current.getSourceNumber()).contains(current.getData().getKey())) {
-                continue;
-            }
-
-            visited.get(current.getSourceNumber()).add(current.getData().getKey());
-
-            Iterator<Record> currentIter = iterators.get(current.getSourceNumber());
-            if (result.isEmpty() || !current.getData().getKey().equals(result.get(result.size() - 1).getKey())) {
-                result.add(current.getData());
-            }
-
-            if (currentIter.hasNext()) {
-                queue.add(new QueueUnit(currentIter.next(), current.getSourceNumber()));
-            }
-
-        }
-
-        return result.iterator();
+        return new MergeIterator(iterators);
     }
-
 }
