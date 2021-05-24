@@ -5,12 +5,17 @@ import ru.mail.polis.lsm.DAOConfig;
 import ru.mail.polis.lsm.Record;
 
 import javax.annotation.Nullable;
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
+import java.nio.MappedByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.channels.WritableByteChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.SortedMap;
@@ -19,34 +24,58 @@ import java.util.concurrent.ConcurrentSkipListMap;
 public class InMemoryDAO implements DAO {
 
     private final SortedMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
-    private static final String SAVE_FILE_NAME = "leonid.bat";
+
+    private static final Method CLEAN;
+    static {
+        try {
+            Class<?> aClass = Class.forName("sun.nio.ch.FileChannelImpl");
+            CLEAN = aClass.getDeclaredMethod("unmap", MappedByteBuffer.class);
+            CLEAN.setAccessible(true);
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    @SuppressWarnings({"FieldCanBeLocal", "unused"})
     private final DAOConfig config;
+
+    private final Path saveFileName;
+    private final Path tmpFileName;
+
+    private final MappedByteBuffer mmap;
 
     public InMemoryDAO(DAOConfig config) throws IOException {
         this.config = config;
 
-        final Path path = config.getDir().resolve(SAVE_FILE_NAME);
-        if (!Files.exists(path)) {
-            return;
+        Path dir = config.getDir();
+        saveFileName = dir.resolve("save.dat");
+        tmpFileName = dir.resolve("tmp.dat");
+        if (!Files.exists(saveFileName)) {
+            if (Files.exists(tmpFileName)) {
+                Files.move(tmpFileName, saveFileName, StandardCopyOption.ATOMIC_MOVE);
+            } else {
+                mmap = null;
+                return;
+            }
         }
 
-        try (BufferedInputStream inputStream = new BufferedInputStream(Files.newInputStream(path))) {
-            while (inputStream.available() > 0) {
-                final ByteBuffer key = readFile(inputStream);
-                final ByteBuffer value = readFile(inputStream);
+        try (FileChannel channel = FileChannel.open(saveFileName, StandardOpenOption.READ)) {
+            mmap = channel.map(FileChannel.MapMode.READ_ONLY, 0, channel.size());
+            while (mmap.hasRemaining()) {
+                int keySize = mmap.getInt();
+                ByteBuffer key = mmap.slice().limit(keySize).asReadOnlyBuffer();
+
+                mmap.position(mmap.position() + keySize);
+
+                int valueSize = mmap.getInt();
+                ByteBuffer value = mmap.slice().limit(valueSize).asReadOnlyBuffer();
+
+                mmap.position(mmap.position() + valueSize);
+
                 storage.put(key, Record.of(key, value));
             }
-        } catch (IOException e) {
-            throw new IOException(e);
         }
     }
-
-
-    private ByteBuffer readFile(BufferedInputStream stream) throws IOException {
-        final int length = stream.read();
-        return ByteBuffer.wrap(stream.readNBytes(length));
-    }
-
 
     @Override
     public Iterator<Record> range(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
@@ -64,24 +93,39 @@ public class InMemoryDAO implements DAO {
 
     @Override
     public void close() throws IOException {
-        try (BufferedOutputStream outputStream = new BufferedOutputStream(Files.newOutputStream(config.getDir().resolve(SAVE_FILE_NAME)))) {
-            for (final Map.Entry<ByteBuffer, Record> temp : storage.entrySet()) {
-                writeFile(outputStream, temp.getKey());
-                writeFile(outputStream, temp.getValue().getValue());
+        try (FileChannel fileChannel = FileChannel.open(
+                tmpFileName,
+                StandardOpenOption.CREATE_NEW,
+                StandardOpenOption.WRITE,
+                StandardOpenOption.TRUNCATE_EXISTING
+        )) {
+            ByteBuffer size = ByteBuffer.allocate(Integer.BYTES);
+            for (Record record : storage.values()) {
+                writeInt(record.getKey(), fileChannel, size);
+                writeInt(record.getValue(), fileChannel, size);
             }
-        } catch (IOException e) {
-            throw new IOException(e);
+            fileChannel.force(false);
         }
+
+        if (mmap != null) {
+            try {
+                CLEAN.invoke(null, mmap);
+            } catch (IllegalAccessException | InvocationTargetException e) {
+                throw new IOException(e);
+            }
+        }
+
+        Files.deleteIfExists(saveFileName);
+        Files.move(tmpFileName, saveFileName, StandardCopyOption.ATOMIC_MOVE);
     }
 
-    private void writeFile(BufferedOutputStream outputStream, ByteBuffer byteBuffer) throws IOException {
-        final int length = byteBuffer.remaining();
-        final byte[] bytes = new byte[length];
-        byteBuffer.get(bytes);
-        outputStream.write(length);
-        outputStream.write(bytes);
+    private static void writeInt(ByteBuffer value, WritableByteChannel channel, ByteBuffer tmp) throws IOException {
+        tmp.position(0);
+        tmp.putInt(value.remaining());
+        tmp.position(0);
+        channel.write(tmp);
+        channel.write(value);
     }
-
 
     private SortedMap<ByteBuffer, Record> map(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
         if (fromKey == null && toKey == null)
