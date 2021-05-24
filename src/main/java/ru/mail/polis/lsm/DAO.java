@@ -96,31 +96,32 @@ public interface DAO extends Closeable {
 
         @Override
         public E next() {
+            E toReturn;
             if (leftNext != null && rightNext != null) {
                 int compareResult = leftNext.getKey().compareTo(rightNext.getKey());
                 if (compareResult < 0) {
-                    E toReturn = leftNext;
+                    toReturn = leftNext;
                     leftNext = left.hasNext() ? left.next() : null;
                     return toReturn;
                 } else if (compareResult > 0) {
-                    E toReturn = rightNext;
+                    toReturn = rightNext;
                     rightNext = right.hasNext() ? right.next() : null;
                     return toReturn;
                 } else {
-                    E toReturn = rightNext;
+                    toReturn = rightNext;
                     leftNext = left.hasNext() ? left.next() : null;
                     rightNext = right.hasNext() ? right.next() : null;
                     return toReturn;
                 }
-            } else if (leftNext == null) {
-                E toReturn = rightNext;
-                rightNext = right.hasNext() ? right.next() : null;
-                return toReturn;
-            } else {
-                E toReturn = leftNext;
-                leftNext = left.hasNext() ? left.next() : null;
-                return toReturn;
             }
+            if (leftNext == null) {
+                toReturn = rightNext;
+                rightNext = right.hasNext() ? right.next() : null;
+            } else {
+                toReturn = leftNext;
+                leftNext = left.hasNext() ? left.next() : null;
+            }
+            return toReturn;
         }
     }
 
