@@ -101,32 +101,4 @@ class MergeTest {
         return TestDaoWrapper.create(new DAOConfig(child));
     }
 
-    /**
-     * Cycled iterator class for infinite iterator test.
-     */
-    private static class CycledIterator implements Iterator<Record> {
-        private final List<Record> data;
-        private int current;
-        public CycledIterator(List<Record> data) {
-            this.data = data;
-        }
-        @Override
-        public boolean hasNext() {
-            return data.size() > 0;
-        }
-
-        @Override
-        public Record next() {
-            return data.get((current++) % data.size());
-        }
-
-        @Override
-        public void remove() {
-            if (current - 1 < 0) {
-                data.remove(data.size() - 1);
-            } else {
-                data.remove(current - 1);
-            }
-        }
-    }
 }
