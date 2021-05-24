@@ -53,7 +53,9 @@ class Utils {
     static byte[] sizeBasedRandomData(int size) {
         Random random = new Random(size);
         byte[] result = new byte[size];
-        random.nextBytes(result);
+        for (int i = 0; i < result.length; i++) {
+            result[i] = (byte) ('A' + (random.nextInt() % 26));
+        }
         return result;
     }
 
@@ -106,6 +108,14 @@ class Utils {
         }
 
         assertIterableEquals(i2List, i1List);
+    }
+
+    public static String toString(ByteBuffer buffer) {
+        try {
+            return StandardCharsets.UTF_8.newDecoder().decode(buffer).toString();
+        } catch (CharacterCodingException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private static String toString(CharsetDecoder decoder, ByteBuffer key, ByteBuffer value) {
