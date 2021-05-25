@@ -21,7 +21,7 @@ public class AdvancedTest {
     void close(@TempDir Path data) throws IOException {
         Iterator<Record> iterator;
 
-        Map<ByteBuffer, ByteBuffer> map = generateMap(0, 10);
+        Map<ByteBuffer, ByteBuffer> map = generateMap(0, 1000);
 
         try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
             dao.upsert(Record.of(key(1), value(1)));

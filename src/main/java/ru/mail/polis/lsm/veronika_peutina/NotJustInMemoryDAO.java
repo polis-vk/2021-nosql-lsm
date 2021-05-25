@@ -37,7 +37,7 @@ public class NotJustInMemoryDAO implements DAO {
             }
 
         } catch (IOException e) {
-            e.printStackTrace();
+            System.out.println("Error with read File");
         }
     }
 
@@ -82,6 +82,8 @@ public class NotJustInMemoryDAO implements DAO {
             for (final Record record : storage.values()) {
                 writeRecord(record, fileChannel, byteBuffer);
             }
+        } catch (IOException e) {
+            System.out.println("Error with write in File");
         }
     }
 
