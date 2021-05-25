@@ -3,13 +3,16 @@ package ru.mail.polis.lsm;
 import javax.annotation.Nullable;
 import java.io.Closeable;
 import java.nio.ByteBuffer;
-import java.util.Iterator;
-import java.util.List;
+import java.util.*;
 
 /**
  * Minimal database API.
  */
 public interface DAO extends Closeable {
+
+    PriorityQueue<Record> queue = new PriorityQueue<>(Comparator.comparing(Record::getKey));
+    Set<Record> set = new TreeSet<>(Comparator.comparing(Record::getKey));
+
     Iterator<Record> range(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey);
 
     void upsert(Record record);
@@ -35,7 +38,20 @@ public interface DAO extends Closeable {
     }
 
     static Iterator<Record> merge(List<Iterator<Record>> iterators) {
-        throw new UnsupportedOperationException("Implement me");
+
+
+//        for (int i = 0; i < iterators.size(); i++) {
+//
+//            Iterator<Record> iterator = iterators.get(i);
+//
+//            while (iterator.hasNext()) {
+//                set.add(iterator.next());
+//            }
+//
+//        }
+//
+//        return set.iterator();
+        return Collections.emptyIterator();
     }
 
 }
