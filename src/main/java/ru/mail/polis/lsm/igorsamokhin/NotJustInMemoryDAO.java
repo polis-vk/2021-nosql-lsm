@@ -23,38 +23,41 @@ public class NotJustInMemoryDAO implements DAO {
     private final DAOConfig config;
     private static final String FILE_NAME = "save.dat";
 
+    private final Path filePath;
+
     /**
      * Create DAO object.
+     *
      * @param config - objects contains directory with data files
      */
-    public NotJustInMemoryDAO(DAOConfig config) {
+    public NotJustInMemoryDAO(DAOConfig config) throws IOException {
         this.config = config;
-
-        final Path path = config.getDir().resolve(FILE_NAME);
-        if (!path.toFile().exists()) {
+        filePath = config.getDir().resolve(FILE_NAME);
+        if (!filePath.toFile().exists()) {
             return;
         }
 
-        try (FileChannel fileChannel = FileChannel.open(path,
+        try (FileChannel fileChannel = FileChannel.open(filePath,
                 StandardOpenOption.READ, StandardOpenOption.CREATE_NEW)) {
             final long size = fileChannel.size();
             final ByteBuffer buffer = ByteBuffer.allocate(Integer.BYTES);
-            ByteBuffer key;
-            ByteBuffer value;
+
             while (fileChannel.position() != size) {
-                key = readValue(fileChannel, buffer);
-                value = readValue(fileChannel, buffer);
+                ByteBuffer key = readValue(fileChannel, buffer);
+                ByteBuffer value = readValue(fileChannel, buffer);
                 storage.put(key, Record.of(key, value));
             }
-        } catch (IOException e) {
-            e.printStackTrace();
         }
     }
 
     private ByteBuffer readValue(ReadableByteChannel channel, ByteBuffer tmp) throws IOException {
+        int amount = 0;
+        tmp.position(amount);
+        while (amount <= tmp.remaining()) {
+            amount += channel.read(tmp);
+        }
         tmp.position(0);
-        channel.read(tmp);
-        tmp.position(0);
+
         final int size = tmp.getInt();
         final ByteBuffer returnBuff = ByteBuffer.allocate(size);
         channel.read(returnBuff);
@@ -81,10 +84,7 @@ public class NotJustInMemoryDAO implements DAO {
     @Override
     public void upsert(Record record) {
         if (record.getValue() == null) {
-            final Record r = storage.get(record.getKey());
-            if (r != null) {
-                storage.remove(r.getKey());
-            }
+            storage.remove(record.getKey());
         } else {
             storage.put(record.getKey(), record);
         }
@@ -92,18 +92,11 @@ public class NotJustInMemoryDAO implements DAO {
 
     @Override
     public void close() throws IOException {
-        Files.deleteIfExists(config.getDir().resolve(FILE_NAME));
+        Files.deleteIfExists(filePath);
+        Files.createDirectories(config.getDir());
 
-        final Path dir = config.getDir();
-        final Path file = config.getDir().resolve(FILE_NAME);
-        if (!dir.toFile().exists()) {
-            Files.createDirectory(dir);
-        }
-        if (!file.toFile().exists()) {
-            Files.createFile(file);
-        }
-
-        try (FileChannel fileChannel = FileChannel.open(file, StandardOpenOption.WRITE)) {
+        try (FileChannel fileChannel = FileChannel.open(filePath, StandardOpenOption.WRITE,
+                StandardOpenOption.CREATE_NEW)) {
             final ByteBuffer size = ByteBuffer.allocate(Integer.BYTES);
             for (final Record record : storage.values()) {
                 writeInt(record.getKey(), fileChannel, size);
