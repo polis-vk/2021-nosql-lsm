@@ -3,12 +3,11 @@ package ru.mail.polis.lsm;
 import javax.annotation.Nullable;
 import java.io.Closeable;
 import java.nio.ByteBuffer;
-import java.util.*;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.List;
+import java.util.SortedMap;
 import java.util.concurrent.ConcurrentSkipListMap;
-import java.util.stream.Collector;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
-import java.util.stream.StreamSupport;
 
 /**
  * Minimal database API.
@@ -38,7 +37,6 @@ public interface DAO extends Closeable {
         return result;
     }
 
-
     static Iterator<Record> mergeTwo(Iterator<Record> list1, Iterator<Record> list2) {
         final SortedMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
         Record one = list1.hasNext() ? list1.next() : null;
@@ -46,39 +44,48 @@ public interface DAO extends Closeable {
         while (one != null || two != null) {
             if (one == null) {
                 storage.put(two.getKey(), Record.of(two.getKey(), two.getValue()));
-                if (list2.hasNext())
+                if (list2.hasNext()) {
                     two = list2.next();
-                else
+                }
+                else {
                     two = null;
+                }
                 continue;
             }
             if (two == null) {
                 storage.put(one.getKey(), Record.of(one.getKey(), one.getValue()));
-                if (list1.hasNext())
+                if (list1.hasNext()) {
                     one = list1.next();
-                else
+                }
+                else {
                     one = null;
+                }
                 continue;
             }
             if (one.getKey().compareTo(two.getKey()) > 0) {
                 storage.put(two.getKey(), Record.of(two.getKey(), two.getValue()));
-                if (list2.hasNext())
+                if (list2.hasNext()) {
                     two = list2.next();
-                else
+                }
+                else {
                     two = null;
+
+                }
             } else {
                 storage.put(one.getKey(), Record.of(one.getKey(), one.getValue()));
-                if (list1.hasNext())
+                if (list1.hasNext()) {
                     one = list1.next();
-                else
+                }
+                else {
                     one = null;
+                }
             }
         }
         return storage.values().iterator();
     }
 
     static Iterator<Record> merge(List<Iterator<Record>> iterators) {
-        if (iterators.size() == 0) {
+        if (iterators.isEmpty()) {
             return Collections.emptyIterator();
         }
         if (iterators.size() == 1) {

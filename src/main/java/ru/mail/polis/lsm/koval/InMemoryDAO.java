@@ -1,4 +1,4 @@
-package ru.mail.polis.lsm.koval_leonid;
+package ru.mail.polis.lsm.koval;
 
 import ru.mail.polis.lsm.DAO;
 import ru.mail.polis.lsm.DAOConfig;
@@ -17,7 +17,6 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.util.Iterator;
-import java.util.Map;
 import java.util.SortedMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 
@@ -26,18 +25,16 @@ public class InMemoryDAO implements DAO {
     private final SortedMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
 
     private static final Method CLEAN;
+
     static {
         try {
             Class<?> aClass = Class.forName("sun.nio.ch.FileChannelImpl");
             CLEAN = aClass.getDeclaredMethod("unmap", MappedByteBuffer.class);
             CLEAN.setAccessible(true);
-        } catch (Exception e) {
+        } catch (ClassNotFoundException | NoSuchMethodException e) {
             throw new IllegalStateException(e);
         }
     }
-
-    @SuppressWarnings({"FieldCanBeLocal", "unused"})
-    private final DAOConfig config;
 
     private final Path saveFileName;
     private final Path tmpFileName;
@@ -45,7 +42,6 @@ public class InMemoryDAO implements DAO {
     private final MappedByteBuffer mmap;
 
     public InMemoryDAO(DAOConfig config) throws IOException {
-        this.config = config;
 
         Path dir = config.getDir();
         saveFileName = dir.resolve("save.dat");
@@ -128,14 +124,17 @@ public class InMemoryDAO implements DAO {
     }
 
     private SortedMap<ByteBuffer, Record> map(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
-        if (fromKey == null && toKey == null)
+        if (fromKey == null && toKey == null) {
             return storage;
+        }
 
-        if (fromKey == null)
+        if (fromKey == null) {
             return storage.headMap(toKey);
+        }
 
-        if (toKey == null)
+        if (toKey == null) {
             return storage.tailMap(fromKey);
+        }
 
         return storage.subMap(fromKey, toKey);
     }

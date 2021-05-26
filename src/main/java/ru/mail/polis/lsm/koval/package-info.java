@@ -1,3 +1,5 @@
 @ParametersAreNonnullByDefault
-package ru.mail.polis.lsm.koval_leonid;
+
+package ru.mail.polis.lsm.koval;
+
 import javax.annotation.ParametersAreNonnullByDefault;

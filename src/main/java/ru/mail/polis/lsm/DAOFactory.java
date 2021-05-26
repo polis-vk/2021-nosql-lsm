@@ -1,6 +1,6 @@
 package ru.mail.polis.lsm;
 
-import ru.mail.polis.lsm.koval_leonid.InMemoryDAO;
+import ru.mail.polis.lsm.koval.InMemoryDAO;
 
 import java.io.IOException;
 
