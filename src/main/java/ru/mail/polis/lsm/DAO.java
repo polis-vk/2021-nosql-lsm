@@ -44,41 +44,20 @@ public interface DAO extends Closeable {
         while (one != null || two != null) {
             if (one == null) {
                 storage.put(two.getKey(), Record.of(two.getKey(), two.getValue()));
-                if (list2.hasNext()) {
-                    two = list2.next();
-                }
-                else {
-                    two = null;
-                }
+                two = list2.hasNext() ? list2.next() : null;
                 continue;
             }
             if (two == null) {
                 storage.put(one.getKey(), Record.of(one.getKey(), one.getValue()));
-                if (list1.hasNext()) {
-                    one = list1.next();
-                }
-                else {
-                    one = null;
-                }
+                one = list1.hasNext() ? list1.next() : null;
                 continue;
             }
             if (one.getKey().compareTo(two.getKey()) > 0) {
                 storage.put(two.getKey(), Record.of(two.getKey(), two.getValue()));
-                if (list2.hasNext()) {
-                    two = list2.next();
-                }
-                else {
-                    two = null;
-
-                }
+                two = list2.hasNext() ? list2.next() : null;
             } else {
                 storage.put(one.getKey(), Record.of(one.getKey(), one.getValue()));
-                if (list1.hasNext()) {
-                    one = list1.next();
-                }
-                else {
-                    one = null;
-                }
+                one = list1.hasNext() ? list1.next() : null;
             }
         }
         return storage.values().iterator();
@@ -98,5 +77,4 @@ public interface DAO extends Closeable {
         Iterator<Record> right = merge(iterators.subList(iterators.size() / 2, iterators.size()));
         return mergeTwo(left, right);
     }
-
 }

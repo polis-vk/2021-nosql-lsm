@@ -28,8 +28,8 @@ public class InMemoryDAO implements DAO {
 
     static {
         try {
-            Class<?> aClass = Class.forName("sun.nio.ch.FileChannelImpl");
-            CLEAN = aClass.getDeclaredMethod("unmap", MappedByteBuffer.class);
+            Class<?> cleanse = Class.forName("sun.nio.ch.FileChannelImpl");
+            CLEAN = cleanse.getDeclaredMethod("unmap", MappedByteBuffer.class);
             CLEAN.setAccessible(true);
         } catch (ClassNotFoundException | NoSuchMethodException e) {
             throw new IllegalStateException(e);
@@ -41,6 +41,9 @@ public class InMemoryDAO implements DAO {
 
     private final MappedByteBuffer mmap;
 
+    /**
+     * Database implementation.
+     */
     public InMemoryDAO(DAOConfig config) throws IOException {
 
         Path dir = config.getDir();
