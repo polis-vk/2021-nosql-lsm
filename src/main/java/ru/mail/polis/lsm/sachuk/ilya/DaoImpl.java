@@ -4,13 +4,13 @@ import ru.mail.polis.lsm.DAO;
 import ru.mail.polis.lsm.Record;
 
 import javax.annotation.Nullable;
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.nio.MappedByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.file.*;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.SortedMap;
@@ -18,10 +18,25 @@ import java.util.concurrent.ConcurrentSkipListMap;
 
 public class DaoImpl implements DAO {
 
-    private final SortedMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
+    private static final Method CLEAN;
 
-    private static final String FILE_NAME = "data";
-    private final Path path;
+    static {
+        try {
+            Class<?> aClass = Class.forName("sun.nio.ch.FileChannelImpl");
+            CLEAN = aClass.getDeclaredMethod("unmap", MappedByteBuffer.class);
+            CLEAN.setAccessible(true);
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    private final SortedMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
+    private MappedByteBuffer mappedByteBuffer;
+
+    private static final String SAVE_FILE_NAME = "save";
+    private static final String TMP_FILE_NAME = "tmp";
+    private final Path savePath;
+    private final Path tmpPath;
 
     /**
      * Constructor that initialize path and restore storage.
@@ -30,8 +45,18 @@ public class DaoImpl implements DAO {
      * @throws IOException is thrown when an I/O error occurs.
      */
     public DaoImpl(Path dirPath) throws IOException {
-        this.path = dirPath.resolve(Paths.get(FILE_NAME));
+        this.savePath = dirPath.resolve(Paths.get(SAVE_FILE_NAME));
+        this.tmpPath = dirPath.resolve(Paths.get(TMP_FILE_NAME));
 
+        if (!Files.exists(savePath)) {
+            if (Files.exists(tmpPath)) {
+                Files.move(tmpPath, savePath, StandardCopyOption.ATOMIC_MOVE);
+            } else {
+                mappedByteBuffer = null;
+                return;
+            }
+
+        }
         restoreStorage();
     }
 
@@ -54,6 +79,17 @@ public class DaoImpl implements DAO {
     @Override
     public void close() throws IOException {
         save();
+
+        if (mappedByteBuffer != null) {
+            try {
+                CLEAN.invoke(null, mappedByteBuffer);
+            } catch (IllegalAccessException | InvocationTargetException e) {
+                throw new IllegalStateException(e);
+            }
+        }
+
+        Files.deleteIfExists(savePath);
+        Files.move(tmpPath, savePath, StandardCopyOption.ATOMIC_MOVE);
     }
 
     private Map<ByteBuffer, Record> map(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
@@ -71,23 +107,25 @@ public class DaoImpl implements DAO {
 
     private void save() throws IOException {
 
-        try (BufferedOutputStream bufferedOutputStream = new BufferedOutputStream(Files.newOutputStream(path))) {
+        try (FileChannel fileChannel = FileChannel.open(tmpPath, StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)) {
 
             for (final Map.Entry<ByteBuffer, Record> byteBufferRecordEntry : storage.entrySet()) {
-                writeToFile(bufferedOutputStream, byteBufferRecordEntry.getKey());
-                writeToFile(bufferedOutputStream, byteBufferRecordEntry.getValue().getValue());
+                writeToFile(fileChannel, byteBufferRecordEntry.getKey());
+                writeToFile(fileChannel, byteBufferRecordEntry.getValue().getValue());
             }
 
         }
     }
 
     private void restoreStorage() throws IOException {
-        if (Files.exists(path)) {
-            try (BufferedInputStream bufferedInputStream = new BufferedInputStream(Files.newInputStream(path))) {
-                while (bufferedInputStream.available() > 0) {
+        if (Files.exists(savePath)) {
+            try (FileChannel fileChannel = FileChannel.open(savePath, StandardOpenOption.CREATE_NEW, StandardOpenOption.READ)) {
 
-                    final ByteBuffer keyByteBuffer = readFromFile(bufferedInputStream);
-                    final ByteBuffer valueByteBuffer = readFromFile(bufferedInputStream);
+                mappedByteBuffer = fileChannel.map(FileChannel.MapMode.READ_ONLY, 0, fileChannel.size());
+
+                while (mappedByteBuffer.hasRemaining()) {
+                    ByteBuffer keyByteBuffer = readFromFile(mappedByteBuffer);
+                    ByteBuffer valueByteBuffer = readFromFile(mappedByteBuffer);
 
                     storage.put(keyByteBuffer, Record.of(keyByteBuffer, valueByteBuffer));
                 }
@@ -95,19 +133,35 @@ public class DaoImpl implements DAO {
         }
     }
 
-    private ByteBuffer readFromFile(BufferedInputStream bufferedInputStream) throws IOException {
-        final int length = bufferedInputStream.read();
+    private ByteBuffer readFromFile(MappedByteBuffer mappedByteBuffer) throws IOException {
+        final int length = mappedByteBuffer.getInt();
 
-        return ByteBuffer.wrap(bufferedInputStream.readNBytes(length));
+//        byte[] arr = new byte[length];
+//        mappedByteBuffer.get(arr);
+
+        ByteBuffer byteBuffer = mappedByteBuffer.slice().limit(length).asReadOnlyBuffer();
+        mappedByteBuffer.position(mappedByteBuffer.position() + length);
+
+        return byteBuffer;
     }
 
-    private void writeToFile(BufferedOutputStream bufferedOutputStream, ByteBuffer byteBuffer) throws IOException {
-        final int length = byteBuffer.remaining();
+    private void writeToFile(FileChannel fileChannel, ByteBuffer value) throws
+            IOException {
 
-        final byte[] bytes = new byte[length];
-        byteBuffer.get(bytes);
+        ByteBuffer byteBuffer = ByteBuffer.allocate(value.capacity());
+        ByteBuffer secBuf = ByteBuffer.allocate(Integer.BYTES);
 
-        bufferedOutputStream.write(length);
-        bufferedOutputStream.write(bytes);
+        secBuf.putInt(value.remaining());
+        byteBuffer.put(value);
+
+        write(fileChannel, secBuf);
+        write(fileChannel, byteBuffer);
+
+    }
+
+    private void write(FileChannel fileChannel, ByteBuffer byteBuffer) throws IOException {
+        byteBuffer.flip();
+        fileChannel.write(byteBuffer);
+        byteBuffer.compact();
     }
 }
