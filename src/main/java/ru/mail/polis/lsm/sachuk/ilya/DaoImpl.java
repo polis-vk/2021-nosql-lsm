@@ -5,6 +5,7 @@ import ru.mail.polis.lsm.Record;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
@@ -17,18 +18,6 @@ import java.util.SortedMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 
 public class DaoImpl implements DAO {
-
-    private static final Method CLEAN;
-
-    static {
-        try {
-            Class<?> aClass = Class.forName("sun.nio.ch.FileChannelImpl");
-            CLEAN = aClass.getDeclaredMethod("unmap", MappedByteBuffer.class);
-            CLEAN.setAccessible(true);
-        } catch (Exception e) {
-            throw new IllegalStateException(e);
-        }
-    }
 
     private final SortedMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
     private MappedByteBuffer mappedByteBuffer;
@@ -81,11 +70,7 @@ public class DaoImpl implements DAO {
         save();
 
         if (mappedByteBuffer != null) {
-            try {
-                CLEAN.invoke(null, mappedByteBuffer);
-            } catch (IllegalAccessException | InvocationTargetException e) {
-                throw new IllegalStateException(e);
-            }
+            clean();
         }
 
         Files.deleteIfExists(savePath);
@@ -136,9 +121,6 @@ public class DaoImpl implements DAO {
     private ByteBuffer readFromFile(MappedByteBuffer mappedByteBuffer) throws IOException {
         final int length = mappedByteBuffer.getInt();
 
-//        byte[] arr = new byte[length];
-//        mappedByteBuffer.get(arr);
-
         ByteBuffer byteBuffer = mappedByteBuffer.slice().limit(length).asReadOnlyBuffer();
         mappedByteBuffer.position(mappedByteBuffer.position() + length);
 
@@ -163,5 +145,18 @@ public class DaoImpl implements DAO {
         byteBuffer.flip();
         fileChannel.write(byteBuffer);
         byteBuffer.compact();
+    }
+
+    private void clean() {
+        try {
+            Class<?> unsafeClass = Class.forName("sun.misc.Unsafe");
+            Field unsafeField = unsafeClass.getDeclaredField("theUnsafe");
+            unsafeField.setAccessible(true);
+            Object unsafe = unsafeField.get(null);
+            Method invokeCleaner = unsafeClass.getMethod("invokeCleaner", ByteBuffer.class);
+            invokeCleaner.invoke(unsafe, mappedByteBuffer);
+        } catch (ClassNotFoundException | NoSuchFieldException | NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
+            e.printStackTrace();
+        }
     }
 }
