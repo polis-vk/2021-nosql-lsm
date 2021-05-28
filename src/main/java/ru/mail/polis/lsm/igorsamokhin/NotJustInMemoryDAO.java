@@ -12,7 +12,6 @@ import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
-import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -37,7 +36,7 @@ public class NotJustInMemoryDAO implements DAO {
 
     private final SortedMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
     private final DAOConfig config;
-    private final MappedByteBuffer map;
+    private final MappedByteBuffer mmap;
 
     private final Path filePath;
     private final Path tmpFilePath;
@@ -57,17 +56,17 @@ public class NotJustInMemoryDAO implements DAO {
             if (Files.exists(tmpFilePath)) {
                 Files.move(tmpFilePath, filePath, StandardCopyOption.ATOMIC_MOVE);
             } else {
-                map = null;
+                mmap = null;
                 return;
             }
         }
 
         try (FileChannel fileChannel = FileChannel.open(filePath, StandardOpenOption.READ)) {
-            map = fileChannel.map(FileChannel.MapMode.READ_ONLY, 0, fileChannel.size());
+            mmap = fileChannel.map(FileChannel.MapMode.READ_ONLY, 0, fileChannel.size());
 
-            while (map.hasRemaining()) {
-                ByteBuffer key = readValue(map);
-                ByteBuffer value = readValue(map);
+            while (mmap.hasRemaining()) {
+                ByteBuffer key = readValue(mmap);
+                ByteBuffer value = readValue(mmap);
 
                 storage.put(key, Record.of(key, value));
             }
@@ -124,9 +123,9 @@ public class NotJustInMemoryDAO implements DAO {
             fileChannel.force(false);
         }
 
-        if (map != null) {
+        if (mmap != null) {
             try {
-                CLEAN.invoke(null, map);
+                CLEAN.invoke(null, mmap);
             } catch (IllegalAccessException | InvocationTargetException e) {
                 throw new IOException(e);
             }
