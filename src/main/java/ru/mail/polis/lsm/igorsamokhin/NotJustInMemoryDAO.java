@@ -33,7 +33,8 @@ public class NotJustInMemoryDAO implements DAO {
     public NotJustInMemoryDAO(DAOConfig config) throws IOException {
         this.config = config;
         filePath = config.getDir().resolve(FILE_NAME);
-        if (!filePath.toFile().exists()) {
+
+        if (!Files.exists(filePath)) {
             return;
         }
 
