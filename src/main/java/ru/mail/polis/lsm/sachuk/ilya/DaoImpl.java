@@ -99,7 +99,6 @@ public class DaoImpl implements DAO {
                 writeToFile(fileChannel, byteBufferRecordEntry.getKey());
                 writeToFile(fileChannel, byteBufferRecordEntry.getValue().getValue());
             }
-
         }
     }
 
@@ -139,7 +138,6 @@ public class DaoImpl implements DAO {
 
         write(fileChannel, secBuf);
         write(fileChannel, byteBuffer);
-
     }
 
     private void write(FileChannel fileChannel, ByteBuffer byteBuffer) throws IOException {
