@@ -56,7 +56,7 @@ $ ./gradlew test
 
 ## Этап 3. Merge Iterator (deadline 2021-05-26 00:00:00 MSK)
 ### Update
-Находясь в той ветке, где находится ваш код из Этапа 1, выполните:
+Находясь в той ветке, где находится ваш код из Этапа 2, выполните:
 ```bash
 $ git fetch upstream
 $ git merge upstream/stage3
