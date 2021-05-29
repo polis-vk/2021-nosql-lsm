@@ -14,6 +14,14 @@ import java.util.PriorityQueue;
  * Minimal database API.
  */
 public interface DAO extends Closeable {
+    Comparator<Entry> comparator = (a, b) -> {
+        int i = a.prevRecord.getKey().compareTo(b.prevRecord.getKey());
+        if (i == 0) {
+            return a.order < b.order ? 1 : -1;
+        }
+        return i;
+    };
+
     Iterator<Record> range(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey);
 
     void upsert(Record record);
@@ -56,14 +64,6 @@ public interface DAO extends Closeable {
             this.order = order;
         }
     }
-
-    Comparator<Entry> comparator = (a, b) -> {
-        int i = a.prevRecord.getKey().compareTo(b.prevRecord.getKey());
-        if (i == 0) {
-            return a.order < b.order ? 1 : -1;
-        }
-        return i;
-    };
 
     /**
      * Do merge iterators into one iterator.
