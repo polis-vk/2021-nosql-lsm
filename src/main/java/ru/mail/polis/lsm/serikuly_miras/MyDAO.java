@@ -12,11 +12,9 @@ import java.util.SortedMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 
 public class MyDAO implements DAO {
-    private final DAOConfig config;
     private final SortedMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
 
     public MyDAO(DAOConfig config) {
-        this.config = config;
     }
 
     @Override
