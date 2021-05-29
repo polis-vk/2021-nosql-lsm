@@ -4,8 +4,6 @@ import javax.annotation.Nullable;
 
 import java.io.Closeable;
 import java.nio.ByteBuffer;
-import java.nio.charset.CharacterCodingException;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -42,23 +40,31 @@ public interface DAO extends Closeable {
     class Entry {
         Iterator<Record> iterator;
         Record prevRecord;
-        int k;
+        int order;
 
-        public Entry(Iterator<Record> iterator, Record prevRecord, int k) {
+        /**
+         * Util class to store current iterator state.
+         *
+         * @param iterator  the iterator
+         * @param prevRecord  value of the iterator
+         * @param order order of an iterator
+         */
+        private Entry(Iterator<Record> iterator, Record prevRecord, int order) {
             this.iterator = iterator;
             this.prevRecord = prevRecord;
-            this.k = k;
+            this.order = order;
         }
     }
 
-
+    /**
+     * Do merge iterators into one iterator.
+     */
     static Iterator<Record> merge(List<Iterator<Record>> iterators) {
         PriorityQueue<Entry> queue = new PriorityQueue<>((a, b) -> {
             int i = a.prevRecord.getKey().compareTo(b.prevRecord.getKey());
             if (i == 0) {
-                return a.k > b.k ? -1 : 1;
+                return a.order < b.order ? 1 : -1;
             }
-
             return i;
         });
 
@@ -77,7 +83,7 @@ public interface DAO extends Closeable {
                 Entry head = queue.poll();
 
                 if (head != null && head.iterator.hasNext()) {
-                    head.iterator.next();
+                    head.prevRecord = head.iterator.next();
                     queue.add(head);
                 }
             }
