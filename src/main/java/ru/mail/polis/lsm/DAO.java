@@ -4,7 +4,6 @@ import javax.annotation.Nullable;
 
 import java.io.Closeable;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.PriorityQueue;
@@ -75,19 +74,28 @@ public interface DAO extends Closeable {
             }
         }
 
-        List<Record> returnList = new ArrayList<>();
-        while (!queue.isEmpty()) {
-            Entry poll = queue.poll();
-            clearQueue(queue, poll);
-
-            returnList.add(poll.prevRecord);
-            if (poll.iterator.hasNext()) {
-                poll.prevRecord = poll.iterator.next();
-                queue.add(poll);
+        return new Iterator<Record>() {
+            @Override
+            public boolean hasNext() {
+                return !queue.isEmpty();
             }
-        }
 
-        return returnList.subList(0, returnList.size()).iterator();
+            @Override
+            public Record next() {
+                Entry poll = queue.poll();
+                if (poll == null) {
+                    return null;
+                }
+
+                clearQueue(queue, poll);
+                Record record = poll.prevRecord;
+                if (poll.iterator.hasNext()) {
+                    poll.prevRecord = poll.iterator.next();
+                    queue.add(poll);
+                }
+                return record;
+            }
+        };
     }
 
     /**
