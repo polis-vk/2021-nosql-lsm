@@ -19,13 +19,14 @@ import java.util.concurrent.ConcurrentSkipListMap;
 
 public class DaoImpl implements DAO {
 
-    private final SortedMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
-    private MappedByteBuffer mappedByteBuffer;
-
     private static final String SAVE_FILE_NAME = "save";
     private static final String TMP_FILE_NAME = "tmp";
+
     private final Path savePath;
     private final Path tmpPath;
+    private final SortedMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
+
+    private MappedByteBuffer mappedByteBuffer;
 
     /**
      * Constructor that initialize path and restore storage.
@@ -119,7 +120,7 @@ public class DaoImpl implements DAO {
     }
 
     private ByteBuffer readFromFile(MappedByteBuffer mappedByteBuffer) throws IOException {
-        final int length = mappedByteBuffer.getInt();
+        int length = mappedByteBuffer.getInt();
 
         ByteBuffer byteBuffer = mappedByteBuffer.slice().limit(length).asReadOnlyBuffer();
         mappedByteBuffer.position(mappedByteBuffer.position() + length);
