@@ -5,7 +5,6 @@ import javax.annotation.Nullable;
 import java.io.Closeable;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
 import java.util.PriorityQueue;
@@ -14,14 +13,6 @@ import java.util.PriorityQueue;
  * Minimal database API.
  */
 public interface DAO extends Closeable {
-    Comparator<Entry> comparator = (a, b) -> {
-        int i = a.prevRecord.getKey().compareTo(b.prevRecord.getKey());
-        if (i == 0) {
-            return a.order < b.order ? 1 : -1;
-        }
-        return i;
-    };
-
     Iterator<Record> range(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey);
 
     void upsert(Record record);
@@ -69,7 +60,13 @@ public interface DAO extends Closeable {
      * Do merge iterators into one iterator.
      */
     static Iterator<Record> merge(List<Iterator<Record>> iterators) {
-        PriorityQueue<Entry> queue = new PriorityQueue<>(comparator);
+        PriorityQueue<Entry> queue = new PriorityQueue<>((a, b) -> {
+            int i = a.prevRecord.getKey().compareTo(b.prevRecord.getKey());
+            if (i == 0) {
+                return a.order < b.order ? 1 : -1;
+            }
+            return i;
+        });
 
         for (int i = 0; i < iterators.size(); i++) {
             Iterator<Record> it = iterators.get(i);
@@ -106,5 +103,4 @@ public interface DAO extends Closeable {
             }
         }
     }
-
 }
