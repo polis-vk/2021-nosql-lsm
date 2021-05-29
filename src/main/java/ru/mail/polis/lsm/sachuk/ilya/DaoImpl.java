@@ -99,6 +99,7 @@ public class DaoImpl implements DAO {
                 writeToFile(fileChannel, byteBufferRecordEntry.getKey());
                 writeToFile(fileChannel, byteBufferRecordEntry.getValue().getValue());
             }
+            fileChannel.force(false);
         }
     }
 
