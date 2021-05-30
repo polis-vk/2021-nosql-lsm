@@ -137,8 +137,7 @@ public class DaoImpl implements DAO {
         return byteBuffer;
     }
 
-    private void writeToFile(FileChannel fileChannel, ByteBuffer value) throws
-            IOException {
+    private void writeToFile(FileChannel fileChannel, ByteBuffer value) throws IOException {
 
         ByteBuffer byteBuffer = ByteBuffer.allocate(value.capacity());
         ByteBuffer secBuf = ByteBuffer.allocate(Integer.BYTES);
