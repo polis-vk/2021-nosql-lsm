@@ -156,7 +156,7 @@ public class DaoImpl implements DAO {
         byteBuffer.compact();
     }
 
-    private void clean() {
+    private void clean() throws IOException {
         try {
             Class<?> unsafeClass = Class.forName("sun.misc.Unsafe");
             Field unsafeField = unsafeClass.getDeclaredField("theUnsafe");
@@ -166,7 +166,7 @@ public class DaoImpl implements DAO {
             invokeCleaner.invoke(unsafe, mappedByteBuffer);
         } catch (ClassNotFoundException | NoSuchFieldException | NoSuchMethodException
                 | IllegalAccessException | InvocationTargetException e) {
-            e.printStackTrace();
+            throw new IOException(e);
         }
     }
 }
