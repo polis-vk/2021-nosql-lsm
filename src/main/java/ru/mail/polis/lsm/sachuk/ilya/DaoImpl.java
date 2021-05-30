@@ -93,7 +93,7 @@ public class DaoImpl implements DAO {
 
     private void save() throws IOException {
 
-        try (FileChannel fileChannel = FileChannel.open(tmpPath, StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)) {
+        try (FileChannel fileChannel = FileChannel.open(tmpPath, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)) {
 
             for (final Map.Entry<ByteBuffer, Record> byteBufferRecordEntry : storage.entrySet()) {
                 writeToFile(fileChannel, byteBufferRecordEntry.getKey());
@@ -105,7 +105,7 @@ public class DaoImpl implements DAO {
 
     private void restoreStorage() throws IOException {
         if (Files.exists(savePath)) {
-            try (FileChannel fileChannel = FileChannel.open(savePath, StandardOpenOption.CREATE_NEW, StandardOpenOption.READ)) {
+            try (FileChannel fileChannel = FileChannel.open(savePath, StandardOpenOption.READ)) {
 
                 mappedByteBuffer = fileChannel.map(FileChannel.MapMode.READ_ONLY, 0, fileChannel.size());
 
