@@ -11,7 +11,11 @@ import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
-import java.nio.file.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.SortedMap;
@@ -93,7 +97,12 @@ public class DaoImpl implements DAO {
 
     private void save() throws IOException {
 
-        try (FileChannel fileChannel = FileChannel.open(tmpPath, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)) {
+        try (FileChannel fileChannel = FileChannel.open(
+                tmpPath,
+                StandardOpenOption.CREATE_NEW,
+                StandardOpenOption.WRITE,
+                StandardOpenOption.TRUNCATE_EXISTING
+        )) {
 
             for (final Map.Entry<ByteBuffer, Record> byteBufferRecordEntry : storage.entrySet()) {
                 writeToFile(fileChannel, byteBufferRecordEntry.getKey());
@@ -155,7 +164,8 @@ public class DaoImpl implements DAO {
             Object unsafe = unsafeField.get(null);
             Method invokeCleaner = unsafeClass.getMethod("invokeCleaner", ByteBuffer.class);
             invokeCleaner.invoke(unsafe, mappedByteBuffer);
-        } catch (ClassNotFoundException | NoSuchFieldException | NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
+        } catch (ClassNotFoundException | NoSuchFieldException | NoSuchMethodException
+                | IllegalAccessException | InvocationTargetException e) {
             e.printStackTrace();
         }
     }
