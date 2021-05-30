@@ -37,6 +37,12 @@ public interface DAO extends Closeable {
         return result;
     }
 
+    /**
+     * Method that merge iterators and return iterator
+     *
+     * @param iterators is list of iterators to merge
+     * @return merged iterators
+     */
     static Iterator<Record> merge(List<Iterator<Record>> iterators) {
 
         Map<ByteBuffer, Record> map = new TreeMap<>(ByteBuffer::compareTo);
