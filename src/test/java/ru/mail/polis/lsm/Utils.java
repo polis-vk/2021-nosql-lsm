@@ -54,7 +54,7 @@ class Utils {
         Random random = new Random(size);
         byte[] result = new byte[size];
         for (int i = 0; i < result.length; i++) {
-            result[i] = (byte) ('A' + (random.nextInt() % 26));
+            result[i] = (byte) ('A' + random.nextInt(26));
         }
         return result;
     }
