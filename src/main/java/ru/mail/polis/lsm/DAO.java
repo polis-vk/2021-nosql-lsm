@@ -54,7 +54,7 @@ public interface DAO extends Closeable {
             while (iterator.hasNext()) {
                 Record record = iterator.next();
 
-                if (prevRecord != null && prevRecord == record) {
+                if (prevRecord != null && prevRecord.equals(record)) {
                     return Stream.generate(() -> record).iterator();
                 }
                 map.put(record.getKey(), record);
