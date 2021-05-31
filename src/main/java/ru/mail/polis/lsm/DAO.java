@@ -45,7 +45,7 @@ public interface DAO extends Closeable {
      */
     static Iterator<Record> merge(List<Iterator<Record>> iterators) {
 
-        Map<ByteBuffer, Record> map = new TreeMap<>(ByteBuffer::compareTo);
+        Map<ByteBuffer, Record> map = new TreeMap<>();
 
         for (Iterator<Record> iterator : iterators) {
             iterator.forEachRemaining(record -> map.put(record.getKey(), record));
