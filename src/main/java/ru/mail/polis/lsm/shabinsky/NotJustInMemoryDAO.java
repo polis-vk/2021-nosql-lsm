@@ -22,21 +22,19 @@ import java.util.concurrent.ConcurrentSkipListMap;
 
 public class NotJustInMemoryDAO implements DAO {
 
-    private static final Method CLEAN;
+    private static Method CLEAN;
+
     static {
         try {
             Class<?> aClass = Class.forName("sun.nio.ch.FileChannelImpl");
             CLEAN = aClass.getDeclaredMethod("unmap", MappedByteBuffer.class);
             CLEAN.setAccessible(true);
-        } catch (Exception e) {
-            throw new IllegalStateException(e);
+        } catch (ClassNotFoundException | NoSuchMethodException e) {
+            e.printStackTrace();
         }
     }
 
     private final SortedMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
-
-    @SuppressWarnings({"FieldCanBeLocal", "unused"})
-    private final DAOConfig config;
 
     private final Path saveFileName;
     private final Path tmpFileName;
@@ -44,7 +42,6 @@ public class NotJustInMemoryDAO implements DAO {
     private final MappedByteBuffer mmap;
 
     public NotJustInMemoryDAO(DAOConfig config) throws IOException {
-        this.config = config;
 
         Path dir = config.getDir();
         saveFileName = dir.resolve("save.dat");
