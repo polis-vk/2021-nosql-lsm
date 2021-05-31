@@ -22,12 +22,17 @@ public class InMemoryDAO implements DAO {
     private final NavigableMap<ByteBuffer, Record> storage;
     private static final String FILE_NAME = "IN_MEMORY_DAO_STORAGE";
 
+    /**
+     * @param config - config of DAO for get directory
+     */
     public InMemoryDAO(DAOConfig config) {
         this.directory = config.getDir();
         this.storage = new ConcurrentSkipListMap<>();
         try {
             initStorageByInMemoryFile();
-        } catch (IOException ignore) { }
+        } catch (IOException exception) {
+            System.err.println("Init storage by file was failed: " + exception.getMessage());
+        }
     }
 
     private void initStorageByInMemoryFile() throws IOException {
@@ -41,12 +46,6 @@ public class InMemoryDAO implements DAO {
                 key = readByteBuffer(channel, buffer);
                 value = readByteBuffer(channel, buffer);
                 storage.put(key, Record.of(key, value));
-
-                String sb = "READ: " + key.toString() +
-                        "\t" +
-                        value.toString() +
-                        "\n";
-                System.out.println(sb);
             }
         }
     }
@@ -99,12 +98,6 @@ public class InMemoryDAO implements DAO {
             for (Record record: storage.values()) {
                 writeInteger(record.getKey(), channel, buffer);
                 writeInteger(record.getValue(), channel, buffer);
-
-                String sb = "WRITE: " + record.getKey().toString() +
-                        "\t" +
-                        record.getValue().toString() +
-                        "\n";
-                System.out.println(sb);
             }
         }
     }
