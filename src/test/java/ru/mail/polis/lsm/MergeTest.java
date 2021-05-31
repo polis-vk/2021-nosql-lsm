@@ -9,7 +9,7 @@ import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -17,8 +17,10 @@ import java.util.TreeMap;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static ru.mail.polis.lsm.Utils.key;
 import static ru.mail.polis.lsm.Utils.sizeBasedRandomData;
+import static ru.mail.polis.lsm.Utils.value;
 import static ru.mail.polis.lsm.Utils.valueWithSuffix;
 
 class MergeTest {
@@ -90,6 +92,38 @@ class MergeTest {
             throw e;
         }
     }
+
+    @Test
+    void endlessIterator() {
+        class Repeater implements Iterator<Record> {   // do not use local classes for non-tests code
+
+            private final Record next;
+
+            Repeater(Record next) {
+                this.next = next;
+            }
+
+            @Override
+            public boolean hasNext() {
+                return true;
+            }
+
+            @Override
+            public Record next() {
+                return next;
+            }
+        }
+        Record left = Record.of(key(0), value(0));
+        Record right = Record.of(key(1), value(1));
+        Iterator<Record> iterator = DAO.merge(Arrays.asList(new Repeater(left), new Repeater(right)));
+        for (int i = 0; i < 1000; i++) {
+            assertTrue(iterator.hasNext());
+            Record next = iterator.next();
+            assertEquals(Utils.toString(next.getKey()), Utils.toString(key(0)));
+            assertEquals(Utils.toString(next.getValue()), Utils.toString(value(0)));
+        }
+    }
+
 
     private DAO createDAO(@TempDir Path data, int prefix) throws IOException {
         Path child = data.resolve("child_" + prefix);
