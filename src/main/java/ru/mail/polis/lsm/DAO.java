@@ -110,7 +110,8 @@ public interface DAO extends Closeable {
                 QueueUnit current = queue.poll();
 
                 Iterator<Record> currentIter = iterators.get(current.getSourceNumber());
-                if (lastReturned == null || lastReturnedIndex == current.getSourceNumber() || !current.getData().getKey().equals(lastReturned.getKey())) {
+                if (lastReturned == null || lastReturnedIndex == current.getSourceNumber() 
+                    || !current.getData().getKey().equals(lastReturned.getKey())) {
                     result = current.getData();
                     lastReturned = result;
                     lastReturnedIndex = current.getSourceNumber();
