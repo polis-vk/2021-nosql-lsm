@@ -37,7 +37,7 @@ public interface DAO extends Closeable {
     }
 
     /**
-     * Method merges iterator list
+     * Method merges iterator list.
      * @param iterators - iterators list
      * @return - merged iterator
      */

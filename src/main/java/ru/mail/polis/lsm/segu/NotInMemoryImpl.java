@@ -35,10 +35,10 @@ public class NotInMemoryImpl implements DAO {
     private Path tmpFilePath;
 
     static {
-        Class<?> aClass;
+        Class<?> clazz;
         try {
-            aClass = Class.forName("sun.nio.ch.FileChannelImpl");
-            CLEAN = aClass.getDeclaredMethod("unmap", MappedByteBuffer.class);
+            clazz = Class.forName("sun.nio.ch.FileChannelImpl");
+            CLEAN = clazz.getDeclaredMethod("unmap", MappedByteBuffer.class);
             CLEAN.setAccessible(true);
         } catch (NoSuchMethodException | ClassNotFoundException e) {
             throw new IllegalStateException(e);
