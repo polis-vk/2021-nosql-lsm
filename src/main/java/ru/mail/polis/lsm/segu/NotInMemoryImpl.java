@@ -6,10 +6,14 @@ import ru.mail.polis.lsm.Record;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
+import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.util.Iterator;
 import java.util.SortedMap;
@@ -20,11 +24,27 @@ import java.util.concurrent.ConcurrentSkipListMap;
  */
 
 public class NotInMemoryImpl implements DAO {
-    private final SortedMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
 
+    private final SortedMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
+    private MappedByteBuffer mappedByteBuffer;
+    private static final Method CLEAN;
     private final DAOConfig config;
-    private static final String FILE_NAME = "data.dat";
-    private Path filePath;
+    private static final String SAVE_FILE_NAME = "data.dat";
+    private Path saveFilePath;
+    private static final String TMP_FILE_NAME = "temp.dat";
+    private Path tmpFilePath;
+
+    static {
+        Class<?> aClass;
+        try {
+            aClass = Class.forName("sun.nio.ch.FileChannelImpl");
+            CLEAN = aClass.getDeclaredMethod("unmap", MappedByteBuffer.class);
+            CLEAN.setAccessible(true);
+        } catch (NoSuchMethodException | ClassNotFoundException e) {
+            throw new IllegalStateException(e);
+        }
+
+    }
 
     /**
      * Constructor.
@@ -38,20 +58,34 @@ public class NotInMemoryImpl implements DAO {
     }
 
     private void initStorage() throws IOException {
-        filePath = config.getDir().resolve(FILE_NAME);
-        if (Files.exists(filePath)) {
-            try (FileChannel fileChannel = FileChannel.open(filePath, StandardOpenOption.READ)) {
-                final ByteBuffer size = ByteBuffer.allocate(Integer.BYTES);
-                while (fileChannel.read(size) > 0) {
-                    final ByteBuffer key = readValue(fileChannel, size);
-                    fileChannel.read(size.flip());
-                    size.position(0);
-                    if (size.getInt() < 0) {
-                        storage.put(key, Record.tombstone(key));
-                    } else {
-                        final ByteBuffer value = readValue(fileChannel, size);
-                        storage.put(key, Record.of(key, value));
-                    }
+        saveFilePath = config.getDir().resolve(SAVE_FILE_NAME);
+        tmpFilePath = config.getDir().resolve(TMP_FILE_NAME);
+        if (!Files.exists(saveFilePath)) {
+            if (Files.exists(tmpFilePath)) {
+                Files.move(tmpFilePath, saveFilePath, StandardCopyOption.ATOMIC_MOVE);
+            } else {
+                mappedByteBuffer = null;
+                return;
+            }
+        }
+        try (FileChannel fileChannel = FileChannel.open(saveFilePath, StandardOpenOption.READ)) {
+            mappedByteBuffer = fileChannel.map(FileChannel.MapMode.READ_ONLY, 0, fileChannel.size());
+            while (mappedByteBuffer.hasRemaining()) {
+                int keySize = mappedByteBuffer.getInt();
+                ByteBuffer key = mappedByteBuffer.slice().limit(keySize).asReadOnlyBuffer();
+
+                mappedByteBuffer.position(mappedByteBuffer.position() + keySize);
+
+                int valueSize = mappedByteBuffer.getInt();
+
+                if (valueSize < 0) {
+                    storage.put(key, Record.tombstone(key));
+                } else {
+                    ByteBuffer value = mappedByteBuffer.slice().limit(valueSize).asReadOnlyBuffer();
+                    storage.put(key, Record.of(key, value));
+                }
+                if (mappedByteBuffer.hasRemaining()) {
+                    mappedByteBuffer.position(mappedByteBuffer.position() + valueSize);
                 }
             }
         }
@@ -71,7 +105,8 @@ public class NotInMemoryImpl implements DAO {
 
     @Override
     public void close() throws IOException {
-        try (FileChannel fileChannel = FileChannel.open(filePath,
+
+        try (FileChannel fileChannel = FileChannel.open(tmpFilePath,
                 StandardOpenOption.TRUNCATE_EXISTING,
                 StandardOpenOption.CREATE,
                 StandardOpenOption.WRITE)) {
@@ -81,6 +116,15 @@ public class NotInMemoryImpl implements DAO {
                 writeValue(fileChannel, record.getValue(), size);
             }
         }
+        if (mappedByteBuffer != null) {
+            try {
+                CLEAN.invoke(null, mappedByteBuffer);
+            } catch (IllegalAccessException | InvocationTargetException e) {
+                throw new IllegalStateException(e);
+            }
+        }
+
+        Files.move(tmpFilePath, saveFilePath, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
     }
 
     private void writeValue(FileChannel fileChannel, @Nullable ByteBuffer value, ByteBuffer size) throws IOException {
@@ -97,13 +141,6 @@ public class NotInMemoryImpl implements DAO {
         sizeBuffer.putInt(size);
         sizeBuffer.position(0);
         fileChannel.write(sizeBuffer);
-    }
-
-    private ByteBuffer readValue(FileChannel fileChannel, ByteBuffer size) throws IOException {
-        size.flip();
-        final ByteBuffer value = ByteBuffer.allocate(size.getInt());
-        fileChannel.read(value);
-        return value.flip();
     }
 
     private SortedMap<ByteBuffer, Record> map(@Nullable final ByteBuffer fromKey, @Nullable final ByteBuffer toKey) {

@@ -5,6 +5,8 @@ import java.io.Closeable;
 import java.nio.ByteBuffer;
 import java.util.Iterator;
 import java.util.List;
+import java.util.SortedMap;
+import java.util.concurrent.ConcurrentSkipListMap;
 
 /**
  * Minimal database API.
@@ -34,8 +36,20 @@ public interface DAO extends Closeable {
         return result;
     }
 
-    static Iterator<Record> merge(List<Iterator<Record>> iterators) {
-        throw new UnsupportedOperationException("Implement me");
-    }
+    /**
+     * Method merges iterator list
+     * @param iterators - iterators list
+     * @return - merged iterator
+     */
 
+    static Iterator<Record> merge(List<Iterator<Record>> iterators) {
+        SortedMap<ByteBuffer, Record> resultMap = new ConcurrentSkipListMap<>(ByteBuffer::compareTo);
+        for (Iterator<Record> iterator : iterators) {
+            while (iterator.hasNext()) {
+                Record currentRecord = iterator.next();
+                resultMap.put(currentRecord.getKey(), currentRecord);
+            }
+        }
+        return resultMap.values().iterator();
+    }
 }
