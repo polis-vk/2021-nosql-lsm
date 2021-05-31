@@ -3,7 +3,10 @@ package ru.mail.polis.lsm;
 import javax.annotation.Nullable;
 import java.io.Closeable;
 import java.nio.ByteBuffer;
-import java.util.*;
+import java.util.Iterator;
+import java.util.List;
+import java.util.PriorityQueue;
+import java.util.Queue;
 import java.util.stream.IntStream;
 
 /**
@@ -37,8 +40,8 @@ public interface DAO extends Closeable {
     /**
      * Merge Iterators.
      *
-     * @param iterators original List<Iterator<Record>>
-     * @return original Iterator<Record>
+     * @param iterators List
+     * @return Iterator
      */
     static Iterator<Record> merge(List<Iterator<Record>> iterators) {
         return new MergeRecordIterator(iterators);

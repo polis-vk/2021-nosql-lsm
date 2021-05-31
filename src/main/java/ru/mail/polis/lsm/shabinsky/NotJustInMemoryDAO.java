@@ -26,8 +26,8 @@ public class NotJustInMemoryDAO implements DAO {
 
     static {
         try {
-            Class<?> aClass = Class.forName("sun.nio.ch.FileChannelImpl");
-            CLEAN = aClass.getDeclaredMethod("unmap", MappedByteBuffer.class);
+            Class<?> classs = Class.forName("sun.nio.ch.FileChannelImpl");
+            CLEAN = classs.getDeclaredMethod("unmap", MappedByteBuffer.class);
             CLEAN.setAccessible(true);
         } catch (ClassNotFoundException | NoSuchMethodException e) {
             e.printStackTrace();
@@ -41,6 +41,12 @@ public class NotJustInMemoryDAO implements DAO {
 
     private final MappedByteBuffer mmap;
 
+    /**
+     * NotJustInMemoryDAO constructor.
+     *
+     * @param config {@link DAOConfig}
+     * @throws IOException raises an exception
+     */
     public NotJustInMemoryDAO(DAOConfig config) throws IOException {
 
         Path dir = config.getDir();
