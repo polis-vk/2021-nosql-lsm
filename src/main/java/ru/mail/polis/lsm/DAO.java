@@ -3,10 +3,12 @@ package ru.mail.polis.lsm;
 import javax.annotation.Nullable;
 import java.io.Closeable;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.stream.Stream;
 
 /**
  * Minimal database API.
@@ -48,7 +50,16 @@ public interface DAO extends Closeable {
         Map<ByteBuffer, Record> map = new TreeMap<>();
 
         for (Iterator<Record> iterator : iterators) {
-            iterator.forEachRemaining(record -> map.put(record.getKey(), record));
+
+            while (iterator.hasNext()) {
+                Record record = iterator.next();
+                try {
+                    map.put(record.getKey(), record);
+                    iterator.remove();
+                } catch (UnsupportedOperationException e) {
+                    return Stream.generate(() -> record).iterator();
+                }
+            }
         }
 
         return map.values().iterator();
