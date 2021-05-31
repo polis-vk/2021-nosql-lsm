@@ -6,12 +6,15 @@ import ru.mail.polis.lsm.Record;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
+import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
-import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.util.Iterator;
 import java.util.SortedMap;
@@ -19,32 +22,56 @@ import java.util.concurrent.ConcurrentSkipListMap;
 
 public class NotJustInMemoryDAO implements DAO {
 
+    private static final Method CLEAN;
+    static {
+        try {
+            var aClass = Class.forName("sun.nio.ch.FileChannelImpl");
+            CLEAN = aClass.getDeclaredMethod("unmap", MappedByteBuffer.class);
+            CLEAN.setAccessible(true);
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
     private final SortedMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
-    private static final String DATA_BASE = "database.dat";
+
+    @SuppressWarnings({"FieldCanBeLocal", "unused"})
     private final DAOConfig config;
 
-    /**
-     * Constructor that initialize buffers.
-     */
+    private final Path saveFileName;
+    private final Path tmpFileName;
 
-    public NotJustInMemoryDAO(DAOConfig config) {
+    private final MappedByteBuffer mmap;
+
+    public NotJustInMemoryDAO(DAOConfig config) throws IOException {
         this.config = config;
 
-        final Path path = config.getDir().resolve(DATA_BASE);
+        Path dir = config.getDir();
+        saveFileName = dir.resolve("save.dat");
+        tmpFileName = dir.resolve("tmp.dat");
+        if (!Files.exists(saveFileName)) {
+            if (Files.exists(tmpFileName)) {
+                Files.move(tmpFileName, saveFileName, StandardCopyOption.ATOMIC_MOVE);
+            } else {
+                mmap = null;
+                return;
+            }
+        }
 
-        if (Files.exists(path)) {
-            try (FileChannel fileChannel =
-                         FileChannel.open(path, StandardOpenOption.READ, StandardOpenOption.CREATE_NEW)) {
-                final ByteBuffer buffer = ByteBuffer.allocate(Integer.BYTES);
-                ByteBuffer key;
-                ByteBuffer value;
-                while (fileChannel.position() < fileChannel.size()) {
-                    key = readInt(fileChannel, buffer);
-                    value = readInt(fileChannel, buffer);
-                    storage.put(key, Record.of(key, value));
-                }
-            } catch (IOException e) {
-                e.printStackTrace();
+        try (FileChannel channel = FileChannel.open(saveFileName, StandardOpenOption.READ)) {
+            mmap = channel.map(FileChannel.MapMode.READ_ONLY, 0, channel.size());
+            while (mmap.hasRemaining()) {
+                int keySize = mmap.getInt();
+                ByteBuffer key = mmap.slice().limit(keySize).asReadOnlyBuffer();
+
+                mmap.position(mmap.position() + keySize);
+
+                int valueSize = mmap.getInt();
+                ByteBuffer value = mmap.slice().limit(valueSize).asReadOnlyBuffer();
+
+                mmap.position(mmap.position() + valueSize);
+
+                storage.put(key, Record.of(key, value));
             }
         }
     }
@@ -56,7 +83,6 @@ public class NotJustInMemoryDAO implements DAO {
 
     @Override
     public void upsert(Record record) {
-
         if (record.getValue() == null) {
             storage.remove(record.getKey());
         } else {
@@ -66,18 +92,38 @@ public class NotJustInMemoryDAO implements DAO {
 
     @Override
     public void close() throws IOException {
-        Files.deleteIfExists(config.getDir().resolve(DATA_BASE));
-
-        final Path file = config.getDir().resolve(DATA_BASE);
-
-        try (FileChannel fileChannel =
-                     FileChannel.open(file, StandardOpenOption.WRITE, StandardOpenOption.CREATE_NEW)) {
-            final ByteBuffer size = ByteBuffer.allocate(Integer.BYTES);
-            for (final Record record : storage.values()) {
+        try (FileChannel fileChannel = FileChannel.open(
+                tmpFileName,
+                StandardOpenOption.CREATE_NEW,
+                StandardOpenOption.WRITE,
+                StandardOpenOption.TRUNCATE_EXISTING
+        )) {
+            ByteBuffer size = ByteBuffer.allocate(Integer.BYTES);
+            for (Record record : storage.values()) {
                 writeInt(record.getKey(), fileChannel, size);
                 writeInt(record.getValue(), fileChannel, size);
             }
+            fileChannel.force(false);
         }
+
+        if (mmap != null) {
+            try {
+                CLEAN.invoke(null, mmap);
+            } catch (IllegalAccessException | InvocationTargetException e) {
+                throw new IOException(e);
+            }
+        }
+
+        Files.deleteIfExists(saveFileName);
+        Files.move(tmpFileName, saveFileName, StandardCopyOption.ATOMIC_MOVE);
+    }
+
+    private static void writeInt(ByteBuffer value, WritableByteChannel channel, ByteBuffer tmp) throws IOException {
+        tmp.position(0);
+        tmp.putInt(value.remaining());
+        tmp.position(0);
+        channel.write(tmp);
+        channel.write(value);
     }
 
     private SortedMap<ByteBuffer, Record> map(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
@@ -93,21 +139,4 @@ public class NotJustInMemoryDAO implements DAO {
         return storage.subMap(fromKey, toKey);
     }
 
-    private void writeInt(ByteBuffer value, WritableByteChannel channel, ByteBuffer byteBuffer) throws IOException {
-        byteBuffer.position(0);
-        byteBuffer.putInt(value.remaining());
-        byteBuffer.position(0);
-        channel.write(byteBuffer);
-        channel.write(value);
-    }
-
-    private ByteBuffer readInt(ReadableByteChannel channel, ByteBuffer byteBuffer) throws IOException {
-        byteBuffer.position(0);
-        channel.read(byteBuffer);
-        byteBuffer.position(0);
-        final ByteBuffer returnBuff = ByteBuffer.allocate(byteBuffer.getInt());
-        channel.read(returnBuff);
-        returnBuff.position(0);
-        return returnBuff;
-    }
 }
