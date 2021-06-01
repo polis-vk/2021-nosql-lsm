@@ -46,12 +46,12 @@ public interface DAO extends Closeable {
                 return iterators.get(0);
             case (2):
                 return new MergeTwo(iterators.get(0), iterators.get(1));
+            default:
+                Iterator<Record> left = merge(iterators.subList(0, iterators.size() / 2));
+                Iterator<Record> right = merge(iterators.subList(iterators.size() / 2, iterators.size()));
+
+                return new MergeTwo(left, right);
         }
-
-        Iterator<Record> left = merge(iterators.subList(0, iterators.size() / 2));
-        Iterator<Record> right = merge(iterators.subList(iterators.size() / 2, iterators.size()));
-
-        return new MergeTwo(left, right);
     }
 
     Iterator<Record> range(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey);
@@ -84,11 +84,11 @@ public interface DAO extends Closeable {
 
         @Override
         public Record next() {
-            Record result;
-
             if (leftPart == null && rightPart == null) {
                 throw new NoSuchElementException();
             }
+
+            Record result;
 
             if (leftPart == null) {
                 result = rightPart;

@@ -28,10 +28,10 @@ public class DAOImpl implements DAO {
 
     static {
         try {
-            Class<?> aClass = Class.forName("sun.nio.ch.FileChannelImpl");
-            CLEAN = aClass.getDeclaredMethod("unmap", MappedByteBuffer.class);
+            Class<?> filename = Class.forName("sun.nio.ch.FileChannelImpl");
+            CLEAN = filename.getDeclaredMethod("unmap", MappedByteBuffer.class);
             CLEAN.setAccessible(true);
-        } catch (Exception e) {
+        } catch (ClassNotFoundException | NoSuchMethodException e) {
             throw new IllegalStateException(e);
         }
     }
@@ -117,7 +117,7 @@ public class DAOImpl implements DAO {
             try {
                 CLEAN.invoke(null, mmap);
             } catch (IllegalAccessException | InvocationTargetException e) {
-                throw new IOException();
+                throw new IOException(e);
             }
         }
 
