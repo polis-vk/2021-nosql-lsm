@@ -3,16 +3,15 @@ package ru.mail.polis.lsm;
 import javax.annotation.Nullable;
 import java.io.Closeable;
 import java.nio.ByteBuffer;
-import java.util.Iterator;
+import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 /**
  * Minimal database API.
  */
 public interface DAO extends Closeable {
-    Iterator<Record> range(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey);
-
-    void upsert(Record record);
-
     /**
      * Appends {@code Byte.MIN_VALUE} to {@code buffer}.
      *
@@ -32,4 +31,31 @@ public interface DAO extends Closeable {
 
         return result;
     }
+
+    /**
+     * Merges iterators without only with new {@code Record} and without duplicates.
+     *
+     * @param iterators original {@link Iterator} list
+     * @return merged iterators
+     */
+    static Iterator<Record> merge(List<Iterator<Record>> iterators) {
+        return iterators.stream()
+                .flatMap(recordIterator ->
+                        StreamSupport.stream(
+                                Spliterators.spliteratorUnknownSize(recordIterator, Spliterator.ORDERED),
+                                false))
+                .collect(
+                        Collectors.toMap(
+                                Record::getKey,
+                                Function.identity(),
+                                (record1, record2) -> record2,
+                                TreeMap::new))
+                .values()
+                .iterator();
+    }
+
+    Iterator<Record> range(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey);
+
+    void upsert(Record record);
+
 }
