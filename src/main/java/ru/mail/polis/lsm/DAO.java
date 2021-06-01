@@ -3,14 +3,14 @@ package ru.mail.polis.lsm;
 import javax.annotation.Nullable;
 import java.io.Closeable;
 import java.nio.ByteBuffer;
-import java.util.*;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.ConcurrentNavigableMap;
+import java.util.Iterator;
+import java.util.Spliterators;
+import java.util.Spliterator;
+import java.util.List;
 import java.util.concurrent.ConcurrentSkipListMap;
-import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
-import static java.util.stream.Collectors.*;
+import static java.util.stream.Collectors.toMap;
 
 /**
  * Minimal database API.
@@ -47,7 +47,8 @@ public interface DAO extends Closeable {
 //                                Spliterators.spliteratorUnknownSize(recordIterator, Spliterator.ORDERED),
 //                                false))
 //                .collect(Collectors.toCollection(ArrayList::new))
-//               .iterator(); // так не работает ?
+//               .iterator();
+// так не работает ?
         return iterators.stream()
                 .flatMap(e ->
                         StreamSupport.stream(
