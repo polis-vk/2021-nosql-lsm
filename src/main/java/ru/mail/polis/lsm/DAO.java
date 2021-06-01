@@ -3,14 +3,13 @@ package ru.mail.polis.lsm;
 import javax.annotation.Nullable;
 import java.io.Closeable;
 import java.nio.ByteBuffer;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Spliterator;
-import java.util.Spliterators;
+import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
-import java.util.function.Function;
-import java.util.stream.Collectors;
-import java.util.stream.StreamSupport;
 
 /**
  * Minimal database API.
@@ -43,19 +42,19 @@ public interface DAO extends Closeable {
      * @return merged iterators
      */
     static Iterator<Record> merge(List<Iterator<Record>> iterators) {
-        return iterators.stream()
-                .flatMap(recordIterator ->
-                        StreamSupport.stream(
-                                Spliterators.spliteratorUnknownSize(recordIterator, Spliterator.ORDERED),
-                                false))
-                .collect(
-                        Collectors.toMap(
-                                Record::getKey,
-                                Function.identity(),
-                                (record1, record2) -> record2,
-                                TreeMap::new))
-                .values()
-                .iterator();
+        Map<ByteBuffer, Record> out = new TreeMap<>(Comparator.naturalOrder());
+        for (Iterator<Record> iterator : iterators) {
+            Set<Record> records = new HashSet<>();
+            while (iterator.hasNext()) {
+                Record current = iterator.next();
+                if (records.contains(current)) {
+                    return iterator;
+                }
+                records.add(current);
+                out.put(current.getKey(), current);
+            }
+        }
+        return out.values().iterator();
     }
 
     Iterator<Record> range(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey);

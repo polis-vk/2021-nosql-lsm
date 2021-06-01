@@ -10,6 +10,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -120,6 +121,48 @@ class MergeTest {
             Record next = iterator.next();
             assertEquals(Utils.toString(next.getKey()), Utils.toString(key(0)));
             assertEquals(Utils.toString(next.getValue()), Utils.toString(value(0)));
+        }
+    }
+
+    @Test
+    void endlessIteratorVadim() {
+        class Repeater implements Iterator<Record> {   // do not use local classes for non-tests code
+
+            private final Record[] next;
+            private int size = 0;
+
+            Repeater(Record[] next) {
+                this.next = next;
+            }
+
+            @Override
+            public boolean hasNext() {
+                return true;
+            }
+
+            @Override
+            public Record next() {
+                if (size == next.length - 1) {
+                    size = 0;
+                    return next[size];
+                } else {
+                    return next[++size];
+                }
+
+            }
+        }
+        Record first = Record.of(key(0), value(0));
+        Record second = Record.of(key(1), value(1));
+        Iterator<Record> iterator = DAO.merge(Collections.singletonList(new Repeater(new Record[]{first, second})));
+        boolean temp = true;
+        for (int i = 0; i < 1000; i++) {
+            assertTrue(iterator.hasNext());
+            Record next = iterator.next();
+            System.out.println(Utils.toString(next.getKey()));
+            System.out.println(temp);
+            assertEquals(Utils.toString(next.getKey()), Utils.toString(key(temp ? 0 : 1)));
+            assertEquals(Utils.toString(next.getValue()), Utils.toString(value(temp ? 0 : 1)));
+            temp = !temp;
         }
     }
 
