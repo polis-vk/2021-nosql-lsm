@@ -50,15 +50,10 @@ public interface DAO extends Closeable {
         for (var item : iterators) {
             do {
                 var temp = item.next();
-                if(temp.equals(lastRec)) {
-                    return iterators.stream()
-                            .flatMap(e ->
-                                    StreamSupport.stream(
-                                            Spliterators.spliteratorUnknownSize(e, Spliterator.ORDERED),
-                                            false))
-                            .collect(toMap(Record::getKey, record -> record, (recordL, recordR) -> recordR,
-                                    ConcurrentSkipListMap::new))
-                            .values()
+                if (temp.equals(lastRec)) {
+                    return StreamSupport.stream(
+                            Spliterators.spliteratorUnknownSize(item, Spliterator.ORDERED),
+                            false)
                             .iterator();
                 }
                 map.put(temp.getKey(), temp);
