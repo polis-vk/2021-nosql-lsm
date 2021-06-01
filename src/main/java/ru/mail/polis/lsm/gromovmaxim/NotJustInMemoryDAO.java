@@ -29,15 +29,12 @@ public class NotJustInMemoryDAO implements DAO {
             var classS = Class.forName("sun.nio.ch.FileChannelImpl");
             CLEAN = classS.getDeclaredMethod("unmap", MappedByteBuffer.class);
             CLEAN.setAccessible(true);
-        } catch (Exception e) {
+        } catch (ClassNotFoundException | NoSuchMethodException e) {
             throw new IllegalStateException(e);
         }
     }
 
     private final SortedMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
-
-    @SuppressWarnings({"FieldCanBeLocal", "unused"})
-    private final DAOConfig config;
 
     private final Path saveFileName;
     private final Path tmpFileName;
@@ -49,8 +46,6 @@ public class NotJustInMemoryDAO implements DAO {
      */
 
     public NotJustInMemoryDAO(DAOConfig config) throws IOException {
-        this.config = config;
-
         Path dir = config.getDir();
         saveFileName = dir.resolve("save.dat");
         tmpFileName = dir.resolve("tmp.dat");
