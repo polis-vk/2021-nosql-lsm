@@ -104,6 +104,7 @@ public interface DAO extends Closeable {
                 if (i == minIndex) {
                     continue;
                 }
+
                 Pair pair = nextRecordList.get(i);
                 while (pair.iterator != null && minRecord != null && pair.record.getKey().equals(minRecord.getKey())) {
                     if (pair.iterator.hasNext()) {
