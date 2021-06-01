@@ -3,10 +3,7 @@ package ru.mail.polis.lsm;
 import javax.annotation.Nullable;
 import java.io.Closeable;
 import java.nio.ByteBuffer;
-import java.util.Iterator;
-import java.util.Spliterator;
-import java.util.List;
-import java.util.Spliterators;
+import java.util.*;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.stream.StreamSupport;
 
@@ -44,15 +41,26 @@ public interface DAO extends Closeable {
      * Merge iterators.
      */
     static Iterator<Record> merge(List<Iterator<Record>> iterators) {
-        return iterators.stream()
-                .flatMap(e ->
-                        StreamSupport.stream(
-                                Spliterators.spliteratorUnknownSize(e, Spliterator.ORDERED),
-                                false))
-                .collect(toMap(Record::getKey, record -> record, (recordL, recordR) -> recordR,
-                        ConcurrentSkipListMap::new))
-                .values()
-                .iterator();
+        var map = new TreeMap<ByteBuffer, Record>();
+        Record lastRec = null;
+        for (var item : iterators) {
+            do {
+                var temp = item.next();
+                if(temp.equals(lastRec)) {
+                    return iterators.stream()
+                            .flatMap(e ->
+                                    StreamSupport.stream(
+                                            Spliterators.spliteratorUnknownSize(e, Spliterator.ORDERED),
+                                            false))
+                            .collect(toMap(Record::getKey, record -> record, (recordL, recordR) -> recordR,
+                                    ConcurrentSkipListMap::new))
+                            .values()
+                            .iterator();
+                }
+                map.put(temp.getKey(), temp);
+                lastRec = temp;
+            } while (item.hasNext());
+        }
+        return map.values().iterator();
     }
-
 }
