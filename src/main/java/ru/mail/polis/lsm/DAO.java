@@ -10,7 +10,6 @@ import java.util.Spliterators;
 import java.util.TreeMap;
 import java.util.stream.StreamSupport;
 
-
 /**
  * Minimal database API.
  */
