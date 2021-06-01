@@ -3,11 +3,7 @@ package ru.mail.polis.lsm;
 import javax.annotation.Nullable;
 import java.io.Closeable;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.List;
-import java.util.NoSuchElementException;
+import java.util.*;
 
 /**
  * Minimal database API.
@@ -34,7 +30,6 @@ public interface DAO extends Closeable {
     }
 
     /**
-     *
      * @param iterators
      * @return
      */
@@ -80,8 +75,8 @@ public interface DAO extends Closeable {
 
         @Override
         public boolean hasNext() {
-            for(Pair pair : nextRecordList) {
-                if(pair.iterator != null) {
+            for (Pair pair : nextRecordList) {
+                if (pair.iterator != null) {
                     return true;
                 }
             }
@@ -90,36 +85,35 @@ public interface DAO extends Closeable {
 
         @Override
         public Record next() {
-            if(!hasNext()) {
+            if (!hasNext()) {
                 throw new NoSuchElementException();
             }
             Record minRecord = null;
             int minIndex = -1;
-            for(int i = 0; i < nextRecordList.size(); ++i) {
+            for (int i = 0; i < nextRecordList.size(); ++i) {
                 Record currentRecord = nextRecordList.get(i).record;
-                if(currentRecord != null) {
-                    if(minRecord == null || minRecord.getKey().compareTo(currentRecord.getKey()) >= 0) {
-                        minRecord = currentRecord;
-                        minIndex = i;
-                    }
+                if (currentRecord != null &&
+                        (minRecord == null || minRecord.getKey().compareTo(currentRecord.getKey()) >= 0)) {
+                    minRecord = currentRecord;
+                    minIndex = i;
                 }
             }
             Iterator<Record> iteratorToUpdate = nextRecordList.get(minIndex).iterator;
-            if(iteratorToUpdate != null && minIndex != -1) {
-                if(iteratorToUpdate.hasNext()) {
+            if (iteratorToUpdate != null && minIndex != -1) {
+                if (iteratorToUpdate.hasNext()) {
                     nextRecordList.set(minIndex, new Pair(iteratorToUpdate.next(), iteratorToUpdate));
                 } else {
                     nextRecordList.set(minIndex, new Pair(null, null));
                 }
             }
 
-            for(int i = 0; i < nextRecordList.size(); ++i) {
-                if(i == minIndex) {
+            for (int i = 0; i < nextRecordList.size(); ++i) {
+                if (i == minIndex) {
                     continue;
                 }
                 Pair pair = nextRecordList.get(i);
-                while(pair.iterator != null && pair.record.getKey().equals(minRecord.getKey())) {
-                    if(pair.iterator.hasNext()) {
+                while (pair.iterator != null && pair.record.getKey().equals(minRecord.getKey())) {
+                    if (pair.iterator.hasNext()) {
                         pair.record = pair.iterator.next();
                     } else {
                         pair.iterator = null;
