@@ -86,6 +86,17 @@ public interface DAO extends Closeable {
             return false;
         }
 
+        private void updateIteratorWithMinRecord(int minIndex) {
+            Iterator<Record> iteratorToUpdate = nextRecordList.get(minIndex).iterator;
+            if (iteratorToUpdate != null && minIndex != -1) {
+                if (iteratorToUpdate.hasNext()) {
+                    nextRecordList.set(minIndex, new Pair(iteratorToUpdate.next(), iteratorToUpdate));
+                } else {
+                    nextRecordList.set(minIndex, new Pair(null, null));
+                }
+            }
+        }
+
         @Override
         public Record next() {
             if (!hasNext()) {
@@ -101,14 +112,7 @@ public interface DAO extends Closeable {
                     minIndex = i;
                 }
             }
-            Iterator<Record> iteratorToUpdate = nextRecordList.get(minIndex).iterator;
-            if (iteratorToUpdate != null && minIndex != -1) {
-                if (iteratorToUpdate.hasNext()) {
-                    nextRecordList.set(minIndex, new Pair(iteratorToUpdate.next(), iteratorToUpdate));
-                } else {
-                    nextRecordList.set(minIndex, new Pair(null, null));
-                }
-            }
+            updateIteratorWithMinRecord(minIndex);
 
             for (int i = 0; i < nextRecordList.size(); ++i) {
                 if (i == minIndex) {
