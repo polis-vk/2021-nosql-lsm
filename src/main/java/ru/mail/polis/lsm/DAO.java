@@ -3,8 +3,14 @@ package ru.mail.polis.lsm;
 import javax.annotation.Nullable;
 import java.io.Closeable;
 import java.nio.ByteBuffer;
-import java.util.Iterator;
-import java.util.List;
+import java.util.*;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ConcurrentNavigableMap;
+import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
+
+import static java.util.stream.Collectors.*;
 
 /**
  * Minimal database API.
@@ -35,7 +41,21 @@ public interface DAO extends Closeable {
     }
 
     static Iterator<Record> merge(List<Iterator<Record>> iterators) {
-        throw new UnsupportedOperationException("Implement me");
+//        iterators.stream()
+//                .flatMap(recordIterator ->
+//                        StreamSupport.stream(
+//                                Spliterators.spliteratorUnknownSize(recordIterator, Spliterator.ORDERED),
+//                                false))
+//                .collect(Collectors.toCollection(ArrayList::new))
+//               .iterator(); // так не работает ?
+        return iterators.stream()
+                .flatMap(e ->
+                        StreamSupport.stream(
+                                Spliterators.spliteratorUnknownSize(e, Spliterator.ORDERED),
+                                false))
+                .collect(toMap(Record::getKey, record -> record, (recordL, recordR) -> recordR, ConcurrentSkipListMap::new))
+                .values()
+                .iterator();
     }
 
 }
