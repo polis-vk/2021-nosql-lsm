@@ -110,7 +110,14 @@ public class NotJustInMemoryDAO implements DAO {
         channel.read(tmp);
         tmp.position(0);
         final ByteBuffer byteBuffer = ByteBuffer.allocate(tmp.getInt());
-        channel.read(byteBuffer);
+      //  channel.read(byteBuffer);
+      //  byteBuffer.position(0);
+        while (channel.read(byteBuffer) > 0) {
+            byteBuffer.flip();
+            while (byteBuffer.hasRemaining()) {
+                channel.read(byteBuffer);
+            }
+        }
         byteBuffer.position(0);
         return byteBuffer;
     }
