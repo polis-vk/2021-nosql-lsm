@@ -23,15 +23,14 @@ public class DaoImpl implements DAO {
 
     static {
         try {
-            Class<?> aClass = Class.forName("sun.nio.ch.FileChannelImpl");
-            CLEAN = aClass.getDeclaredMethod("unmap", MappedByteBuffer.class);
+            Class<?> fileChannelImplClass = Class.forName("sun.nio.ch.FileChannelImpl");
+            CLEAN = fileChannelImplClass.getDeclaredMethod("unmap", MappedByteBuffer.class);
             CLEAN.setAccessible(true);
-        } catch (Exception e) {
+        } catch (ClassNotFoundException | NoSuchMethodException e) {
             throw new IllegalStateException(e);
         }
     }
 
-    private final DAOConfig config;
     private final NavigableMap<ByteBuffer, Record> map;
     private final Path saveFileName;
     private final Path tmpFileName;
@@ -42,7 +41,6 @@ public class DaoImpl implements DAO {
      * Implementation of DAO with Persistence.
      */
     public DaoImpl(DAOConfig config) throws IOException {
-        this.config = config;
         this.map = new ConcurrentSkipListMap<>();
 
         Path dir = config.getDir();
