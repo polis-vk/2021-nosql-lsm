@@ -35,8 +35,14 @@ public interface DAO extends Closeable {
         return result;
     }
 
+    /**
+     * Merges iterators.
+     *
+     * @param iterators List
+     * @return Iterator
+     */
     static Iterator<Record> merge(List<Iterator<Record>> iterators) {
-        if (iterators.size() == 0) {
+        if (iterators.isEmpty()) {
             return Collections.emptyIterator();
         }
         if (iterators.size() == 1) {
@@ -78,25 +84,28 @@ public interface DAO extends Closeable {
         public Record next() {
             Record returnRecord = null;
 
-            if (next1 != null && next2 != null) {
-                int compareResult = next1.getKey().compareTo(next2.getKey());
-                if (compareResult <= 0) {
+            if (hasNext()) {
+                if (next2 == null) {
                     returnRecord = next1;
                     getNext1();
-
-                    if (compareResult == 0) {
-                        getNext2();
-                    }
-                } else {
+                } else if (next1 == null) {
                     returnRecord = next2;
                     getNext2();
+                } else {
+                    int compareResult = next1.getKey().compareTo(next2.getKey());
+
+                    if (compareResult <= 0) {
+                        returnRecord = next1;
+                        getNext1();
+
+                        if (compareResult == 0) {
+                            getNext2();
+                        }
+                    } else {
+                        returnRecord = next2;
+                        getNext2();
+                    }
                 }
-            } else if (next1 != null) {
-                returnRecord = next1;
-                getNext1();
-            } else if (next2 != null) {
-                returnRecord = next2;
-                getNext2();
             }
 
             return returnRecord;
