@@ -41,14 +41,6 @@ public interface DAO extends Closeable {
     }
 
     static Iterator<Record> merge(List<Iterator<Record>> iterators) {
-        //        iterators.stream()
-        //                .flatMap(recordIterator ->
-        //                        StreamSupport.stream(
-        //                                Spliterators.spliteratorUnknownSize(recordIterator, Spliterator.ORDERED),
-        //                                false))
-        //                .collect(Collectors.toCollection(ArrayList::new))
-        //               .iterator();
-        //        так не работает ?
         return iterators.stream()
                 .flatMap(e ->
                         StreamSupport.stream(
