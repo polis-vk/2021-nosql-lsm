@@ -10,8 +10,8 @@ public class Record {
     private final ByteBuffer value;
 
     Record(ByteBuffer key, @Nullable ByteBuffer value) {
-        this.key = key;
-        this.value = value;
+        this.key = key.asReadOnlyBuffer();
+        this.value = value == null ? null : value.asReadOnlyBuffer();
     }
 
     public static Record of(ByteBuffer key, ByteBuffer value) {
@@ -33,4 +33,5 @@ public class Record {
     public boolean isTombstone() {
         return value == null;
     }
+
 }
