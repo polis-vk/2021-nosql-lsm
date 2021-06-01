@@ -4,8 +4,8 @@ import javax.annotation.Nullable;
 import java.io.Closeable;
 import java.nio.ByteBuffer;
 import java.util.Iterator;
-import java.util.Spliterators;
 import java.util.Spliterator;
+import java.util.Spliterators;
 import java.util.List;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.stream.StreamSupport;
@@ -48,7 +48,7 @@ public interface DAO extends Closeable {
 //                                false))
 //                .collect(Collectors.toCollection(ArrayList::new))
 //               .iterator();
-// так не работает ?
+//        так не работает ?
         return iterators.stream()
                 .flatMap(e ->
                         StreamSupport.stream(
