@@ -23,6 +23,7 @@ import java.util.concurrent.ConcurrentSkipListMap;
 public class NotJustInMemoryDAO implements DAO {
 
     private static final Method CLEAN;
+
     static {
         try {
             var aClass = Class.forName("sun.nio.ch.FileChannelImpl");
