@@ -108,10 +108,10 @@ public class SerializeDAO implements DAO {
 
     @Override
     public void upsert(Record recordUpsert) {
-        if (!recordUpsert.isTombstone()) {
-            storage.put(recordUpsert.getKey(), recordUpsert);
-        } else {
+        if (recordUpsert.isTombstone()) {
             storage.remove(recordUpsert.getKey());
+        } else {
+            storage.put(recordUpsert.getKey(), recordUpsert);
         }
     }
 
