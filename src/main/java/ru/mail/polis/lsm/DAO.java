@@ -8,10 +8,8 @@ import java.util.List;
 import java.util.Spliterator;
 import java.util.Spliterators;
 import java.util.TreeMap;
-import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.stream.StreamSupport;
 
-import static java.util.stream.Collectors.toMap;
 
 /**
  * Minimal database API.
