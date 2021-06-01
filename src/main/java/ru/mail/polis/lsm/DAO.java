@@ -46,22 +46,35 @@ public interface DAO extends Closeable {
      */
     static Iterator<Record> merge(List<Iterator<Record>> iterators) {
 
+        int limit = Integer.MAX_VALUE / 128;
+
         Map<ByteBuffer, Record> map = new TreeMap<>();
         Record prevRecord = null;
 
         for (Iterator<Record> iterator : iterators) {
+            int counter = 1;
+
+            Stream.Builder<Record> builder = Stream.builder();
 
             while (iterator.hasNext()) {
+
                 Record record = iterator.next();
 
                 if (prevRecord != null && prevRecord.equals(record)) {
-                    return Stream.generate(() -> record).iterator();
+                    builder.add(record);
+
+                    counter++;
+                    if (counter > limit) {
+                        Stream<Record> finalStream = builder.build();
+                        return Stream.concat(map.values().stream(), finalStream)
+                                .limit(limit).iterator();
+                    }
+                } else {
+                    map.put(record.getKey(), record);
                 }
-                map.put(record.getKey(), record);
                 prevRecord = record;
             }
         }
-
         return map.values().iterator();
     }
 }
