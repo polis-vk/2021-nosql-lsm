@@ -5,10 +5,7 @@ import java.io.Closeable;
 import java.nio.ByteBuffer;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.List;
+import java.util.*;
 
 /**
  * Minimal database API.
@@ -35,7 +32,9 @@ public interface DAO extends Closeable {
     }
 
     /**
-     * Function that merge k iterators to one.
+     *
+     * @param iterators
+     * @return
      */
 
     static Iterator<Record> merge(List<Iterator<Record>> iterators) {
@@ -45,90 +44,89 @@ public interface DAO extends Closeable {
         if (iterators.size() == 1) {
             return iterators.get(0);
         }
-        if (iterators.size() == 2) {
-            return mergeTwo(iterators.get(0), iterators.get(1));
-        } else {
-            Iterator<Record> left = merge(iterators.subList(0, iterators.size() / 2));
-            Iterator<Record> right = merge(iterators.subList(iterators.size() / 2, iterators.size()));
-            return mergeTwo(left, right);
-        }
-    }
-
-    private static String toString(ByteBuffer buffer) {
-        try {
-            return StandardCharsets.UTF_8.newDecoder().decode(buffer).toString();
-        } catch (CharacterCodingException e) {
-            throw new IllegalArgumentException(e);
-        }
-    }
-
-    private static Record updateRecord(Iterator<Record> iterator) {
-        if (iterator.hasNext()) {
-            return iterator.next();
-        } else {
-            return null;
-        }
-    }
-    /**
-     * Function that merge two iterators to one.
-     */
-
-    static Iterator<Record> mergeTwo(Iterator<Record> left, Iterator<Record> right) {
-        if (!left.hasNext() && !right.hasNext()) {
-            return Collections.emptyIterator();
-        }
-        if (left.hasNext() && !right.hasNext()) {
-            return left;
-        }
-        if (!left.hasNext() && right.hasNext()) {
-            return right;
-        }
-
-        final List<Record> listOfRecords = new ArrayList<>();
-        Record leftRecord = updateRecord(left);
-        Record rightRecord = updateRecord(right);
-
-        while (!(leftRecord == null && rightRecord == null)) {
-
-            if (leftRecord == null) {
-                listOfRecords.add(rightRecord);
-                rightRecord = updateRecord(right);
-                if (rightRecord == null) {
-                    return listOfRecords.iterator();
-                }
-                continue;
-            }
-
-            if (rightRecord == null) {
-                listOfRecords.add(leftRecord);
-                leftRecord = updateRecord(left);
-                if (leftRecord == null) {
-                    return listOfRecords.iterator();
-                }
-                continue;
-            }
-
-            int compare = toString(leftRecord.getKey()).compareTo(toString(rightRecord.getKey()));
-
-            if (compare == 0) {
-                listOfRecords.add(rightRecord);
-                rightRecord = updateRecord(right);
-                leftRecord = updateRecord(left);
-            } else if (compare < 0) {
-                listOfRecords.add(leftRecord);
-                leftRecord = updateRecord(left);
-
-            } else {
-                listOfRecords.add(rightRecord);
-                rightRecord = updateRecord(right);
-            }
-        }
-
-        return listOfRecords.iterator();
+        return new MyIterator(iterators);
     }
 
     Iterator<Record> range(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey);
 
     void upsert(Record record);
 
+    class Pair {
+
+        Record record;
+        Iterator<Record> iterator;
+
+        Pair(Record record, Iterator<Record> iterator) {
+            this.record = record;
+            this.iterator = iterator;
+        }
+    }
+
+    class MyIterator implements Iterator<Record> {
+
+        LinkedList<Pair> nextRecordList = new LinkedList<>();
+        List<Iterator<Record>> iterators;
+
+        public MyIterator(List<Iterator<Record>> iterators) {
+            this.iterators = iterators;
+            for (Iterator<Record> i : this.iterators) {
+                if (i.hasNext()) {
+                    nextRecordList.add(new Pair(i.next(), i));
+                }
+            }
+        }
+
+        @Override
+        public boolean hasNext() {
+            for(Pair pair : nextRecordList) {
+                if(pair.iterator != null) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        @Override
+        public Record next() {
+            if(!hasNext()) {
+                throw new NoSuchElementException();
+            }
+            Record minRecord = null;
+            int minIndex = -1;
+            for(int i = 0; i < nextRecordList.size(); ++i) {
+                Record currentRecord = nextRecordList.get(i).record;
+                if(currentRecord != null) {
+                    if(minRecord == null || minRecord.getKey().compareTo(currentRecord.getKey()) >= 0) {
+                        minRecord = currentRecord;
+                        minIndex = i;
+                    }
+                }
+            }
+            Iterator<Record> iteratorToUpdate = nextRecordList.get(minIndex).iterator;
+            if(iteratorToUpdate != null && minIndex != -1) {
+                if(iteratorToUpdate.hasNext()) {
+                    nextRecordList.set(minIndex, new Pair(iteratorToUpdate.next(), iteratorToUpdate));
+                } else {
+                    nextRecordList.set(minIndex, new Pair(null, null));
+                }
+            }
+
+            for(int i = 0; i < nextRecordList.size(); ++i) {
+                if(i == minIndex) {
+                    continue;
+                }
+                Pair pair = nextRecordList.get(i);
+                while(pair.iterator != null && pair.record.getKey().equals(minRecord.getKey())) {
+                    if(pair.iterator.hasNext()) {
+                        pair.record = pair.iterator.next();
+                    } else {
+                        pair.iterator = null;
+                        pair.record = null;
+                    }
+                }
+            }
+
+            return minRecord;
+        }
+    }
 }
