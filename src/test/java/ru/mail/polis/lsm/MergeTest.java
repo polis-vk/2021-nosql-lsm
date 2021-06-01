@@ -165,7 +165,7 @@ class MergeTest {
             temp = !temp;
         }
     }
-
+    
 
     private DAO createDAO(@TempDir Path data, int prefix) throws IOException {
         Path child = data.resolve("child_" + prefix);
