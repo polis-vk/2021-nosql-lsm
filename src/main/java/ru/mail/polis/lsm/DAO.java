@@ -37,7 +37,6 @@ public interface DAO extends Closeable {
      * @param iterators original {@link Iterator} list
      * @return merged iterator
      */
-
     static Iterator<Record> merge(List<Iterator<Record>> iterators) {
         if (iterators.isEmpty()) {
             return Collections.emptyIterator();
