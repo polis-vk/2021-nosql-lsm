@@ -64,7 +64,7 @@ public interface DAO extends Closeable {
 
     class MyIterator implements Iterator<Record> {
 
-        LinkedList<Pair> nextRecordList = new LinkedList<>();
+        ArrayList<Pair> nextRecordList = new ArrayList<>();
         List<Iterator<Record>> iterators;
 
         public MyIterator(List<Iterator<Record>> iterators) {
