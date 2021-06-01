@@ -96,8 +96,8 @@ public interface DAO extends Closeable {
             int minIndex = -1;
             for (int i = 0; i < nextRecordList.size(); ++i) {
                 Record currentRecord = nextRecordList.get(i).record;
-                if (currentRecord != null &&
-                        (minRecord == null || minRecord.getKey().compareTo(currentRecord.getKey()) >= 0)) {
+                if (currentRecord != null
+                        && (minRecord == null || minRecord.getKey().compareTo(currentRecord.getKey()) >= 0)) {
                     minRecord = currentRecord;
                     minIndex = i;
                 }
