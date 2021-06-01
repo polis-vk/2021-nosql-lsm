@@ -5,12 +5,7 @@ import ru.mail.polis.lsm.DAOConfig;
 import ru.mail.polis.lsm.Record;
 
 import javax.annotation.Nullable;
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
 import java.io.IOException;
-import java.lang.invoke.ConstantBootstraps;
-import java.lang.ref.Cleaner;
-import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
@@ -29,16 +24,16 @@ import java.util.stream.Stream;
 public class FileMemoryDAO implements DAO {
 
     private static final Method CLEAN;
+
     static {
         try {
-            Class<?> aClass = Class.forName("sun.nio.ch.FileChannelImpl");
-            CLEAN = aClass.getDeclaredMethod("unmap", MappedByteBuffer.class);
+            Class<?> clas = Class.forName("sun.nio.ch.FileChannelImpl");
+            CLEAN = clas.getDeclaredMethod("unmap", MappedByteBuffer.class);
             CLEAN.setAccessible(true);
-        } catch (Exception e) {
+        } catch (ClassNotFoundException | NoSuchMethodException e) {
             throw new IllegalStateException(e);
         }
     }
-
 
     private final SortedMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
     private MappedByteBuffer mmap;
@@ -147,7 +142,6 @@ public class FileMemoryDAO implements DAO {
                 throw new IOException(e);
             }
         }
-
 
         Files.deleteIfExists(dataFilePath);
         Files.move(tempFilePath, dataFilePath, StandardCopyOption.ATOMIC_MOVE);
