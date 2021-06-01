@@ -31,7 +31,7 @@ public interface DAO extends Closeable {
 
     /**
      * @param iterators
-     * @return
+     * @return iterator
      */
 
     static Iterator<Record> merge(List<Iterator<Record>> iterators) {
