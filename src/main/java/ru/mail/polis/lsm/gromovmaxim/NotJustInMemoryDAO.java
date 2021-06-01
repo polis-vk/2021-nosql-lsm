@@ -26,8 +26,8 @@ public class NotJustInMemoryDAO implements DAO {
 
     static {
         try {
-            var aClass = Class.forName("sun.nio.ch.FileChannelImpl");
-            CLEAN = aClass.getDeclaredMethod("unmap", MappedByteBuffer.class);
+            var classS = Class.forName("sun.nio.ch.FileChannelImpl");
+            CLEAN = classS.getDeclaredMethod("unmap", MappedByteBuffer.class);
             CLEAN.setAccessible(true);
         } catch (Exception e) {
             throw new IllegalStateException(e);
@@ -43,6 +43,10 @@ public class NotJustInMemoryDAO implements DAO {
     private final Path tmpFileName;
 
     private final MappedByteBuffer mmap;
+
+    /**
+     * Constructor that initialize buffers.
+     */
 
     public NotJustInMemoryDAO(DAOConfig config) throws IOException {
         this.config = config;
