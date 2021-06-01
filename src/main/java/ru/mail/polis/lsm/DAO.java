@@ -46,7 +46,8 @@ public interface DAO extends Closeable {
                         StreamSupport.stream(
                                 Spliterators.spliteratorUnknownSize(e, Spliterator.ORDERED),
                                 false))
-                .collect(toMap(Record::getKey, record -> record, (recordL, recordR) -> recordR, ConcurrentSkipListMap::new))
+                .collect(toMap(Record::getKey, record -> record, (recordL, recordR) -> recordR,
+                        ConcurrentSkipListMap::new))
                 .values()
                 .iterator();
     }
