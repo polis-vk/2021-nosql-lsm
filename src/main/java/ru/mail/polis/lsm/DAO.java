@@ -3,19 +3,15 @@ package ru.mail.polis.lsm;
 import javax.annotation.Nullable;
 import java.io.Closeable;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.NoSuchElementException;
 
 /**
  * Minimal database API.
  */
 public interface DAO extends Closeable {
-    Iterator<Record> range(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey);
-
-    void upsert(Record record);
-
     /**
      * Appends {@code Byte.MIN_VALUE} to {@code buffer}.
      *
@@ -36,6 +32,12 @@ public interface DAO extends Closeable {
         return result;
     }
 
+    /**
+     * Merges iterators.
+     *
+     * @param iterators iterators List
+     * @return result Iterator
+     */
     static Iterator<Record> merge(List<Iterator<Record>> iterators) {
         switch (iterators.size()) {
             case (0):
@@ -43,64 +45,77 @@ public interface DAO extends Closeable {
             case (1):
                 return iterators.get(0);
             case (2):
-                return mergeTwo(iterators.get(0), iterators.get(1));
+                return new MergeTwo(iterators.get(0), iterators.get(1));
         }
 
         Iterator<Record> left = merge(iterators.subList(0, iterators.size() / 2));
         Iterator<Record> right = merge(iterators.subList(iterators.size() / 2, iterators.size()));
 
-        if (left.hasNext() && !right.hasNext()) {
-            return left;
-        } else if (!left.hasNext() && right.hasNext()) {
-            return right;
-        } else return mergeTwo(left, right);
+        return new MergeTwo(left, right);
     }
 
-    static Iterator<Record> mergeTwo(Iterator<Record> left, Iterator<Record> right) {
-        final ArrayList<Record> result = new ArrayList<>();
+    Iterator<Record> range(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey);
 
-        Record leftPart = left.next();
-        Record rightPart = right.next();
-        int compareParts;
+    void upsert(Record record);
 
-        while (leftPart != null || rightPart != null) {
-            if (leftPart == null) {
-                result.add(rightPart);
-                if (right.hasNext()) {
-                    rightPart = right.next();
-                } else {
-                    rightPart = null;
-                }
-            } else if (rightPart == null) {
-                result.add(leftPart);
-                if (left.hasNext()) {
-                    leftPart = left.next();
-                } else {
-                    leftPart = null;
-                }
-            }
-            if (leftPart != null && rightPart != null) {
-                compareParts = leftPart.getKey().compareTo(rightPart.getKey());
-                if (compareParts == 0) {
-                    result.add(rightPart);
-                    rightPart = checkNext(right);
-                    leftPart = checkNext(left);
-                } else if (compareParts > 0) {
-                    result.add(rightPart);
-                    rightPart = checkNext(right);
-                } else {
-                    result.add(leftPart);
-                    leftPart = checkNext(left);
-                }
-            }
+    class MergeTwo implements Iterator<Record> {
+        private final Iterator<Record> left;
+        private final Iterator<Record> right;
+        private Record leftPart;
+        private Record rightPart;
+
+        private MergeTwo(Iterator<Record> left, Iterator<Record> right) {
+            this.left = left;
+            this.right = right;
+            leftPart = left.next();
+            rightPart = right.next();
         }
-        return result.iterator();
-    }
 
-    private static Record checkNext(Iterator<Record> iterator) {
-        if (iterator.hasNext()) {
-            return iterator.next();
-        } else return null;
-    }
+        private Record getNextOrNull(Iterator<Record> iterator) {
+            if (iterator.hasNext()) {
+                return iterator.next();
+            } else return null;
+        }
 
+        @Override
+        public boolean hasNext() {
+            return leftPart != null || rightPart != null;
+        }
+
+        @Override
+        public Record next() {
+            Record result;
+
+            if (leftPart == null && rightPart == null) {
+                throw new NoSuchElementException();
+            }
+
+            if (leftPart == null) {
+                result = rightPart;
+                rightPart = getNextOrNull(right);
+                return result;
+            }
+
+            if (rightPart == null) {
+                result = leftPart;
+                leftPart = getNextOrNull(left);
+                return result;
+            }
+
+            int compareResult = leftPart.getKey().compareTo(rightPart.getKey());
+            if (compareResult == 0) {
+                result = rightPart;
+                rightPart = getNextOrNull(right);
+                leftPart = getNextOrNull(left);
+            } else if (compareResult > 0) {
+                result = rightPart;
+                rightPart = getNextOrNull(right);
+            } else {
+                result = leftPart;
+                leftPart = getNextOrNull(left);
+            }
+
+            return result;
+        }
+    }
 }

@@ -23,6 +23,8 @@ import java.util.concurrent.ConcurrentSkipListMap;
 public class DAOImpl implements DAO {
 
     private static final Method CLEAN;
+    private static final String SAVE_FILE_NAME = "save.dat";
+    private static final String TMP_FILE_NAME = "tmp.dat";
 
     static {
         try {
@@ -35,13 +37,9 @@ public class DAOImpl implements DAO {
     }
 
     private final SortedMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
-
-    private final DAOConfig config;
     private final Path saveFileName;
     private final Path tmpFileName;
     private final MappedByteBuffer mmap;
-    private static final String SAVE_FILE_NAME = "save.dat";
-    private static final String TMP_FILE_NAME = "tmp.dat";
 
     /**
      * Create DAOImpl constructor.
@@ -49,7 +47,6 @@ public class DAOImpl implements DAO {
      * @param config contains directory with file
      */
     public DAOImpl(DAOConfig config) throws IOException {
-        this.config = config;
 
         Path path = config.getDir();
         saveFileName = path.resolve(SAVE_FILE_NAME);
@@ -77,6 +74,14 @@ public class DAOImpl implements DAO {
                 storage.put(key, Record.of(key, value));
             }
         }
+    }
+
+    private static void writeInt(ByteBuffer value, WritableByteChannel channel, ByteBuffer tmp) throws IOException {
+        tmp.position(0);
+        tmp.putInt(value.remaining());
+        tmp.position(0);
+        channel.write(tmp);
+        channel.write(value);
     }
 
     @Override
@@ -118,14 +123,6 @@ public class DAOImpl implements DAO {
 
         Files.deleteIfExists(saveFileName);
         Files.move(tmpFileName, saveFileName, StandardCopyOption.ATOMIC_MOVE);
-    }
-
-    private static void writeInt(ByteBuffer value, WritableByteChannel channel, ByteBuffer tmp) throws IOException {
-        tmp.position(0);
-        tmp.putInt(value.remaining());
-        tmp.position(0);
-        channel.write(tmp);
-        channel.write(value);
     }
 
     private SortedMap<ByteBuffer, Record> map(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
