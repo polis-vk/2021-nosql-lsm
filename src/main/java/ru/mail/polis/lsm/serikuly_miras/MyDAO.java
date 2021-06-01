@@ -14,9 +14,6 @@ import java.util.concurrent.ConcurrentSkipListMap;
 public class MyDAO implements DAO {
     private final SortedMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
 
-    public MyDAO(DAOConfig config) {
-    }
-
     @Override
     public Iterator<Record> range(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
         return subMap(fromKey, toKey).values().iterator();
