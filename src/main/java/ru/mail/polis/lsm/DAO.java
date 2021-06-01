@@ -97,6 +97,23 @@ public interface DAO extends Closeable {
             }
         }
 
+        private void deleteEqualElementsInNextRecordList(int minIndex, Record minRecord) {
+            for (int i = 0; i < nextRecordList.size(); ++i) {
+                if (i == minIndex) {
+                    continue;
+                }
+                Pair pair = nextRecordList.get(i);
+                while (pair.iterator != null && minRecord != null && pair.record.getKey().equals(minRecord.getKey())) {
+                    if (pair.iterator.hasNext()) {
+                        pair.record = pair.iterator.next();
+                    } else {
+                        pair.iterator = null;
+                        pair.record = null;
+                    }
+                }
+            }
+        }
+
         @Override
         public Record next() {
             if (!hasNext()) {
@@ -112,22 +129,9 @@ public interface DAO extends Closeable {
                     minIndex = i;
                 }
             }
-            updateIteratorWithMinRecord(minIndex);
 
-            for (int i = 0; i < nextRecordList.size(); ++i) {
-                if (i == minIndex) {
-                    continue;
-                }
-                Pair pair = nextRecordList.get(i);
-                while (pair.iterator != null && minRecord != null && pair.record.getKey().equals(minRecord.getKey())) {
-                    if (pair.iterator.hasNext()) {
-                        pair.record = pair.iterator.next();
-                    } else {
-                        pair.iterator = null;
-                        pair.record = null;
-                    }
-                }
-            }
+            updateIteratorWithMinRecord(minIndex);
+            deleteEqualElementsInNextRecordList(minIndex, minRecord);
 
             return minRecord;
         }
