@@ -5,20 +5,19 @@ import ru.mail.polis.lsm.Record;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
-import java.lang.reflect.Field;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
+import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
+import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.SortedMap;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ConcurrentSkipListMap;
 
 public class DaoImpl implements DAO {
@@ -28,7 +27,9 @@ public class DaoImpl implements DAO {
 
     private final Path savePath;
     private final Path tmpPath;
-    private final SortedMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
+    private final SortedMap<ByteBuffer, Record> memoryStorage = new ConcurrentSkipListMap<>();
+    private final ConcurrentLinkedDeque<SSTable> tables = new ConcurrentLinkedDeque<>();
+
 
     private MappedByteBuffer mappedByteBuffer;
 
@@ -39,60 +40,95 @@ public class DaoImpl implements DAO {
      * @throws IOException is thrown when an I/O error occurs.
      */
     public DaoImpl(Path dirPath) throws IOException {
-        this.savePath = dirPath.resolve(Paths.get(SAVE_FILE_NAME));
-        this.tmpPath = dirPath.resolve(Paths.get(TMP_FILE_NAME));
+//        this.savePath = dirPath.resolve(Paths.get(SAVE_FILE_NAME));
+//        this.tmpPath = dirPath.resolve(Paths.get(TMP_FILE_NAME));
+//
+//        if (!Files.exists(savePath)) {
+//            if (Files.exists(tmpPath)) {
+//                Files.move(tmpPath, savePath, StandardCopyOption.ATOMIC_MOVE);
+//            } else {
+//                mappedByteBuffer = null;
+//                return;
+//            }
+//
+//        }
+//        restoreStorage();
 
-        if (!Files.exists(savePath)) {
-            if (Files.exists(tmpPath)) {
-                Files.move(tmpPath, savePath, StandardCopyOption.ATOMIC_MOVE);
-            } else {
-                mappedByteBuffer = null;
-                return;
-            }
-
-        }
-        restoreStorage();
+        this.config = config;
+        tables.add(SSTable.loadFromDir(config.getDir()));
     }
 
     @Override
     public Iterator<Record> range(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
+        synchronized (this) {
+            Iterator<Record> sstableRanges = sstableRanges(fromKey, toKey);
+            Iterator<Record> memoryRange = map(fromKey, toKey).values().iterator();
+            return mergeTwo(sstableRange, memoryRange);
+        }
+
         return map(fromKey, toKey).values().iterator();
     }
 
     @Override
     public void upsert(Record record) {
 
+        synchronized (this) {
+            memoryConsuption += sizeOf(record);
+            if (memoryConsuption > memoryList) {
+                try {
+                    flush();
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            }
+        }
+
         if (record.getValue() == null) {
-            storage.remove(record.getKey());
+            memoryStorage.remove(record.getKey());
         } else {
-            storage.put(record.getKey(), record);
+            memoryStorage.put(record.getKey(), record);
         }
 
     }
 
     @Override
     public void close() throws IOException {
-        save();
-
-        if (mappedByteBuffer != null) {
-            clean();
-        }
-
-        Files.deleteIfExists(savePath);
-        Files.move(tmpPath, savePath, StandardCopyOption.ATOMIC_MOVE);
+//        save();
+//
+//        if (mappedByteBuffer != null) {
+//            clean();
+//        }
+//
+//        Files.deleteIfExists(savePath);
+//        Files.move(tmpPath, savePath, StandardCopyOption.ATOMIC_MOVE);
+        flush();
     }
 
     private Map<ByteBuffer, Record> map(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
 
         if (fromKey == null && toKey == null) {
-            return storage;
+            return memoryStorage;
         } else if (fromKey == null) {
-            return storage.headMap(toKey);
+            return memoryStorage.headMap(toKey);
         } else if (toKey == null) {
-            return storage.tailMap(fromKey);
+            return memoryStorage.tailMap(fromKey);
         } else {
-            return storage.subMap(fromKey, toKey);
+            return memoryStorage.subMap(fromKey, toKey);
         }
+    }
+
+    private void flush() throws IOException {
+        SSTable ssTable = SSTable.save(memoryStorage.values().iterator(), ...);
+        tables.add(ssTable);
+        memoryStorage.clear();
+    }
+
+    private Iterator<Record> sstableRanges(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
+        List<Iterator<Record>> iterators = new ArrayList<>(sstable.size());
+
+        iterators.forEach(() -> sstable.range(fromKey, toKey));
+
+        return merge(iterators);
     }
 
     private void save() throws IOException {
@@ -104,7 +140,7 @@ public class DaoImpl implements DAO {
                 StandardOpenOption.TRUNCATE_EXISTING
         )) {
 
-            for (final Map.Entry<ByteBuffer, Record> byteBufferRecordEntry : storage.entrySet()) {
+            for (final Map.Entry<ByteBuffer, Record> byteBufferRecordEntry : memoryStorage.entrySet()) {
                 writeToFile(fileChannel, byteBufferRecordEntry.getKey());
                 writeToFile(fileChannel, byteBufferRecordEntry.getValue().getValue());
             }
@@ -122,7 +158,7 @@ public class DaoImpl implements DAO {
                     ByteBuffer keyByteBuffer = readFromFile(mappedByteBuffer);
                     ByteBuffer valueByteBuffer = readFromFile(mappedByteBuffer);
 
-                    storage.put(keyByteBuffer, Record.of(keyByteBuffer, valueByteBuffer));
+                    memoryStorage.put(keyByteBuffer, Record.of(keyByteBuffer, valueByteBuffer));
                 }
             }
         }
@@ -153,19 +189,5 @@ public class DaoImpl implements DAO {
         byteBuffer.flip();
         fileChannel.write(byteBuffer);
         byteBuffer.compact();
-    }
-
-    private void clean() throws IOException {
-        try {
-            Class<?> unsafeClass = Class.forName("sun.misc.Unsafe");
-            Field unsafeField = unsafeClass.getDeclaredField("theUnsafe");
-            unsafeField.setAccessible(true);
-            Object unsafe = unsafeField.get(null);
-            Method invokeCleaner = unsafeClass.getMethod("invokeCleaner", ByteBuffer.class);
-            invokeCleaner.invoke(unsafe, mappedByteBuffer);
-        } catch (ClassNotFoundException | NoSuchFieldException | NoSuchMethodException
-                | IllegalAccessException | InvocationTargetException e) {
-            throw new IOException(e);
-        }
     }
 }
