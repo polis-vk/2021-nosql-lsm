@@ -5,7 +5,6 @@ import java.io.Closeable;
 import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.util.Iterator;
-import java.util.List;
 
 /**
  * Minimal database API.

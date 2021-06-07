@@ -8,6 +8,7 @@ import javax.annotation.Nullable;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
@@ -89,7 +90,7 @@ public class DaoImpl implements DAO {
     }
 
     private void flush() throws IOException {
-        SSTable ssTable = SSTable.save(memoryStorage.values().iterator(), config.getDir());
+        SSTable ssTable = SSTable.save(memoryStorage.values().iterator(), config.getDir().resolve(Path.of("ss" + ssTables.size())));
         ssTables.add(ssTable);
         memoryStorage.clear();
     }
