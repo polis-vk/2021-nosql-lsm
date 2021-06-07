@@ -20,12 +20,12 @@ import java.util.concurrent.ConcurrentSkipListMap;
 public class LsmDAO implements DAO {
     private static final int MEMORY_LIMIT = 1024 * 1024;
     private static final String FILE_PREFIX = "SSTable_";
-    private Integer n;
+    private Integer currentTableN;
 
     private final SortedMap<ByteBuffer, Record> memoryStorage = new ConcurrentSkipListMap<>();
     private final List<SSTable> ssTables;
     private final DAOConfig config;
-    private int memoryConsumption = 0;
+    private int memoryConsumption;
 
     private Path filePath;
 
@@ -36,16 +36,17 @@ public class LsmDAO implements DAO {
      */
     public LsmDAO(DAOConfig config) throws IOException {
         this.config = config;
+        memoryConsumption = 0;
 
         ssTables = SSTable.loadFromDir(config.getDir());
-        n = ssTables.size();
+        currentTableN = ssTables.size();
 
         filePath = getNewFileName();
     }
 
     private Path getNewFileName() {
-        String name = FILE_PREFIX.concat(n.toString());
-        ++n;
+        String name = FILE_PREFIX.concat(currentTableN.toString());
+        ++currentTableN;
         return config.getDir().resolve(name);
     }
 
@@ -82,11 +83,7 @@ public class LsmDAO implements DAO {
             }
         }
 
-        if (record.getValue() == null) {
-            memoryStorage.remove(record.getKey());
-        } else {
-            memoryStorage.put(record.getKey(), record);
-        }
+        memoryStorage.put(record.getKey(), record);
     }
 
     private int sizeOf(Record record) {
@@ -158,6 +155,10 @@ public class LsmDAO implements DAO {
                     poll.prevRecord = poll.iterator.next();
                     queue.add(poll);
                 }
+
+                if (record.getValue() == null) {
+                    return null;
+                }
                 return record;
             }
         };
@@ -167,32 +168,15 @@ public class LsmDAO implements DAO {
      * Delete first N elements of the queue, which are equals with given.
      */
     private static void clearQueue(PriorityQueue<Entry> queue, Entry entry) {
-        while (!queue.isEmpty() && (queue.peek().prevRecord.getKey().compareTo(entry.prevRecord.getKey()) == 0)) {
+        while (!queue.isEmpty() && (queue.peek().prevRecord.getKey().compareTo(entry.prevRecord.getKey()) == 0
+                || queue.peek().prevRecord.getValue() == null)) {
             Entry head = queue.poll();
 
             if (head != null && head.iterator.hasNext()) {
                 head.prevRecord = head.iterator.next();
                 queue.add(head);
             }
+
         }
-    }
-}
-
-class Entry {
-    Iterator<Record> iterator;
-    Record prevRecord;
-    int order;
-
-    /**
-     * Util class to store current iterator state.
-     *
-     * @param iterator   the iterator
-     * @param prevRecord value of the iterator
-     * @param order      order of an iterator
-     */
-    Entry(Iterator<Record> iterator, Record prevRecord, int order) {
-        this.iterator = iterator;
-        this.prevRecord = prevRecord;
-        this.order = order;
     }
 }

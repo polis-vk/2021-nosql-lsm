@@ -81,6 +81,9 @@ class SSTable {
 
     private ByteBuffer readValue(MappedByteBuffer map) {
         int size = map.getInt();
+        if (size == 0) {
+            return null;
+        }
         ByteBuffer value = map.slice().limit(size).asReadOnlyBuffer();
         map.position(map.position() + size);
         return value;
@@ -112,8 +115,8 @@ class SSTable {
                 StandardOpenOption.CREATE_NEW
         )) {
             final ByteBuffer size = ByteBuffer.allocate(Integer.BYTES);
-            for (Iterator<Record> it = records; it.hasNext(); ) {
-                Record record = it.next();
+            while (records.hasNext()) {
+                Record record = records.next();
                 writeInt(record.getKey(), fileChannel, size);
                 writeInt(record.getValue(), fileChannel, size);
             }
@@ -126,7 +129,13 @@ class SSTable {
         return new SSTable(file);
     }
 
-    private static void writeInt(ByteBuffer value, WritableByteChannel channel, ByteBuffer tmp) throws IOException {
+    private static void writeInt(@Nullable ByteBuffer value, WritableByteChannel channel, ByteBuffer tmp) throws IOException {
+        if (value == null) {
+            tmp.putInt(0);
+            channel.write(tmp);
+            return;
+        }
+
         tmp.position(0);
         tmp.putInt(value.remaining());
         tmp.position(0);
