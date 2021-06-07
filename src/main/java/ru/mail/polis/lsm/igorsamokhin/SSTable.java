@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.SortedMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 
+@SuppressWarnings("JdkObsolete")
 class SSTable {
     private static final Method CLEAN;
     private static final String TMP_FILE_SUFFIX = "_temp";
@@ -47,7 +48,14 @@ class SSTable {
                 ByteBuffer key = readValue(mmap);
                 ByteBuffer value = readValue(mmap);
 
-                memoryStorage.put(key, Record.of(key, value));
+                Record record;
+                if (value == null) {
+                    record = Record.tombstone(key);
+                } else {
+                    record = Record.of(key, value);
+                }
+
+                memoryStorage.put(key, record);
             }
         }
     }
@@ -80,10 +88,15 @@ class SSTable {
     }
 
     private ByteBuffer readValue(MappedByteBuffer map) {
+        if (map.position() == map.limit()) {
+            return map.slice().limit(0).asReadOnlyBuffer();
+        }
+
         int size = map.getInt();
-        if (size == 0) {
+        if (size < 0) {
             return null;
         }
+
         ByteBuffer value = map.slice().limit(size).asReadOnlyBuffer();
         map.position(map.position() + size);
         return value;
@@ -92,7 +105,7 @@ class SSTable {
     static List<SSTable> loadFromDir(Path dir) throws IOException {
         File[] files = dir.toFile().listFiles();
         ArrayList<SSTable> ssTables = new ArrayList<>();
-        if (files == null) {
+        if (files.length == 0) {
             return ssTables;
         }
 
@@ -129,14 +142,17 @@ class SSTable {
         return new SSTable(file);
     }
 
-    private static void writeInt(@Nullable ByteBuffer value, WritableByteChannel channel, ByteBuffer tmp) throws IOException {
+    private static void writeInt(@Nullable ByteBuffer value, WritableByteChannel channel, ByteBuffer tmp)
+            throws IOException {
+        tmp.position(0);
         if (value == null) {
-            tmp.putInt(0);
+            tmp.putInt(-1);
+            tmp.position(0);
             channel.write(tmp);
+            tmp.position(0);
             return;
         }
 
-        tmp.position(0);
         tmp.putInt(value.remaining());
         tmp.position(0);
         channel.write(tmp);

@@ -17,8 +17,9 @@ import java.util.PriorityQueue;
 import java.util.SortedMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 
+@SuppressWarnings("JdkObsolete")
 public class LsmDAO implements DAO {
-    private static final int MEMORY_LIMIT = 1024 * 1024;
+    private static final int MEMORY_LIMIT = 1024 * 1024 * 32;
     private static final String FILE_PREFIX = "SSTable_";
     private Integer currentTableN;
 
@@ -51,23 +52,17 @@ public class LsmDAO implements DAO {
     }
 
     @Override
-    public Iterator<Record> range(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
+    public Iterator<Record> range(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey)
+            throws UncheckedIOException {
         synchronized (this) {
-            Iterator<Record> sstableRanges = sstableRanges(fromKey, toKey);
-            Iterator<Record> memoryRange = getSubMap(fromKey, toKey).values().iterator();
-            return LsmDAO.merge(List.of(sstableRanges, memoryRange));
-        }
-    }
+            try {
+                flush();
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
 
-    private SortedMap<ByteBuffer, Record> getSubMap(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
-        if (fromKey == null && toKey == null) {
-            return memoryStorage;
-        } else if (fromKey == null) {
-            return memoryStorage.headMap(toKey);
-        } else if (toKey == null) {
-            return memoryStorage.tailMap(fromKey);
+            return sstableRanges(fromKey, toKey);
         }
-        return memoryStorage.subMap(fromKey, toKey);
     }
 
     @Override
@@ -94,6 +89,9 @@ public class LsmDAO implements DAO {
     }
 
     private void flush() throws IOException {
+        if (memoryConsumption == 0) {
+            return;
+        }
         SSTable ssTable = SSTable.write(memoryStorage.values().iterator(), filePath);
         ssTables.add(ssTable);
         memoryStorage.clear();
@@ -139,16 +137,19 @@ public class LsmDAO implements DAO {
         return new Iterator<Record>() {
             @Override
             public boolean hasNext() {
+                checkTombstones(queue);
+
                 return !queue.isEmpty();
             }
 
             @Override
             public Record next() {
+                checkTombstones(queue);
+
                 Entry poll = queue.poll();
                 if (poll == null) {
                     return null;
                 }
-
                 clearQueue(queue, poll);
                 Record record = poll.prevRecord;
                 if (poll.iterator.hasNext()) {
@@ -156,27 +157,37 @@ public class LsmDAO implements DAO {
                     queue.add(poll);
                 }
 
-                if (record.getValue() == null) {
-                    return null;
-                }
                 return record;
             }
         };
     }
 
     /**
+     * Skip all first tombstones.
+     */
+    private static void checkTombstones(PriorityQueue<Entry> queue) {
+        while (!queue.isEmpty() && (queue.peek().prevRecord.getValue() == null)) {
+            Entry head = queue.poll();
+
+            clearQueue(queue, head);
+            if (head.iterator.hasNext()) {
+                head.prevRecord = head.iterator.next();
+                queue.add(head);
+            }
+        }
+    }
+
+    /**
      * Delete first N elements of the queue, which are equals with given.
      */
     private static void clearQueue(PriorityQueue<Entry> queue, Entry entry) {
-        while (!queue.isEmpty() && (queue.peek().prevRecord.getKey().compareTo(entry.prevRecord.getKey()) == 0
-                || queue.peek().prevRecord.getValue() == null)) {
+        while (!queue.isEmpty() && (queue.peek().prevRecord.getKey().compareTo(entry.prevRecord.getKey()) == 0)) {
             Entry head = queue.poll();
 
             if (head != null && head.iterator.hasNext()) {
                 head.prevRecord = head.iterator.next();
                 queue.add(head);
             }
-
         }
     }
 }
