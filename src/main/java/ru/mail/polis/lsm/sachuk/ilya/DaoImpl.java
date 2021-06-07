@@ -1,61 +1,41 @@
 package ru.mail.polis.lsm.sachuk.ilya;
 
 import ru.mail.polis.lsm.DAO;
+import ru.mail.polis.lsm.DAOConfig;
 import ru.mail.polis.lsm.Record;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
-import java.nio.MappedByteBuffer;
-import java.nio.channels.FileChannel;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.SortedMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ConcurrentSkipListMap;
 
 public class DaoImpl implements DAO {
 
-    private static final String SAVE_FILE_NAME = "save";
-    private static final String TMP_FILE_NAME = "tmp";
-
-    private final Path savePath;
-    private final Path tmpPath;
+    private final DAOConfig config;
     private final SortedMap<ByteBuffer, Record> memoryStorage = new ConcurrentSkipListMap<>();
-    private final ConcurrentLinkedDeque<SSTable> tables = new ConcurrentLinkedDeque<>();
+    private final ConcurrentLinkedDeque<SSTable> ssTables = new ConcurrentLinkedDeque<>();
 
-
-    private MappedByteBuffer mappedByteBuffer;
+    private long memoryConsumption = 0;
 
     /**
      * Constructor that initialize path and restore storage.
      *
-     * @param dirPath path to the directory in which will be created file
+     * @param config is config.
      * @throws IOException is thrown when an I/O error occurs.
      */
-    public DaoImpl(Path dirPath) throws IOException {
-//        this.savePath = dirPath.resolve(Paths.get(SAVE_FILE_NAME));
-//        this.tmpPath = dirPath.resolve(Paths.get(TMP_FILE_NAME));
-//
-//        if (!Files.exists(savePath)) {
-//            if (Files.exists(tmpPath)) {
-//                Files.move(tmpPath, savePath, StandardCopyOption.ATOMIC_MOVE);
-//            } else {
-//                mappedByteBuffer = null;
-//                return;
-//            }
-//
-//        }
-//        restoreStorage();
-
+    public DaoImpl(DAOConfig config) throws IOException {
         this.config = config;
-        tables.add(SSTable.loadFromDir(config.getDir()));
+
+        ssTables.addAll(SSTable.loadFromDir(config.getDir()));
     }
 
     @Override
@@ -63,20 +43,20 @@ public class DaoImpl implements DAO {
         synchronized (this) {
             Iterator<Record> sstableRanges = sstableRanges(fromKey, toKey);
             Iterator<Record> memoryRange = map(fromKey, toKey).values().iterator();
-            return mergeTwo(sstableRange, memoryRange);
-        }
 
-        return map(fromKey, toKey).values().iterator();
+            return mergeTwo(sstableRanges, memoryRange);
+        }
     }
 
     @Override
     public void upsert(Record record) {
 
         synchronized (this) {
-            memoryConsuption += sizeOf(record);
-            if (memoryConsuption > memoryList) {
+            memoryConsumption += 4;
+            if (memoryConsumption > Integer.MAX_VALUE / 32) {
                 try {
                     flush();
+                    memoryConsumption = 0;
                 } catch (IOException e) {
                     throw new UncheckedIOException(e);
                 }
@@ -88,19 +68,10 @@ public class DaoImpl implements DAO {
         } else {
             memoryStorage.put(record.getKey(), record);
         }
-
     }
 
     @Override
     public void close() throws IOException {
-//        save();
-//
-//        if (mappedByteBuffer != null) {
-//            clean();
-//        }
-//
-//        Files.deleteIfExists(savePath);
-//        Files.move(tmpPath, savePath, StandardCopyOption.ATOMIC_MOVE);
         flush();
     }
 
@@ -118,76 +89,105 @@ public class DaoImpl implements DAO {
     }
 
     private void flush() throws IOException {
-        SSTable ssTable = SSTable.save(memoryStorage.values().iterator(), ...);
-        tables.add(ssTable);
+        SSTable ssTable = SSTable.save(memoryStorage.values().iterator(), config.getDir());
+        ssTables.add(ssTable);
         memoryStorage.clear();
     }
 
     private Iterator<Record> sstableRanges(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
-        List<Iterator<Record>> iterators = new ArrayList<>(sstable.size());
+        List<Iterator<Record>> iterators = new ArrayList<>(ssTables.size());
 
-        iterators.forEach(() -> sstable.range(fromKey, toKey));
+        for (SSTable ssTable : ssTables) {
+            iterators.add(ssTable.range(fromKey, toKey));
+        }
 
         return merge(iterators);
     }
 
-    private void save() throws IOException {
+    /**
+     * Method that merge iterators and return iterator.
+     *
+     * @param iterators is list of iterators to merge
+     * @return merged iterators
+     */
+    public static Iterator<Record> merge(List<Iterator<Record>> iterators) {
 
-        try (FileChannel fileChannel = FileChannel.open(
-                tmpPath,
-                StandardOpenOption.CREATE_NEW,
-                StandardOpenOption.WRITE,
-                StandardOpenOption.TRUNCATE_EXISTING
-        )) {
-
-            for (final Map.Entry<ByteBuffer, Record> byteBufferRecordEntry : memoryStorage.entrySet()) {
-                writeToFile(fileChannel, byteBufferRecordEntry.getKey());
-                writeToFile(fileChannel, byteBufferRecordEntry.getValue().getValue());
-            }
-            fileChannel.force(false);
+        if (iterators.isEmpty()) {
+            return Collections.emptyIterator();
+        } else if (iterators.size() == 1) {
+            return iterators.get(0);
+        } else if (iterators.size() == 2) {
+            return mergeTwo(iterators.get(0), iterators.get(1));
         }
+
+        Iterator<Record> left = merge(iterators.subList(0, iterators.size() / 2));
+        Iterator<Record> right = merge(iterators.subList(iterators.size() / 2, iterators.size()));
+
+        return mergeTwo(left, right);
     }
 
-    private void restoreStorage() throws IOException {
-        if (Files.exists(savePath)) {
-            try (FileChannel fileChannel = FileChannel.open(savePath, StandardOpenOption.READ)) {
+    private static Iterator<Record> mergeTwo(Iterator<Record> left, Iterator<Record> right) {
+        return new Iterator<>() {
 
-                mappedByteBuffer = fileChannel.map(FileChannel.MapMode.READ_ONLY, 0, fileChannel.size());
+            private Record leftRecord;
+            private Record rightRecord;
 
-                while (mappedByteBuffer.hasRemaining()) {
-                    ByteBuffer keyByteBuffer = readFromFile(mappedByteBuffer);
-                    ByteBuffer valueByteBuffer = readFromFile(mappedByteBuffer);
+            @Override
+            public boolean hasNext() {
+                return left.hasNext() || right.hasNext();
+            }
 
-                    memoryStorage.put(keyByteBuffer, Record.of(keyByteBuffer, valueByteBuffer));
+            @Override
+            public Record next() {
+
+                if (!hasNext()) {
+                    throw new NoSuchElementException();
+                }
+
+                leftRecord = getNext(left, leftRecord);
+                rightRecord = getNext(right, rightRecord);
+
+
+                if (leftRecord == null) {
+                    return getRight();
+                }
+                if (rightRecord == null) {
+                    return getLeft();
+                }
+
+                int compare = leftRecord.getKey().compareTo(rightRecord.getKey());
+
+                if (compare == 0) {
+                    leftRecord = null;
+                    return getRight();
+                } else if (compare < 0) {
+                    return getLeft();
+                } else {
+                    return getRight();
                 }
             }
-        }
-    }
 
-    private ByteBuffer readFromFile(MappedByteBuffer mappedByteBuffer) throws IOException {
-        int length = mappedByteBuffer.getInt();
+            private Record getRight() {
+                Record tmp = rightRecord;
+                rightRecord = null;
 
-        ByteBuffer byteBuffer = mappedByteBuffer.slice().limit(length).asReadOnlyBuffer();
-        mappedByteBuffer.position(mappedByteBuffer.position() + length);
+                return tmp;
+            }
 
-        return byteBuffer;
-    }
+            private Record getLeft() {
+                Record tmp = leftRecord;
+                leftRecord = null;
 
-    private void writeToFile(FileChannel fileChannel, ByteBuffer value) throws IOException {
+                return tmp;
+            }
 
-        ByteBuffer byteBuffer = ByteBuffer.allocate(value.capacity());
-        ByteBuffer secBuf = ByteBuffer.allocate(Integer.BYTES);
+            private Record getNext(Iterator<Record> iterator, @Nullable Record current) {
+                if (current != null) {
+                    return current;
+                }
 
-        secBuf.putInt(value.remaining());
-        byteBuffer.put(value);
-
-        write(fileChannel, secBuf);
-        write(fileChannel, byteBuffer);
-    }
-
-    private void write(FileChannel fileChannel, ByteBuffer byteBuffer) throws IOException {
-        byteBuffer.flip();
-        fileChannel.write(byteBuffer);
-        byteBuffer.compact();
+                return iterator.hasNext() ? iterator.next() : null;
+            }
+        };
     }
 }
