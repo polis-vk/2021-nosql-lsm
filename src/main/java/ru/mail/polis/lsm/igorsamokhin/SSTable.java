@@ -1,5 +1,6 @@
 package ru.mail.polis.lsm.igorsamokhin;
 
+import ru.mail.polis.lsm.DAO;
 import ru.mail.polis.lsm.Record;
 
 import javax.annotation.Nullable;
@@ -48,6 +49,7 @@ class SSTable {
                 ByteBuffer key = readValue(mmap);
                 ByteBuffer value = readValue(mmap);
 
+                assert key != null;
                 Record record;
                 if (value == null) {
                     record = Record.tombstone(key);
@@ -72,19 +74,8 @@ class SSTable {
 
     public Iterator<Record> range(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
         synchronized (this) {
-            return getSubMap(fromKey, toKey).values().iterator();
+            return DAO.getSubMap(memoryStorage, fromKey, toKey).values().iterator();
         }
-    }
-
-    private SortedMap<ByteBuffer, Record> getSubMap(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
-        if (fromKey == null && toKey == null) {
-            return memoryStorage;
-        } else if (fromKey == null) {
-            return memoryStorage.headMap(toKey);
-        } else if (toKey == null) {
-            return memoryStorage.tailMap(fromKey);
-        }
-        return memoryStorage.subMap(fromKey, toKey);
     }
 
     private ByteBuffer readValue(MappedByteBuffer map) {
@@ -138,7 +129,7 @@ class SSTable {
 
         Files.deleteIfExists(file);
         Files.move(tmpFilePath, file, StandardCopyOption.ATOMIC_MOVE);
-        Files.deleteIfExists(tmpFilePath);
+//        Files.deleteIfExists(tmpFilePath);
         return new SSTable(file);
     }
 
@@ -152,7 +143,6 @@ class SSTable {
             tmp.position(0);
             return;
         }
-
         tmp.putInt(value.remaining());
         tmp.position(0);
         channel.write(tmp);

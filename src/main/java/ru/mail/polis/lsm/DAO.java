@@ -6,6 +6,7 @@ import java.io.Closeable;
 import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.util.Iterator;
+import java.util.SortedMap;
 
 /**
  * Minimal database API.
@@ -34,5 +35,17 @@ public interface DAO extends Closeable {
         result.rewind();
 
         return result;
+    }
+
+    static SortedMap<ByteBuffer, Record> getSubMap(SortedMap<ByteBuffer, Record> memoryStorage,
+                                                   @Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
+        if (fromKey == null && toKey == null) {
+            return memoryStorage;
+        } else if (fromKey == null) {
+            return memoryStorage.headMap(toKey);
+        } else if (toKey == null) {
+            return memoryStorage.tailMap(fromKey);
+        }
+        return memoryStorage.subMap(fromKey, toKey);
     }
 }

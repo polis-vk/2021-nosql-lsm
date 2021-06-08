@@ -55,13 +55,9 @@ public class LsmDAO implements DAO {
     public Iterator<Record> range(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey)
             throws UncheckedIOException {
         synchronized (this) {
-            try {
-                flush();
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
-
-            return sstableRanges(fromKey, toKey);
+            Iterator<Record> memoryRange = DAO.getSubMap(memoryStorage, fromKey, toKey).values().iterator();
+            Iterator<Record> sstableRanges = sstableRanges(fromKey, toKey);
+            return LsmDAO.merge(List.of(sstableRanges, memoryRange));
         }
     }
 
@@ -76,9 +72,8 @@ public class LsmDAO implements DAO {
                     throw new UncheckedIOException(e);
                 }
             }
+            memoryStorage.put(record.getKey(), record);
         }
-
-        memoryStorage.put(record.getKey(), record);
     }
 
     private int sizeOf(Record record) {
@@ -109,9 +104,16 @@ public class LsmDAO implements DAO {
 
     @Override
     public void close() throws IOException {
-        flush();
-        for (SSTable ssTable : ssTables) {
-            ssTable.close();
+        synchronized (this) {
+            if (memoryConsumption == 0) {
+                return;
+            }
+            SSTable s = SSTable.write(memoryStorage.values().iterator(), filePath);
+            ssTables.add(s);
+
+            for (SSTable ssTable : ssTables) {
+                ssTable.close();
+            }
         }
     }
 
