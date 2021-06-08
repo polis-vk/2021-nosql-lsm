@@ -59,7 +59,7 @@ public class LsmDAO implements DAO {
     public Iterator<Record> range(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey)
             throws UncheckedIOException {
         synchronized (this) {
-            Iterator<Record> memoryRange = DAO.getSubMap(memoryStorage, fromKey, toKey).values().iterator();
+            Iterator<Record> memoryRange = SSTable.getSubMap(memoryStorage, fromKey, toKey).values().iterator();
             Iterator<Record> sstableRanges = sstableRanges(fromKey, toKey);
             return LsmDAO.merge(List.of(sstableRanges, memoryRange));
         }

@@ -36,16 +36,4 @@ public interface DAO extends Closeable {
 
         return result;
     }
-
-    static SortedMap<ByteBuffer, Record> getSubMap(SortedMap<ByteBuffer, Record> memoryStorage,
-                                                   @Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
-        if (fromKey == null && toKey == null) {
-            return memoryStorage;
-        } else if (fromKey == null) {
-            return memoryStorage.headMap(toKey);
-        } else if (toKey == null) {
-            return memoryStorage.tailMap(fromKey);
-        }
-        return memoryStorage.subMap(fromKey, toKey);
-    }
 }

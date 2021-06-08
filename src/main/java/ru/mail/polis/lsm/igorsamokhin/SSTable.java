@@ -74,7 +74,7 @@ class SSTable {
 
     public Iterator<Record> range(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
         synchronized (this) {
-            return DAO.getSubMap(memoryStorage, fromKey, toKey).values().iterator();
+            return SSTable.getSubMap(memoryStorage, fromKey, toKey).values().iterator();
         }
     }
 
@@ -129,7 +129,6 @@ class SSTable {
 
         Files.deleteIfExists(file);
         Files.move(tmpFilePath, file, StandardCopyOption.ATOMIC_MOVE);
-//        Files.deleteIfExists(tmpFilePath);
         return new SSTable(file);
     }
 
@@ -147,5 +146,21 @@ class SSTable {
         tmp.position(0);
         channel.write(tmp);
         channel.write(value);
+    }
+
+    /**
+     * Create sub map.
+     *
+     */
+    static SortedMap<ByteBuffer, Record> getSubMap(SortedMap<ByteBuffer, Record> memoryStorage,
+                                                   @Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
+        if (fromKey == null && toKey == null) {
+            return memoryStorage;
+        } else if (fromKey == null) {
+            return memoryStorage.headMap(toKey);
+        } else if (toKey == null) {
+            return memoryStorage.tailMap(fromKey);
+        }
+        return memoryStorage.subMap(fromKey, toKey);
     }
 }
