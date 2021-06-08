@@ -3,7 +3,6 @@ package ru.mail.polis.lsm.sachuk.ilya;
 import ru.mail.polis.lsm.Record;
 
 import javax.annotation.Nullable;
-import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
@@ -13,14 +12,17 @@ import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Objects;
+import java.util.Map;
 import java.util.SortedMap;
 import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 class SSTable {
 
@@ -32,20 +34,48 @@ class SSTable {
 
     private final SortedMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
 
-    private MappedByteBuffer mappedByteBuffer;
+    private static MappedByteBuffer mappedByteBuffer;
 
 
     SSTable(Path filePath) throws IOException {
         this.savePath = filePath;
+        this.tmpPath = Paths.get(filePath.toString() + "tmp");
+
+//        if (!Files.exists(savePath)) {
+//            if (Files.exists(tmpPath)) {
+//                Files.move(tmpPath, savePath, StandardCopyOption.ATOMIC_MOVE);
+//            } else {
+//                mappedByteBuffer = null;
+//                return;
+//            }
+//
+//        }
 
         restoreStorage();
+
     }
 
     Iterator<Record> range(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
-        return Collections.emptyIterator();
+        return map(fromKey, toKey).values().iterator();
+    }
+
+    private Map<ByteBuffer, Record> map(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
+
+        if (fromKey == null && toKey == null) {
+            return storage;
+        } else if (fromKey == null) {
+            return storage.headMap(toKey);
+        } else if (toKey == null) {
+            return storage.tailMap(fromKey);
+        } else {
+            return storage.subMap(fromKey, toKey);
+        }
     }
 
     static SSTable save(Iterator<Record> iterators, Path dir) throws IOException {
+
+        Path tmp = Path.of(dir.toString() + "tmp");
+
         try (FileChannel fileChannel = FileChannel.open(
                 dir,
                 StandardOpenOption.CREATE_NEW,
@@ -61,23 +91,35 @@ class SSTable {
             fileChannel.force(false);
         }
 
-        return new SSTable(dir);
+//        if (mappedByteBuffer != null) {
+//            clean();
+//        }
+
+//        Files.deleteIfExists(dir);
+//        Files.move(tmp, dir, StandardCopyOption.ATOMIC_MOVE);
+
+        SSTable ssTable = new SSTable(dir);
+
+//        if (mappedByteBuffer != null) {
+//            clean();
+//        }
+
+        return ssTable;
     }
 
     static List<SSTable> loadFromDir(Path dir) throws IOException {
 
         List<SSTable> listSSTables = new ArrayList<>();
 
-        List<File> files = new ArrayList<>();
+        List<Path> paths;
 
-        for (File file : Objects.requireNonNull(dir.toFile().listFiles())) {
-            if (file.isFile()) {
-                files.add(file);
-            }
+        try (Stream<Path> streamPaths = Files.walk(Paths.get(dir.toUri()))) {
+            paths = streamPaths.filter(Files::isRegularFile)
+                    .collect(Collectors.toList());
         }
 
-        for (File file : files) {
-            listSSTables.add(new SSTable(file.toPath()));
+        for (Path path : paths) {
+            listSSTables.add(new SSTable(path));
         }
 
         return listSSTables;
@@ -85,6 +127,7 @@ class SSTable {
 
     private void restoreStorage() throws IOException {
         if (Files.exists(savePath)) {
+//            Files.move(savePath, tmpPath, StandardCopyOption.ATOMIC_MOVE);
             try (FileChannel fileChannel = FileChannel.open(savePath, StandardOpenOption.READ)) {
 
                 mappedByteBuffer = fileChannel.map(FileChannel.MapMode.READ_ONLY, 0, fileChannel.size());
@@ -96,6 +139,7 @@ class SSTable {
                     storage.put(keyByteBuffer, Record.of(keyByteBuffer, valueByteBuffer));
                 }
             }
+//            Files.deleteIfExists(tmpPath);
         }
     }
 
@@ -143,7 +187,13 @@ class SSTable {
         byteBuffer.compact();
     }
 
-    private void clean() throws IOException {
+    void close() throws IOException {
+        if (mappedByteBuffer != null) {
+            clean();
+        }
+    }
+
+    private static void clean() throws IOException {
         try {
             Class<?> unsafeClass = Class.forName("sun.misc.Unsafe");
             Field unsafeField = unsafeClass.getDeclaredField("theUnsafe");

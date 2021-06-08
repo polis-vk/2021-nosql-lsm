@@ -6,15 +6,15 @@ import ru.mail.polis.lsm.Record;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
-import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Random;
 import java.util.SortedMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ConcurrentSkipListMap;
@@ -55,12 +55,12 @@ public class DaoImpl implements DAO {
         synchronized (this) {
             memoryConsumption += 4;
             if (memoryConsumption > Integer.MAX_VALUE / 32) {
-                try {
-                    flush();
-                    memoryConsumption = 0;
-                } catch (IOException e) {
-                    throw new UncheckedIOException(e);
-                }
+//                try {
+////                    flush();
+//                    memoryConsumption = 0;
+//                } catch (IOException e) {
+//                    throw new UncheckedIOException(e);
+//                }
             }
         }
 
@@ -74,6 +74,11 @@ public class DaoImpl implements DAO {
     @Override
     public void close() throws IOException {
         flush();
+
+        for (SSTable ssTable : ssTables) {
+            ssTable.close();
+        }
+
     }
 
     private Map<ByteBuffer, Record> map(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
@@ -90,8 +95,10 @@ public class DaoImpl implements DAO {
     }
 
     private void flush() throws IOException {
-        SSTable ssTable = SSTable.save(memoryStorage.values().iterator(), config.getDir().resolve(Path.of("ss" + ssTables.size())));
-        ssTables.add(ssTable);
+        SSTable ssTable = SSTable.save(memoryStorage.values().iterator(), config.getDir().resolve(Paths.get("ss" + new Random().nextInt())));
+        if (ssTable != null) {
+            ssTables.add(ssTable);
+        }
         memoryStorage.clear();
     }
 
