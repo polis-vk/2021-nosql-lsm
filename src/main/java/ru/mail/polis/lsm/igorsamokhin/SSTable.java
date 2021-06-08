@@ -1,6 +1,5 @@
 package ru.mail.polis.lsm.igorsamokhin;
 
-import ru.mail.polis.lsm.DAO;
 import ru.mail.polis.lsm.Record;
 
 import javax.annotation.Nullable;
