@@ -1,11 +1,14 @@
 package ru.mail.polis.lsm;
 
+import ru.mail.polis.lsm.danilafedorov.LsmDAO;
+
 import javax.annotation.Nullable;
 import java.io.Closeable;
 import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.SortedMap;
 
 /**
  * Minimal database API.
@@ -35,6 +38,22 @@ public interface DAO extends Closeable {
         return result;
     }
 
+    static SortedMap<ByteBuffer, Record> getSubMap(@Nullable final ByteBuffer fromKey, @Nullable final ByteBuffer toKey, SortedMap<ByteBuffer, Record> storage) {
+        if (fromKey == null) {
+            if (toKey == null) {
+                return storage;
+            }
+
+            return storage.headMap(toKey);
+        }
+
+        if (toKey == null) {
+            return storage.tailMap(fromKey);
+        }
+
+        return storage.subMap(fromKey, toKey);
+    }
+
     /**
      * Merges iterators.
      *
@@ -58,7 +77,7 @@ public interface DAO extends Closeable {
     }
 
     static Iterator<Record> mergeTwo(Iterator<Record> left, Iterator<Record> right) {
-        return new MergedRecordsIterator(left, right);
+        return new LsmDAO.MergedRecordsIterator(left, right);
     }
 
     class MergedRecordsIterator implements Iterator<Record> {
