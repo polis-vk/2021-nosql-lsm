@@ -46,7 +46,11 @@ public class LsmDAO implements DAO {
     }
 
     private Path getNewFileName() {
-        String name = FILE_PREFIX.concat(currentTableN.toString());
+        String binary = Long.toBinaryString(currentTableN);
+        int leadingN = 64 - binary.length();
+
+        String builder = "0".repeat(leadingN) + binary;
+        String name = FILE_PREFIX.concat(builder);
         ++currentTableN;
         return config.getDir().resolve(name);
     }
