@@ -13,7 +13,6 @@ import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -41,18 +40,7 @@ class SSTable {
         this.savePath = filePath;
         this.tmpPath = Paths.get(filePath.toString() + "tmp");
 
-//        if (!Files.exists(savePath)) {
-//            if (Files.exists(tmpPath)) {
-//                Files.move(tmpPath, savePath, StandardCopyOption.ATOMIC_MOVE);
-//            } else {
-//                mappedByteBuffer = null;
-//                return;
-//            }
-//
-//        }
-
         restoreStorage();
-
     }
 
     Iterator<Record> range(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
@@ -91,20 +79,11 @@ class SSTable {
             fileChannel.force(false);
         }
 
-//        if (mappedByteBuffer != null) {
-//            clean();
-//        }
 
 //        Files.deleteIfExists(dir);
 //        Files.move(tmp, dir, StandardCopyOption.ATOMIC_MOVE);
 
-        SSTable ssTable = new SSTable(dir);
-
-//        if (mappedByteBuffer != null) {
-//            clean();
-//        }
-
-        return ssTable;
+        return new SSTable(dir);
     }
 
     static List<SSTable> loadFromDir(Path dir) throws IOException {
@@ -127,7 +106,6 @@ class SSTable {
 
     private void restoreStorage() throws IOException {
         if (Files.exists(savePath)) {
-//            Files.move(savePath, tmpPath, StandardCopyOption.ATOMIC_MOVE);
             try (FileChannel fileChannel = FileChannel.open(savePath, StandardOpenOption.READ)) {
 
                 mappedByteBuffer = fileChannel.map(FileChannel.MapMode.READ_ONLY, 0, fileChannel.size());
@@ -139,7 +117,6 @@ class SSTable {
                     storage.put(keyByteBuffer, Record.of(keyByteBuffer, valueByteBuffer));
                 }
             }
-//            Files.deleteIfExists(tmpPath);
         }
     }
 
