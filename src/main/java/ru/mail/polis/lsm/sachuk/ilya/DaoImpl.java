@@ -22,6 +22,7 @@ import java.util.concurrent.ConcurrentSkipListMap;
 public class DaoImpl implements DAO {
 
     private final DAOConfig config;
+    private boolean isClosed = false;
     private final SortedMap<ByteBuffer, Record> memoryStorage = new ConcurrentSkipListMap<>();
     private final ConcurrentLinkedDeque<SSTable> ssTables = new ConcurrentLinkedDeque<>();
 
@@ -73,6 +74,9 @@ public class DaoImpl implements DAO {
 
     @Override
     public void close() throws IOException {
+
+        isClosed = true;
+
         flush();
 
         for (SSTable ssTable : ssTables) {
@@ -96,10 +100,12 @@ public class DaoImpl implements DAO {
 
     private void flush() throws IOException {
         SSTable ssTable = SSTable.save(memoryStorage.values().iterator(), config.getDir().resolve(Paths.get("ss" + new Random().nextInt())));
-        if (ssTable != null) {
-            ssTables.add(ssTable);
+
+        ssTables.add(ssTable);
+
+        if (!isClosed) {
+            memoryStorage.clear();
         }
-        memoryStorage.clear();
     }
 
     private Iterator<Record> sstableRanges(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
