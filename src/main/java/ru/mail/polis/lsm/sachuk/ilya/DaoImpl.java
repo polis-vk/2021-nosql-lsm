@@ -6,6 +6,7 @@ import ru.mail.polis.lsm.Record;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -21,12 +22,15 @@ import java.util.concurrent.ConcurrentSkipListMap;
 
 public class DaoImpl implements DAO {
 
+    private static final long LIMIT = 16L * 1024 * 1024;
+
     private final DAOConfig config;
-    private boolean isClosed = false;
     private final SortedMap<ByteBuffer, Record> memoryStorage = new ConcurrentSkipListMap<>();
     private final ConcurrentLinkedDeque<SSTable> ssTables = new ConcurrentLinkedDeque<>();
 
+    private boolean isClosed = false;
     private long memoryConsumption = 0;
+
 
     /**
      * Constructor that initialize path and restore storage.
@@ -54,14 +58,14 @@ public class DaoImpl implements DAO {
     public void upsert(Record record) {
 
         synchronized (this) {
-            memoryConsumption += 4;
-            if (memoryConsumption > Integer.MAX_VALUE / 32) {
-//                try {
-////                    flush();
-//                    memoryConsumption = 0;
-//                } catch (IOException e) {
-//                    throw new UncheckedIOException(e);
-//                }
+            memoryConsumption += sizeOf(record);
+            if (memoryConsumption > LIMIT) {
+                try {
+                    flush();
+                    memoryConsumption = 0;
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
             }
         }
 
@@ -116,6 +120,10 @@ public class DaoImpl implements DAO {
         }
 
         return merge(iterators);
+    }
+
+    private int sizeOf(Record record) {
+        return record.getKey().remaining() + (record.isTombstone() ? 0 : record.getKey().remaining());
     }
 
     /**
