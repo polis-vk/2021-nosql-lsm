@@ -6,40 +6,18 @@ import ru.mail.polis.lsm.Record;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
+import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
-import java.nio.MappedByteBuffer;
-import java.nio.channels.FileChannel;
 import java.nio.channels.WritableByteChannel;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
-import java.nio.file.StandardOpenOption;
-import java.util.Iterator;
-import java.util.SortedMap;
+import java.util.*;
 import java.util.concurrent.ConcurrentSkipListMap;
 
 public class DAOImpl implements DAO {
 
-    private static final Method CLEAN;
-    private static final String SAVE_FILE_NAME = "save.dat";
-    private static final String TMP_FILE_NAME = "tmp.dat";
+    private final SortedMap<ByteBuffer, Record> memoryStorage = new ConcurrentSkipListMap<>();
 
-    static {
-        try {
-            Class<?> filename = Class.forName("sun.nio.ch.FileChannelImpl");
-            CLEAN = filename.getDeclaredMethod("unmap", MappedByteBuffer.class);
-            CLEAN.setAccessible(true);
-        } catch (ClassNotFoundException | NoSuchMethodException e) {
-            throw new IllegalStateException(e);
-        }
-    }
-
-    private final SortedMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
-    private final Path saveFileName;
-    private final Path tmpFileName;
-    private final MappedByteBuffer mmap;
+    private final DAOConfig config;
+    private final ArrayList<SSTable> tables = new ArrayList<>();
 
     /**
      * Create DAOImpl constructor.
@@ -47,33 +25,8 @@ public class DAOImpl implements DAO {
      * @param config contains directory with file
      */
     public DAOImpl(DAOConfig config) throws IOException {
-
-        Path path = config.getDir();
-        saveFileName = path.resolve(SAVE_FILE_NAME);
-        tmpFileName = path.resolve(TMP_FILE_NAME);
-
-        if (!Files.exists(saveFileName)) {
-            if (Files.exists(tmpFileName)) {
-                Files.move(tmpFileName, saveFileName, StandardCopyOption.ATOMIC_MOVE);
-            } else {
-                mmap = null;
-                return;
-            }
-        }
-        try (FileChannel channel = FileChannel.open(saveFileName, StandardOpenOption.READ)) {
-            mmap = channel.map(FileChannel.MapMode.READ_ONLY, 0, channel.size());
-            while (mmap.hasRemaining()) {
-                int keySize = mmap.getInt();
-                ByteBuffer key = mmap.slice().limit(keySize).asReadOnlyBuffer();
-                mmap.position(mmap.position() + keySize);
-
-                int valueSize = mmap.getInt();
-                ByteBuffer value = mmap.slice().limit(valueSize).asReadOnlyBuffer();
-                mmap.position(mmap.position() + valueSize);
-
-                storage.put(key, Record.of(key, value));
-            }
-        }
+        this.config = config;
+        tables.add(SSTable.loadFromDir(config.getDir()));
     }
 
     private static void writeInt(ByteBuffer value, WritableByteChannel channel, ByteBuffer tmp) throws IOException {
@@ -84,57 +37,168 @@ public class DAOImpl implements DAO {
         channel.write(value);
     }
 
+    /**
+     * Merges iterators.
+     *
+     * @param iterators iterators List
+     * @return result Iterator
+     */
+    private static Iterator<Record> merge(List<Iterator<Record>> iterators) {
+        switch (iterators.size()) {
+            case (0):
+                return Collections.emptyIterator();
+            case (1):
+                return iterators.get(0);
+            case (2):
+                return new MergeTwo(new PeekingIterator(iterators.get(0)), new PeekingIterator(iterators.get(1)));
+            default:
+                Iterator<Record> left = merge(iterators.subList(0, iterators.size() / 2));
+                Iterator<Record> right = merge(iterators.subList(iterators.size() / 2, iterators.size()));
+
+                return new MergeTwo(new PeekingIterator(left), new PeekingIterator(right));
+        }
+    }
+
     @Override
     public Iterator<Record> range(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
-        return map(fromKey, toKey).values().iterator();
+        synchronized (this) {
+            Iterator<Record> sstableRanges = sstableRanger(fromKey, toKey);
+            Iterator<Record> memoryRange = map(fromKey, toKey).values().iterator();
+            return new MergeTwo(sstableRanges, memoryRange);
+        }
+    }
+
+    private Iterator<Record> sstableRanger(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
+        List<Iterator<Record>> iterators = new ArrayList<>(tables.size());
+        for (SSTable ssTable : tables) {
+            iterators.add(ssTable.range(fromKey, toKey));
+        }
+        return merge(iterators);
     }
 
     @Override
     public void upsert(Record record) {
+        synchronized (this) {
+            memoryCompsumption += sizeOf(record);
+            if (memoryCompsumption > memoryLimit) {
+                try {
+                    flush();
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            }
+        }
+
         if (record.getValue() == null) {
-            storage.remove(record.getKey());
+            memoryStorage.remove(record.getKey());
         } else {
-            storage.put(record.getKey(), record);
+            memoryStorage.put(record.getKey(), record);
         }
     }
 
     @Override
     public void close() throws IOException {
-        try (FileChannel fileChannel = FileChannel.open(
-                tmpFileName,
-                StandardOpenOption.WRITE,
-                StandardOpenOption.CREATE_NEW
-        )) {
-            ByteBuffer size = ByteBuffer.allocate(Integer.BYTES);
-            for (Record record : storage.values()) {
-                writeInt(record.getKey(), fileChannel, size);
-                writeInt(record.getValue(), fileChannel, size);
-            }
-            fileChannel.force(false);
-        }
+        flush();
+    }
 
-        if (mmap != null) {
-            try {
-                CLEAN.invoke(null, mmap);
-            } catch (IllegalAccessException | InvocationTargetException e) {
-                throw new IOException(e);
-            }
-        }
-
-        Files.deleteIfExists(saveFileName);
-        Files.move(tmpFileName, saveFileName, StandardCopyOption.ATOMIC_MOVE);
+    private void flush() throws IOException {
+        SSTable ssTable = SSTable.write(memoryStorage.values().iterator(), ...);
+        tables.add(ssTable);
+        memoryStorage.clear();
     }
 
     private SortedMap<ByteBuffer, Record> map(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
         if (fromKey == null && toKey == null) {
-            return storage;
+            return memoryStorage;
         }
         if (fromKey == null) {
-            return storage.headMap(toKey);
+            return memoryStorage.headMap(toKey);
         }
         if (toKey == null) {
-            return storage.tailMap(fromKey);
+            return memoryStorage.tailMap(fromKey);
         }
-        return storage.subMap(fromKey, toKey);
+        return memoryStorage.subMap(fromKey, toKey);
     }
+
+    static class MergeTwo implements Iterator<Record> {
+        private final PeekingIterator left;
+        private final PeekingIterator right;
+
+        private MergeTwo(PeekingIterator left, PeekingIterator right) {
+            this.left = left;
+            this.right = right;
+        }
+
+        @Override
+        public boolean hasNext() {
+            return left.hasNext() || right.hasNext();
+        }
+
+        @Override
+        public Record next() {
+            if (!left.hasNext() && !right.hasNext()) {
+                throw new NoSuchElementException();
+            }
+
+            if (!left.hasNext()) {
+                return right.next();
+            }
+
+            if (!right.hasNext()) {
+                return left.next();
+            }
+
+            ByteBuffer leftKey = left.peek().getKey();
+            ByteBuffer rightKey = right.peek().getKey();
+
+            int compareResult = leftKey.compareTo(rightKey);
+            if (compareResult == 0) {
+                left.next();
+                return right.next();
+            } else if (compareResult > 0) {
+                return right.next();
+            } else {
+                return left.next();
+            }
+        }
+    }
+
+    private static class PeekingIterator implements Iterator<Record> {
+        private final Iterator<Record> delegate;
+        private Record current;
+
+        public PeekingIterator(Iterator<Record> delegate) {
+            this.delegate = delegate;
+        }
+
+        @Override
+        public boolean hasNext() {
+            return current != null || delegate.hasNext();
+        }
+
+        @Override
+        public Record next() {
+            if ((!hasNext())) {
+                throw new NoSuchElementException();
+            }
+            Record now = peek();
+            current = null;
+            return now;
+        }
+
+        public Record peek() {
+            if (current != null) {
+                return current;
+            }
+
+            if (!hasNext()) {
+                return null;
+            }
+
+            current = delegate.next();
+            return current;
+        }
+    }
+
+
 }
