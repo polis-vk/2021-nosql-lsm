@@ -15,7 +15,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
-import java.util.Random;
 import java.util.SortedMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ConcurrentSkipListMap;
@@ -30,6 +29,7 @@ public class DaoImpl implements DAO {
 
     private boolean isClosed = false;
     private long memoryConsumption = 0;
+    private int nextSSTableNumber;
 
 
     /**
@@ -42,6 +42,7 @@ public class DaoImpl implements DAO {
         this.config = config;
 
         ssTables.addAll(SSTable.loadFromDir(config.getDir()));
+        nextSSTableNumber = ssTables.size();
     }
 
     @Override
@@ -69,17 +70,11 @@ public class DaoImpl implements DAO {
             }
         }
 
-        if (record.getValue() == null) {
-            memoryStorage.remove(record.getKey());
-        } else {
-            memoryStorage.put(record.getKey(), record);
-        }
+        memoryStorage.put(record.getKey(), record);
     }
 
     @Override
     public void close() throws IOException {
-
-        isClosed = true;
 
         flush();
 
@@ -103,13 +98,14 @@ public class DaoImpl implements DAO {
     }
 
     private void flush() throws IOException {
-        SSTable ssTable = SSTable.save(memoryStorage.values().iterator(), config.getDir().resolve(Paths.get("ss" + new Random().nextInt())));
+        SSTable ssTable = SSTable.save(
+                memoryStorage.values().iterator(),
+                config.getDir().resolve(Paths.get("sstable" + nextSSTableNumber++))
+        );
 
         ssTables.add(ssTable);
+        memoryStorage.clear();
 
-        if (!isClosed) {
-            memoryStorage.clear();
-        }
     }
 
     private Iterator<Record> sstableRanges(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
@@ -213,3 +209,6 @@ public class DaoImpl implements DAO {
         };
     }
 }
+
+//найти место с которого читать
+//когда в

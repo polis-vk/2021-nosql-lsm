@@ -129,30 +129,15 @@ class SSTable {
         return byteBuffer;
     }
 
-//    private static void saveF() throws IOException {
-//
-//        try (FileChannel fileChannel = FileChannel.open(
-//                tmpPath,
-//                StandardOpenOption.CREATE_NEW,
-//                StandardOpenOption.WRITE,
-//                StandardOpenOption.TRUNCATE_EXISTING
-//        )) {
-//
-//            for (final Map.Entry<ByteBuffer, Record> byteBufferRecordEntry : storage.entrySet()) {
-//                writeToFile(fileChannel, byteBufferRecordEntry.getKey());
-//                writeToFile(fileChannel, byteBufferRecordEntry.getValue().getValue());
-//            }
-//            fileChannel.force(false);
-//        }
-//    }
-
     private static void writeToFile(FileChannel fileChannel, ByteBuffer value) throws IOException {
 
         ByteBuffer byteBuffer = ByteBuffer.allocate(value.capacity());
         ByteBuffer secBuf = ByteBuffer.allocate(Integer.BYTES);
 
         secBuf.putInt(value.remaining());
+        secBuf.position(0);
         byteBuffer.put(value);
+        byteBuffer.position(0);
 
         write(fileChannel, secBuf);
         write(fileChannel, byteBuffer);
