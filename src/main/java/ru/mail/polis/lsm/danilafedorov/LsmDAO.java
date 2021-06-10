@@ -23,7 +23,7 @@ public class LsmDAO implements DAO {
     private Integer memoryConsumption = 0;
     private static final Integer MEMORY_LIMIT = 1024 * 1024 * 32;
 
-    static final String FILE_NAME = "SSTable";
+    static final String FILE_NAME = "SSTable_";
 
 
     /**
