@@ -123,7 +123,7 @@ public class SSTable implements Closeable {
      */
     public Iterator<Record> range(@Nullable final ByteBuffer fromKey, @Nullable final ByteBuffer toKey) {
         int fromIndex = fromKey == null ? 0 : findKeyIndex(fromKey);
-        int toIndex = toKey == null ? indexes.length : findKeyIndex(fromKey);
+        int toIndex = toKey == null ? indexes.length : findKeyIndex(toKey);
 
         ByteBuffer buffer = mmap.position(indexes[fromIndex])
                 .slice();
