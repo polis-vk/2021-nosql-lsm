@@ -38,22 +38,6 @@ public interface DAO extends Closeable {
         return result;
     }
 
-    static SortedMap<ByteBuffer, Record> getSubMap(@Nullable final ByteBuffer fromKey, @Nullable final ByteBuffer toKey, SortedMap<ByteBuffer, Record> storage) {
-        if (fromKey == null) {
-            if (toKey == null) {
-                return storage;
-            }
-
-            return storage.headMap(toKey);
-        }
-
-        if (toKey == null) {
-            return storage.tailMap(fromKey);
-        }
-
-        return storage.subMap(fromKey, toKey);
-    }
-
     /**
      * Merges iterators.
      *

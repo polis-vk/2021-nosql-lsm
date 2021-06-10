@@ -9,7 +9,10 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.nio.file.Path;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.SortedMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ConcurrentSkipListMap;
 
@@ -24,7 +27,6 @@ public class LsmDAO implements DAO {
     private static final Integer MEMORY_LIMIT = 1024 * 1024 * 32;
 
     static final String FILE_NAME = "SSTable_";
-
 
     /**
      * Class constructor identifying directory of DB location.
@@ -89,7 +91,23 @@ public class LsmDAO implements DAO {
     }
 
     private Iterator<Record> memoryStorageRange(ByteBuffer fromKey, ByteBuffer toKey) {
-        return DAO.getSubMap(fromKey, toKey, memoryStorage).values().iterator();
+        return map(fromKey, toKey).values().iterator();
+    }
+
+    private SortedMap<ByteBuffer, Record> map(@Nullable final ByteBuffer fromKey, @Nullable final ByteBuffer toKey) {
+        if (fromKey == null) {
+            if (toKey == null) {
+                return memoryStorage;
+            }
+
+            return memoryStorage.headMap(toKey);
+        }
+
+        if (toKey == null) {
+            return memoryStorage.tailMap(fromKey);
+        }
+
+        return memoryStorage.subMap(fromKey, toKey);
     }
 
     private Integer sizeOf(Record record) {

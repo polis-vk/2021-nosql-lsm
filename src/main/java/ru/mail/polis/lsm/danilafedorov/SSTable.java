@@ -3,8 +3,8 @@ package ru.mail.polis.lsm.danilafedorov;
 import ru.mail.polis.lsm.Record;
 
 import javax.annotation.Nullable;
+import java.io.Closeable;
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
@@ -12,13 +12,17 @@ import java.nio.IntBuffer;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.WritableByteChannel;
-import java.nio.file.*;
-import java.util.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
+import java.util.Comparator;
+import java.util.Iterator;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentLinkedDeque;
-import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.stream.Stream;
 
-public class SSTable {
+public class SSTable implements Closeable {
 
     private static final Method CLEAN;
     private static final Integer NULL_SIZE = -1;
@@ -27,7 +31,7 @@ public class SSTable {
 
     private final MappedByteBuffer mmap;
     private final Path indexPath;
-    private int[] indexes;
+    private final int[] indexes;
 
     static {
         try {
@@ -94,6 +98,12 @@ public class SSTable {
         return new SSTable(path);
     }
 
+    /**
+     * Opens SSTable located in memory.
+     *
+     * @param path contains path to SSTable
+     * @throws IOException If an input exception occurred
+     */
     public SSTable(final Path path) throws IOException {
         String name = path.getFileName().toString();
         indexPath = path.resolveSibling(name + INDEX_FILE_ENDING);
@@ -104,14 +114,16 @@ public class SSTable {
         }
     }
 
-    private static boolean isSSTableFile(Path path) {
-        String name = path.getFileName().toString();
-        return !(name.endsWith(INDEX_FILE_ENDING) || name.endsWith(TEMP_FILE_ENDING));
-    }
-
+    /**
+     * Provides iterator for memory data.
+     *
+     * @param fromKey first record's key will be greater or equal to {@code fromKey}
+     * @param toKey last record's key will be less then {@code toKey}
+     * @return iterator for appropriate records
+     */
     public Iterator<Record> range(@Nullable final ByteBuffer fromKey, @Nullable final ByteBuffer toKey) {
-        int fromIndex = fromKey == null ? 0 : findKeyIndex(fromKey, indexes);
-        int toIndex = toKey == null ? indexes.length : findKeyIndex(fromKey, indexes);
+        int fromIndex = fromKey == null ? 0 : findKeyIndex(fromKey);
+        int toIndex = toKey == null ? indexes.length : findKeyIndex(fromKey);
 
         ByteBuffer buffer = mmap.position(indexes[fromIndex])
                 .slice();
@@ -120,6 +132,27 @@ public class SSTable {
         }
         buffer = buffer.asReadOnlyBuffer();
         return new SSTableIterator(buffer);
+    }
+
+    @Override
+    public void close() throws IOException {
+        if (mmap != null) {
+            try {
+                CLEAN.invoke(null, mmap);
+            } catch (IllegalAccessException | InvocationTargetException e) {
+                throw new IOException(e);
+            }
+        }
+    }
+
+    private static boolean isSSTableFile(Path path) {
+        String name = path.getFileName().toString();
+        return !(name.endsWith(INDEX_FILE_ENDING) || name.endsWith(TEMP_FILE_ENDING));
+    }
+
+    private static Integer getFileOrder(Path path) {
+        String orderString = path.getFileName().toString().substring(LsmDAO.FILE_NAME.length());
+        return Integer.parseInt(orderString);
     }
 
     private int[] getIndexes() throws IOException {
@@ -137,7 +170,7 @@ public class SSTable {
         }
     }
 
-    private int findKeyIndex(ByteBuffer key, int[] indexes) {
+    private int findKeyIndex(ByteBuffer key) {
         ByteBuffer buffer = mmap.duplicate();
 
         int first = 0;
@@ -146,7 +179,7 @@ public class SSTable {
         while ((last - first) > 0) {
             int middle = (first + last) / 2;
             buffer.position(indexes[middle]);
-            ByteBuffer current = read(buffer);
+            ByteBuffer current = checkValue(buffer);
             int compareResult = key.compareTo(current);
 
             if (compareResult < 0) {
@@ -160,17 +193,9 @@ public class SSTable {
         return last;
     }
 
-    public void close() throws IOException {
-        if (mmap != null) {
-            try {
-                CLEAN.invoke(null, mmap);
-            } catch (IllegalAccessException | InvocationTargetException e) {
-                throw new IOException(e);
-            }
-        }
-    }
-
-    private static void writeValue(WritableByteChannel channel, @Nullable ByteBuffer value, ByteBuffer tmp) throws IOException {
+    private static void writeValue(WritableByteChannel channel,
+                                   @Nullable ByteBuffer value,
+                                   ByteBuffer tmp) throws IOException {
         int size = value == null ? NULL_SIZE : value.remaining();
         writeInt(channel, size, tmp);
 
@@ -186,9 +211,8 @@ public class SSTable {
         channel.write(tmp);
     }
 
-    private ByteBuffer read(ByteBuffer buf) {
+    private ByteBuffer checkValue(ByteBuffer buf) {
         int size = buf.getInt();
-
         return buf.slice().limit(size).asReadOnlyBuffer();
     }
 
@@ -211,7 +235,6 @@ public class SSTable {
                 return null;
             }
 
-
             ByteBuffer key = Objects.requireNonNull(read());
             ByteBuffer value = read();
             return value == null ? Record.tombstone(key) : Record.of(key, value);
@@ -228,11 +251,5 @@ public class SSTable {
             buffer.position(buffer.position() + size);
             return value;
         }
-    }
-
-    private static Integer getFileOrder(Path path) {
-        String orderString = path.getFileName().toString().substring(LsmDAO.FILE_NAME.length());
-
-        return Integer.parseInt(orderString);
     }
 }
