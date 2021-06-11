@@ -27,11 +27,8 @@ import java.util.stream.Stream;
 
 class SSTable {
 
-    private Path savePath;
-
-
+    private final Path savePath;
     private final SortedMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
-
     private MappedByteBuffer mappedByteBuffer;
 
 
@@ -43,19 +40,6 @@ class SSTable {
 
     Iterator<Record> range(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
         return map(fromKey, toKey).values().iterator();
-    }
-
-    private Map<ByteBuffer, Record> map(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
-
-        if (fromKey == null && toKey == null) {
-            return storage;
-        } else if (fromKey == null) {
-            return storage.headMap(toKey);
-        } else if (toKey == null) {
-            return storage.tailMap(fromKey);
-        } else {
-            return storage.subMap(fromKey, toKey);
-        }
     }
 
     static List<SSTable> loadFromDir(Path dir) throws IOException {
@@ -103,6 +87,12 @@ class SSTable {
         return new SSTable(dir);
     }
 
+    void close() throws IOException {
+        if (mappedByteBuffer != null) {
+            clean();
+        }
+    }
+
     private void restoreStorage() throws IOException {
         if (Files.exists(savePath)) {
             try (FileChannel fileChannel = FileChannel.open(savePath, StandardOpenOption.READ)) {
@@ -136,12 +126,6 @@ class SSTable {
         channel.write(value);
     }
 
-    void close() throws IOException {
-        if (mappedByteBuffer != null) {
-            clean();
-        }
-    }
-
     private void clean() throws IOException {
         try {
             Class<?> unsafeClass = Class.forName("sun.misc.Unsafe");
@@ -153,6 +137,19 @@ class SSTable {
         } catch (ClassNotFoundException | NoSuchFieldException | NoSuchMethodException
                 | IllegalAccessException | InvocationTargetException e) {
             throw new IOException(e);
+        }
+    }
+
+    private Map<ByteBuffer, Record> map(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
+
+        if (fromKey == null && toKey == null) {
+            return storage;
+        } else if (fromKey == null) {
+            return storage.headMap(toKey);
+        } else if (toKey == null) {
+            return storage.tailMap(fromKey);
+        } else {
+            return storage.subMap(fromKey, toKey);
         }
     }
 }
