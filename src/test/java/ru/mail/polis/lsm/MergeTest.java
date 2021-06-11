@@ -3,6 +3,7 @@ package ru.mail.polis.lsm;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.opentest4j.AssertionFailedError;
+import ru.mail.polis.lsm.sachuk.ilya.DaoImpl;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -61,7 +62,7 @@ class MergeTest {
             }
 
             List<Iterator<Record>> iterators = dao.stream().map(d -> d.range(null, null)).collect(Collectors.toList());
-            Iterator<Record> iterator = DAO.merge(iterators);
+            Iterator<Record> iterator = DaoImpl.merge(iterators);
             for (Map.Entry<String, Integer> entry : expected.entrySet()) {
                 if (!iterator.hasNext()) {
                     throw new AssertionFailedError("Iterator ended on key " + entry.getKey());
@@ -115,7 +116,7 @@ class MergeTest {
         }
         Record left = Record.of(key(0), value(0));
         Record right = Record.of(key(1), value(1));
-        Iterator<Record> iterator = DAO.merge(Arrays.asList(new Repeater(left), new Repeater(right)));
+        Iterator<Record> iterator = DaoImpl.merge(Arrays.asList(new Repeater(left), new Repeater(right)));
         for (int i = 0; i < 1000; i++) {
             assertTrue(iterator.hasNext());
             Record next = iterator.next();
