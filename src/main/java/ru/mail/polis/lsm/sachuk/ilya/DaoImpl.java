@@ -27,7 +27,6 @@ public class DaoImpl implements DAO {
     private final SortedMap<ByteBuffer, Record> memoryStorage = new ConcurrentSkipListMap<>();
     private final ConcurrentLinkedDeque<SSTable> ssTables = new ConcurrentLinkedDeque<>();
 
-    private boolean isClosed = false;
     private long memoryConsumption = 0;
     private int nextSSTableNumber;
 
@@ -48,10 +47,10 @@ public class DaoImpl implements DAO {
     @Override
     public Iterator<Record> range(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
         synchronized (this) {
-            Iterator<Record> sstableRanges = sstableRanges(fromKey, toKey);
+            Iterator<Record> ssTableRanges = ssTableRanges(fromKey, toKey);
             Iterator<Record> memoryRange = map(fromKey, toKey).values().iterator();
 
-            return mergeTwo(sstableRanges, memoryRange);
+            return mergeTwo(ssTableRanges, memoryRange);
         }
     }
 
@@ -108,7 +107,7 @@ public class DaoImpl implements DAO {
 
     }
 
-    private Iterator<Record> sstableRanges(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
+    private Iterator<Record> ssTableRanges(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
         List<Iterator<Record>> iterators = new ArrayList<>(ssTables.size());
 
         for (SSTable ssTable : ssTables) {
