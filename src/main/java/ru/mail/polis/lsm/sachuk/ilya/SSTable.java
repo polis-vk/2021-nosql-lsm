@@ -10,9 +10,11 @@ import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
+import java.nio.channels.WritableByteChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -25,20 +27,16 @@ import java.util.stream.Stream;
 
 class SSTable {
 
-    private static final String SAVE_FILE_NAME = "save";
-    private static final String TMP_FILE_NAME = "tmp";
-
     private Path savePath;
-    private Path tmpPath;
+
 
     private final SortedMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
 
-    private static MappedByteBuffer mappedByteBuffer;
+    private MappedByteBuffer mappedByteBuffer;
 
 
     SSTable(Path filePath) throws IOException {
         this.savePath = filePath;
-        this.tmpPath = Paths.get(filePath.toString() + "tmp");
 
         restoreStorage();
     }
@@ -60,32 +58,6 @@ class SSTable {
         }
     }
 
-    static SSTable save(Iterator<Record> iterators, Path dir) throws IOException {
-
-        Path tmp = Path.of(dir.toString() + "tmp");
-
-        try (FileChannel fileChannel = FileChannel.open(
-                dir,
-                StandardOpenOption.CREATE_NEW,
-                StandardOpenOption.WRITE,
-                StandardOpenOption.TRUNCATE_EXISTING
-        )) {
-
-            while (iterators.hasNext()) {
-                Record record = iterators.next();
-                writeToFile(fileChannel, record.getKey());
-                writeToFile(fileChannel, record.getValue());
-            }
-            fileChannel.force(false);
-        }
-
-
-//        Files.deleteIfExists(dir);
-//        Files.move(tmp, dir, StandardCopyOption.ATOMIC_MOVE);
-
-        return new SSTable(dir);
-    }
-
     static List<SSTable> loadFromDir(Path dir) throws IOException {
 
         List<SSTable> listSSTables = new ArrayList<>();
@@ -102,6 +74,33 @@ class SSTable {
         }
 
         return listSSTables;
+    }
+
+    static SSTable save(Iterator<Record> iterators, Path dir) throws IOException {
+
+        Path tmp = Path.of(dir.toString() + "tmp");
+
+        try (FileChannel fileChannel = FileChannel.open(
+                tmp,
+                StandardOpenOption.CREATE_NEW,
+                StandardOpenOption.WRITE,
+                StandardOpenOption.TRUNCATE_EXISTING
+        )) {
+            ByteBuffer size = ByteBuffer.allocate(Integer.BYTES);
+            while (iterators.hasNext()) {
+                Record record = iterators.next();
+
+                writeInt(record.getKey(), fileChannel, size);
+                writeInt(record.getValue(), fileChannel, size);
+            }
+            fileChannel.force(false);
+        }
+
+
+        Files.deleteIfExists(dir);
+        Files.move(tmp, dir, StandardCopyOption.ATOMIC_MOVE);
+
+        return new SSTable(dir);
     }
 
     private void restoreStorage() throws IOException {
@@ -129,24 +128,12 @@ class SSTable {
         return byteBuffer;
     }
 
-    private static void writeToFile(FileChannel fileChannel, ByteBuffer value) throws IOException {
-
-        ByteBuffer byteBuffer = ByteBuffer.allocate(value.capacity());
-        ByteBuffer secBuf = ByteBuffer.allocate(Integer.BYTES);
-
-        secBuf.putInt(value.remaining());
-        secBuf.position(0);
-        byteBuffer.put(value);
-        byteBuffer.position(0);
-
-        write(fileChannel, secBuf);
-        write(fileChannel, byteBuffer);
-    }
-
-    private static void write(FileChannel fileChannel, ByteBuffer byteBuffer) throws IOException {
-        byteBuffer.flip();
-        fileChannel.write(byteBuffer);
-        byteBuffer.compact();
+    private static void writeInt(ByteBuffer value, WritableByteChannel channel, ByteBuffer tmp) throws IOException {
+        tmp.position(0);
+        tmp.putInt(value.remaining());
+        tmp.position(0);
+        channel.write(tmp);
+        channel.write(value);
     }
 
     void close() throws IOException {
@@ -155,7 +142,7 @@ class SSTable {
         }
     }
 
-    private static void clean() throws IOException {
+    private void clean() throws IOException {
         try {
             Class<?> unsafeClass = Class.forName("sun.misc.Unsafe");
             Field unsafeField = unsafeClass.getDeclaredField("theUnsafe");
