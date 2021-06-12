@@ -68,7 +68,6 @@ public class DaoImpl implements DAO {
                 }
             }
         }
-
         memoryStorage.put(record.getKey(), record);
     }
 
@@ -113,7 +112,6 @@ public class DaoImpl implements DAO {
         for (SSTable ssTable : ssTables) {
             iterators.add(ssTable.range(fromKey, toKey));
         }
-
         return merge(iterators);
     }
 
@@ -143,7 +141,7 @@ public class DaoImpl implements DAO {
         return mergeTwo(left, right);
     }
 
-    private static Iterator<Record> mergeTwo(Iterator<Record> left, Iterator<Record> right) {
+    private static Iterator<Record> mergeTwo(Iterator<Record> leftIterator, Iterator<Record> rightIterator) {
         return new Iterator<>() {
 
             private Record leftRecord;
@@ -151,7 +149,7 @@ public class DaoImpl implements DAO {
 
             @Override
             public boolean hasNext() {
-                return left.hasNext() || right.hasNext();
+                return leftIterator.hasNext() || rightIterator.hasNext();
             }
 
             @Override
@@ -161,8 +159,8 @@ public class DaoImpl implements DAO {
                     throw new NoSuchElementException();
                 }
 
-                leftRecord = getNext(left, leftRecord);
-                rightRecord = getNext(right, rightRecord);
+                leftRecord = getNext(leftIterator, leftRecord);
+                rightRecord = getNext(rightIterator, rightRecord);
 
 
                 if (leftRecord == null) {
@@ -176,7 +174,15 @@ public class DaoImpl implements DAO {
 
                 if (compare == 0) {
                     leftRecord = null;
-                    return getRight();
+
+                    Record record = getRight();
+
+                    if (record.isTombstone()) {
+                        record = null;
+                        rightRecord = null;
+                    }
+
+                    return record;
                 } else if (compare < 0) {
                     return getLeft();
                 } else {
