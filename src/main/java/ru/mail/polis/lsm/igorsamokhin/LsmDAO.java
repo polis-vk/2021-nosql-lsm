@@ -5,6 +5,7 @@ import ru.mail.polis.lsm.DAOConfig;
 import ru.mail.polis.lsm.Record;
 
 import javax.annotation.Nullable;
+import javax.annotation.concurrent.GuardedBy;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -68,14 +69,15 @@ public class LsmDAO implements DAO {
     @Override
     public void upsert(Record record) throws UncheckedIOException {
         synchronized (this) {
-            memoryConsumption += sizeOf(record);
-            if (memoryConsumption > MEMORY_LIMIT) {
+            int size = sizeOf(record);
+            if (memoryConsumption + size > MEMORY_LIMIT) {
                 try {
                     flush();
                 } catch (IOException e) {
                     throw new UncheckedIOException(e);
                 }
             }
+            memoryConsumption += size;
             memoryStorage.put(record.getKey(), record);
         }
     }
@@ -87,6 +89,7 @@ public class LsmDAO implements DAO {
         return keyCapacity + valueCapacity;
     }
 
+    @GuardedBy("this")
     private void flush() throws IOException {
         if (memoryConsumption == 0) {
             return;
@@ -109,11 +112,10 @@ public class LsmDAO implements DAO {
     @Override
     public void close() throws IOException {
         synchronized (this) {
-            if (memoryConsumption == 0) {
+            flush();
+            if (ssTables.isEmpty()) {
                 return;
             }
-            SSTable s = SSTable.write(memoryStorage.values().iterator(), filePath);
-            ssTables.add(s);
 
             for (SSTable ssTable : ssTables) {
                 ssTable.close();
