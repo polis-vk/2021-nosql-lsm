@@ -164,7 +164,7 @@ class PersistenceTest {
         byte[] suffix = sizeBasedRandomData(size);
         int recordsCount = (int) (TestDaoWrapper.MAX_HEAP * 15 / size);
 
-        prepareHugeDao(data, size, suffix);
+        prepareHugeDao(data, recordsCount, suffix);
 
         // Check
         try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
@@ -176,7 +176,12 @@ class PersistenceTest {
 
                 Iterator<Record> range = dao.range(keyFrom, keyTo);
                 for (int j = 0; j < searchStep; j++) {
+                    int delta = j - (recordsCount - i * searchStep) + 1;
+                    if (delta > 0) {
+                        break;
+                    }
                     verifyNext(suffix, range, i * searchStep + j);
+
                 }
                 assertFalse(range.hasNext());
             }
