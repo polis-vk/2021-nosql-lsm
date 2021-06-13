@@ -60,7 +60,11 @@ class Utils {
     }
 
     static ByteBuffer keyWithSuffix(int key, byte[] suffix) {
-        byte[] keyBytes = (KEY_PREFIX + "_" + key).getBytes(StandardCharsets.UTF_8);
+        String binary = Long.toBinaryString(key);
+        int leadingN = 64 - binary.length();
+        String builder = "0".repeat(leadingN) + binary;
+
+        byte[] keyBytes = (KEY_PREFIX + "_" + builder).getBytes(StandardCharsets.UTF_8);
         byte[] result = new byte[keyBytes.length + suffix.length];
         System.arraycopy(keyBytes, 0, result, 0, keyBytes.length);
         System.arraycopy(suffix, 0, result, keyBytes.length, suffix.length);
