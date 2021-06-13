@@ -16,8 +16,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.SortedMap;
+import java.util.Spliterator;
+import java.util.Spliterators;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 public class DaoImpl implements DAO {
 
@@ -50,7 +54,10 @@ public class DaoImpl implements DAO {
             Iterator<Record> ssTableRanges = ssTableRanges(fromKey, toKey);
             Iterator<Record> memoryRange = map(fromKey, toKey).values().iterator();
 
-            return mergeTwo(ssTableRanges, memoryRange);
+            return StreamSupport
+                    .stream(Spliterators.spliteratorUnknownSize(mergeTwo(ssTableRanges, memoryRange), Spliterator.ORDERED), false)
+                    .filter(record -> !record.isTombstone())
+                    .iterator();
         }
     }
 
@@ -174,15 +181,7 @@ public class DaoImpl implements DAO {
 
                 if (compare == 0) {
                     leftRecord = null;
-
-                    Record record = getRight();
-
-                    if (record.isTombstone()) {
-                        record = null;
-                        rightRecord = null;
-                    }
-
-                    return record;
+                    return getRight();
                 } else if (compare < 0) {
                     return getLeft();
                 } else {

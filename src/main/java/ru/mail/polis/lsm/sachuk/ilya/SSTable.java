@@ -11,6 +11,7 @@ import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.WritableByteChannel;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -27,6 +28,7 @@ import java.util.stream.Stream;
 
 class SSTable {
 
+    private static final String NULL_VALUE = "NULL_VALUE";
     private final Path savePath;
     private final SortedMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
     private MappedByteBuffer mappedByteBuffer;
@@ -74,8 +76,12 @@ class SSTable {
             while (iterators.hasNext()) {
                 Record record = iterators.next();
 
+                ByteBuffer value = record.getValue() != null
+                        ? record.getValue()
+                        : ByteBuffer.wrap(NULL_VALUE.getBytes(StandardCharsets.UTF_8));
+
                 writeInt(record.getKey(), fileChannel, size);
-                writeInt(record.getValue(), fileChannel, size);
+                writeInt(value, fileChannel, size);
             }
             fileChannel.force(false);
         }
@@ -94,17 +100,20 @@ class SSTable {
     }
 
     private void restoreStorage() throws IOException {
-        if (Files.exists(savePath)) {
-            try (FileChannel fileChannel = FileChannel.open(savePath, StandardOpenOption.READ)) {
+        try (FileChannel fileChannel = FileChannel.open(savePath, StandardOpenOption.READ)) {
 
-                mappedByteBuffer = fileChannel.map(FileChannel.MapMode.READ_ONLY, 0, fileChannel.size());
+            mappedByteBuffer = fileChannel.map(FileChannel.MapMode.READ_ONLY, 0, fileChannel.size());
 
-                while (mappedByteBuffer.hasRemaining()) {
-                    ByteBuffer keyByteBuffer = readFromFile(mappedByteBuffer);
-                    ByteBuffer valueByteBuffer = readFromFile(mappedByteBuffer);
+            while (mappedByteBuffer.hasRemaining()) {
+                ByteBuffer keyByteBuffer = readFromFile(mappedByteBuffer);
+                ByteBuffer valueByteBuffer = readFromFile(mappedByteBuffer);
 
-                    storage.put(keyByteBuffer, Record.of(keyByteBuffer, valueByteBuffer));
-                }
+                Record record = StandardCharsets.UTF_8.newDecoder().decode(valueByteBuffer.duplicate()).toString().compareTo(NULL_VALUE) == 0
+                        ? Record.tombstone(keyByteBuffer)
+                        : Record.of(keyByteBuffer, valueByteBuffer);
+
+
+                storage.put(keyByteBuffer, record);
             }
         }
     }
