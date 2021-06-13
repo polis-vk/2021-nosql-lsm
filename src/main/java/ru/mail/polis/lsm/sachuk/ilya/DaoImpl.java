@@ -20,7 +20,6 @@ import java.util.Spliterator;
 import java.util.Spliterators;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ConcurrentSkipListMap;
-import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
 public class DaoImpl implements DAO {
@@ -63,7 +62,6 @@ public class DaoImpl implements DAO {
 
     @Override
     public void upsert(Record record) {
-
         synchronized (this) {
             memoryConsumption += sizeOf(record);
             if (memoryConsumption > LIMIT) {
@@ -80,17 +78,15 @@ public class DaoImpl implements DAO {
 
     @Override
     public void close() throws IOException {
-
         flush();
 
         for (SSTable ssTable : ssTables) {
             ssTable.close();
         }
-
     }
 
     private Map<ByteBuffer, Record> map(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
-
+        
         if (fromKey == null && toKey == null) {
             return memoryStorage;
         } else if (fromKey == null) {
