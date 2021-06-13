@@ -123,10 +123,13 @@ public class SSTable implements Closeable {
      */
     public Iterator<Record> range(@Nullable final ByteBuffer fromKey, @Nullable final ByteBuffer toKey) {
         int fromIndex = fromKey == null ? 0 : findKeyIndex(fromKey);
+        if (fromIndex == indexes.length) {
+            return SSTableIterator.emptyIterator();
+        }
+
         int toIndex = toKey == null ? indexes.length : findKeyIndex(toKey);
 
-        ByteBuffer buffer = mmap.position(indexes[fromIndex])
-                .slice();
+        ByteBuffer buffer = mmap.position(indexes[fromIndex]).slice();
         if (toIndex < indexes.length) {
             buffer = buffer.limit(indexes[toIndex] - indexes[fromIndex]);
         }
@@ -185,7 +188,7 @@ public class SSTable implements Closeable {
             if (compareResult < 0) {
                 last = middle;
             } else if (compareResult > 0) {
-                first = middle;
+                first = middle + 1;
             } else {
                 return middle;
             }
@@ -219,6 +222,10 @@ public class SSTable implements Closeable {
     static class SSTableIterator implements Iterator<Record> {
 
         final ByteBuffer buffer;
+
+        static public SSTableIterator emptyIterator() {
+            return new SSTableIterator(ByteBuffer.allocate(0));
+        }
 
         SSTableIterator(ByteBuffer mmap) {
             this.buffer = mmap;
