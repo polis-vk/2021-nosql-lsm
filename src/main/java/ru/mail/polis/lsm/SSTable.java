@@ -16,6 +16,7 @@ import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class SSTable implements Closeable {
 
@@ -34,12 +35,13 @@ public class SSTable implements Closeable {
     private MappedByteBuffer mmap;
 
     static List<SSTable> loadFromDir(Path dir) throws IOException {
-            return Files.list(dir)
-                    .filter(path -> path.getFileName().toString().startsWith("file_"))
-                    .sorted(Comparator.comparingInt(path -> Integer.parseInt(path
-                            .getFileName().toString().substring(5))))
-                    .map(path -> new SSTable(dir.resolve(path)))
-                    .collect(Collectors.toList());
+            try (Stream<Path> files = Files.list(dir)) {
+                return files.filter(path -> path.getFileName().toString().startsWith("file_"))
+                        .sorted(Comparator.comparingInt(path -> Integer.parseInt(path
+                                .getFileName().toString().substring(5))))
+                        .map(path -> new SSTable(dir.resolve(path)))
+                        .collect(Collectors.toList());
+            }
     }
 
     static SSTable write(Iterator<Record> records, Path file) throws IOException {
@@ -101,7 +103,7 @@ public class SSTable implements Closeable {
 
     Iterator<Record> range(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
         synchronized (this) {
-            return new DiskIterator<Record>(fromKey, toKey, mmap.duplicate().slice().asReadOnlyBuffer());
+            return new DiskIterator(fromKey, toKey, mmap.duplicate().slice().asReadOnlyBuffer());
         }
 
     }

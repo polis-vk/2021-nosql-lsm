@@ -2,9 +2,6 @@ package ru.mail.polis.lsm;
 
 import javax.annotation.Nullable;
 import java.nio.ByteBuffer;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
 
 @SuppressWarnings("JavaLangClash")
 public class Record {

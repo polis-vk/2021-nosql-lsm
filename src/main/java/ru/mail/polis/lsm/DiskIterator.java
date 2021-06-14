@@ -4,10 +4,10 @@ import javax.annotation.Nullable;
 import java.nio.ByteBuffer;
 import java.util.Iterator;
 
-public class DiskIterator<T> implements Iterator<Record> {
+public class DiskIterator implements Iterator<Record> {
     private final ByteBuffer fromKey;
     private final ByteBuffer toKey;
-    private Record current = null;
+    private Record current;
     private final ByteBuffer buffer;
 
     /**
@@ -67,10 +67,12 @@ public class DiskIterator<T> implements Iterator<Record> {
                 buffer.position(buffer.position() + valueSize);
             } while (buffer.hasRemaining() && key.compareTo(fromKey) < 0);
         }
-        if (key.compareTo(fromKey) >= 0) {
-            buffer.position(buffer.position() - keySize - valueSize - Integer.BYTES * 2);
+        if (key != null) {
+            if (key.compareTo(fromKey) >= 0) {
+                buffer.position(buffer.position() - keySize - valueSize - Integer.BYTES * 2);
+            }
+            current = Record.tombstone(key);
         }
-        current = Record.tombstone(key);
     }
 
     @Override
