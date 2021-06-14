@@ -28,14 +28,20 @@ import java.util.stream.Stream;
 
 class SSTable {
 
+    private static final String SAVE_FILE = "SSTABLE";
+    private static final String INDEX_FILE = "INDEX";
+    private static final String TMP_FILE = "TMP";
     private static final String NULL_VALUE = "NULL_VALUE";
+
     private final Path savePath;
+    private final Path indexPath;
     private final SortedMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
     private MappedByteBuffer mappedByteBuffer;
 
 
-    SSTable(Path filePath) throws IOException {
-        this.savePath = filePath;
+    SSTable(Path savePath, Path indexPath) throws IOException {
+        this.savePath = savePath;
+        this.indexPath = indexPath;
 
         restoreStorage();
     }
@@ -48,49 +54,91 @@ class SSTable {
 
         List<SSTable> listSSTables = new ArrayList<>();
 
-        List<Path> paths;
+        Iterator<Path> savePaths;
+        Iterator<Path> indexPaths;
+
 
         try (Stream<Path> streamPaths = Files.walk(Paths.get(dir.toUri()))) {
-            paths = streamPaths.filter(Files::isRegularFile)
-                    .collect(Collectors.toList());
+            savePaths = streamPaths.filter(path -> path.toString().endsWith(".save")).collect(Collectors.toList()).iterator();
         }
 
-        for (Path path : paths) {
-            listSSTables.add(new SSTable(path));
+        try (Stream<Path> streamPaths = Files.walk(Paths.get(dir.toUri()))) {
+            indexPaths = streamPaths.filter(path -> path.toString().endsWith(".index")).collect(Collectors.toList()).iterator();
+        }
+
+        while (savePaths.hasNext() && indexPaths.hasNext()) {
+            Path savePath = savePaths.next();
+            Path indexPath = indexPaths.next();
+
+            listSSTables.add(new SSTable(savePath, indexPath));
         }
 
         return listSSTables;
     }
 
-    static SSTable save(Iterator<Record> iterators, Path dir) throws IOException {
+    static SSTable save(Iterator<Record> iterators, Path dir, int fileNumber) throws IOException {
 
-        Path tmp = Path.of(dir.toString() + "tmp");
+        int indexNumber = 0;
 
-        try (FileChannel fileChannel = FileChannel.open(
-                tmp,
+        Path savePath = dir.resolve(SAVE_FILE + fileNumber + ".save");
+        Path indexPath = dir.resolve(INDEX_FILE + fileNumber + ".index");
+
+        Path tmpSavePath = dir.resolve(SAVE_FILE + "_" + TMP_FILE);
+        Path tmpIndexPath = dir.resolve(INDEX_FILE + "_" + TMP_FILE);
+
+        try (FileChannel saveFileChannel = FileChannel.open(
+                tmpSavePath,
                 StandardOpenOption.CREATE_NEW,
                 StandardOpenOption.WRITE,
-                StandardOpenOption.TRUNCATE_EXISTING
-        )) {
-            ByteBuffer size = ByteBuffer.allocate(Integer.BYTES);
-            while (iterators.hasNext()) {
-                Record record = iterators.next();
+                StandardOpenOption.TRUNCATE_EXISTING)) {
+            try (FileChannel indexFileChanel = FileChannel.open(
+                    tmpIndexPath, StandardOpenOption.CREATE_NEW,
+                    StandardOpenOption.WRITE,
+                    StandardOpenOption.TRUNCATE_EXISTING)) {
 
-                ByteBuffer value = record.getValue() != null
-                        ? record.getValue()
-                        : ByteBuffer.wrap(NULL_VALUE.getBytes(StandardCharsets.UTF_8));
+                ByteBuffer size = ByteBuffer.allocate(Integer.BYTES);
+                ByteBuffer longSize = ByteBuffer.allocate(Integer.BYTES);
 
-                writeInt(record.getKey(), fileChannel, size);
-                writeInt(value, fileChannel, size);
+                while (iterators.hasNext()) {
+
+                    //indexPath
+                    long indexPositionToRead = saveFileChannel.position();
+
+                    ByteBuffer number = ByteBuffer.allocate(Integer.BYTES).putInt(indexNumber++);
+                    number.position(0);
+
+                    ByteBuffer offset = ByteBuffer.allocate(Long.BYTES).putLong(indexPositionToRead);
+                    offset.position(0);
+
+                    //number
+                    writeInt(number, indexFileChanel, size);
+                    //offset
+                    writeInt(offset, indexFileChanel, longSize);
+
+                    //savePath
+                    Record record = iterators.next();
+
+                    ByteBuffer value = record.getValue() != null
+                            ? record.getValue()
+                            : ByteBuffer.wrap(NULL_VALUE.getBytes(StandardCharsets.UTF_8));
+
+                    writeInt(record.getKey(), saveFileChannel, size);
+                    writeInt(value, saveFileChannel, size);
+                }
+
+                saveFileChannel.force(false);
+                indexFileChanel.force(false);
             }
-            fileChannel.force(false);
         }
 
 
-        Files.deleteIfExists(dir);
-        Files.move(tmp, dir, StandardCopyOption.ATOMIC_MOVE);
+        Files.deleteIfExists(savePath);
+        Files.deleteIfExists(indexPath);
 
-        return new SSTable(dir);
+        Files.move(tmpSavePath, savePath, StandardCopyOption.ATOMIC_MOVE);
+        Files.move(tmpIndexPath, indexPath, StandardCopyOption.ATOMIC_MOVE);
+
+        return new SSTable(savePath, indexPath);
     }
 
     void close() throws IOException {

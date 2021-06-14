@@ -8,7 +8,6 @@ import javax.annotation.Nullable;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
@@ -86,7 +85,7 @@ public class DaoImpl implements DAO {
     }
 
     private Map<ByteBuffer, Record> map(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
-        
+
         if (fromKey == null && toKey == null) {
             return memoryStorage;
         } else if (fromKey == null) {
@@ -101,8 +100,8 @@ public class DaoImpl implements DAO {
     private void flush() throws IOException {
         SSTable ssTable = SSTable.save(
                 memoryStorage.values().iterator(),
-                config.getDir().resolve(Paths.get("sstable" + nextSSTableNumber++))
-        );
+                config.getDir(),
+                nextSSTableNumber++);
 
         ssTables.add(ssTable);
         memoryStorage.clear();
