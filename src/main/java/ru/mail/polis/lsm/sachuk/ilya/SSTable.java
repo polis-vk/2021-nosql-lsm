@@ -37,6 +37,7 @@ class SSTable {
     private final Path indexPath;
     private final SortedMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
     private MappedByteBuffer mappedByteBuffer;
+    private List<Long> index;
 
 
     SSTable(Path savePath, Path indexPath) throws IOException {
@@ -78,8 +79,6 @@ class SSTable {
 
     static SSTable save(Iterator<Record> iterators, Path dir, int fileNumber) throws IOException {
 
-        int indexNumber = 0;
-
         Path savePath = dir.resolve(SAVE_FILE + fileNumber + ".save");
         Path indexPath = dir.resolve(INDEX_FILE + fileNumber + ".index");
 
@@ -104,14 +103,9 @@ class SSTable {
                     //indexPath
                     long indexPositionToRead = saveFileChannel.position();
 
-                    ByteBuffer number = ByteBuffer.allocate(Integer.BYTES).putInt(indexNumber++);
-                    number.position(0);
-
                     ByteBuffer offset = ByteBuffer.allocate(Long.BYTES).putLong(indexPositionToRead);
                     offset.position(0);
 
-                    //number
-                    writeInt(number, indexFileChanel, size);
                     //offset
                     writeInt(offset, indexFileChanel, longSize);
 
