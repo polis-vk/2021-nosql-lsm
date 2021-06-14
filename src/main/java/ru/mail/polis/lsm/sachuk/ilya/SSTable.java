@@ -4,6 +4,7 @@ import ru.mail.polis.lsm.Record;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -20,9 +21,7 @@ import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
-import java.util.SortedMap;
-import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.NoSuchElementException;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -35,10 +34,10 @@ class SSTable {
 
     private final Path savePath;
     private final Path indexPath;
-    private final SortedMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
+    private final List<Long> indexList = new ArrayList<>();
+
     private MappedByteBuffer mappedByteBuffer;
     private MappedByteBuffer indexByteBuffer;
-    private List<Long> indexList = new ArrayList<>();
 
 
     SSTable(Path savePath, Path indexPath) throws IOException {
@@ -48,8 +47,8 @@ class SSTable {
         restoreStorage();
     }
 
-    Iterator<Record> range(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
-        return map(fromKey, toKey).values().iterator();
+    Iterator<Record> range(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) throws IOException {
+        return new SSTableIterator(binarySearchKey(indexList, fromKey), toKey);
     }
 
     static List<SSTable> loadFromDir(Path dir) throws IOException {
@@ -151,6 +150,43 @@ class SSTable {
 
     }
 
+    private int binarySearchKey(List<Long> indexList, ByteBuffer keyToFind) throws IOException {
+
+        if (keyToFind == null) {
+            return 0;
+        }
+
+        int start = 0;
+        int end = indexList.size() - 1;
+
+        String keyStringToFind = byteBufferToString(keyToFind);
+
+        int positionToRead = 0;
+
+        while (start <= end) {
+
+            int middle = (start + end) / 2;
+
+            positionToRead = indexList.get(middle).intValue();
+
+            mappedByteBuffer.position(positionToRead);
+
+            ByteBuffer key = readFromFile(mappedByteBuffer);
+
+            String keyString = byteBufferToString(key);
+
+            if (keyStringToFind.compareTo(keyString) == 0) {
+                return positionToRead;
+            } else if (keyStringToFind.compareTo(keyString) > 0) {
+                start = middle + 1;
+            } else {
+                end = middle - 1;
+            }
+
+        }
+        return positionToRead;
+    }
+
     private void restoreStorage() throws IOException {
         try (FileChannel saveFileChannel = FileChannel.open(savePath, StandardOpenOption.READ)) {
             try (FileChannel indexFileChannel = FileChannel.open(indexPath, StandardOpenOption.READ)) {
@@ -168,20 +204,18 @@ class SSTable {
                     indexList.add(indexByteBuffer.getLong());
                 }
 
-                while (mappedByteBuffer.hasRemaining()) {
-                    ByteBuffer keyByteBuffer = readFromFile(mappedByteBuffer);
-                    ByteBuffer valueByteBuffer = readFromFile(mappedByteBuffer);
-
-                    Record record;
-                    if (StandardCharsets.UTF_8.newDecoder().decode(valueByteBuffer).toString().compareTo(NULL_VALUE) == 0) {
-                        record = Record.tombstone(keyByteBuffer);
-                    } else {
-                        valueByteBuffer.position(0);
-                        record = Record.of(keyByteBuffer, valueByteBuffer);
-                    }
-
-                    storage.put(keyByteBuffer, record);
-                }
+//                while (mappedByteBuffer.hasRemaining()) {
+//                    ByteBuffer keyByteBuffer = readFromFile(mappedByteBuffer);
+//                    ByteBuffer valueByteBuffer = readFromFile(mappedByteBuffer);
+//
+//                    Record record;
+//                    if (StandardCharsets.UTF_8.newDecoder().decode(valueByteBuffer).toString().compareTo(NULL_VALUE) == 0) {
+//                        record = Record.tombstone(keyByteBuffer);
+//                    } else {
+//                        valueByteBuffer.position(0);
+//                        record = Record.of(keyByteBuffer, valueByteBuffer);
+//                    }
+//                }
             }
         }
     }
@@ -217,16 +251,62 @@ class SSTable {
         }
     }
 
-    private Map<ByteBuffer, Record> map(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
+    private String byteBufferToString(ByteBuffer buffer) {
+        return StandardCharsets.UTF_8.decode(buffer).toString();
+    }
 
-        if (fromKey == null && toKey == null) {
-            return storage;
-        } else if (fromKey == null) {
-            return storage.headMap(toKey);
-        } else if (toKey == null) {
-            return storage.tailMap(fromKey);
-        } else {
-            return storage.subMap(fromKey, toKey);
+    class SSTableIterator implements Iterator<Record> {
+
+        private int positionToStartRead;
+        private ByteBuffer keyToRead;
+        private String keyToReadString;
+
+        SSTableIterator(int positionToStartRead, ByteBuffer keyToRead) {
+            this.positionToStartRead = positionToStartRead;
+            this.keyToRead = keyToRead;
+            this.keyToReadString = byteBufferToString(keyToRead);
+        }
+
+        @Override
+        public boolean hasNext() {
+            try {
+                return mappedByteBuffer.hasRemaining() && getNextKey().compareTo(keyToReadString) < 0;
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
+
+        @Override
+        public Record next() {
+            Record record;
+            try {
+                if (!hasNext()) {
+                    throw new NoSuchElementException();
+                }
+
+                ByteBuffer key = readFromFile(mappedByteBuffer);
+                ByteBuffer value = readFromFile(mappedByteBuffer);
+
+                if (byteBufferToString(value).compareTo(NULL_VALUE) == 0) {
+                    record = Record.tombstone(key);
+                } else {
+                    value.position(0);
+                    record = Record.of(key, value);
+                }
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+            return record;
+        }
+
+        private String getNextKey() throws IOException {
+            int currentPos = mappedByteBuffer.position();
+
+            ByteBuffer key = readFromFile(mappedByteBuffer);
+            String stringKey = byteBufferToString(key);
+            mappedByteBuffer.position(currentPos);
+
+            return stringKey;
         }
     }
 }

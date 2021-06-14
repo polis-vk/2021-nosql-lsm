@@ -49,7 +49,12 @@ public class DaoImpl implements DAO {
     @Override
     public Iterator<Record> range(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
         synchronized (this) {
-            Iterator<Record> ssTableRanges = ssTableRanges(fromKey, toKey);
+            Iterator<Record> ssTableRanges;
+            try {
+                ssTableRanges = ssTableRanges(fromKey, toKey);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
             Iterator<Record> memoryRange = map(fromKey, toKey).values().iterator();
 
             return StreamSupport
@@ -108,7 +113,7 @@ public class DaoImpl implements DAO {
 
     }
 
-    private Iterator<Record> ssTableRanges(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
+    private Iterator<Record> ssTableRanges(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) throws IOException {
         List<Iterator<Record>> iterators = new ArrayList<>(ssTables.size());
 
         for (SSTable ssTable : ssTables) {
