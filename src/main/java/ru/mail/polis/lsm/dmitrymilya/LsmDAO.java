@@ -22,7 +22,7 @@ import java.util.concurrent.ConcurrentSkipListMap;
  * Persistent DAO implementation.
  */
 public class LsmDAO implements DAO {
-    private static final int memoryLimit = 1024 * 1024;
+    private static final int MEMORY_LIMIT = 1024 * 1024;
     private final SortedMap<ByteBuffer, Record> memoryStorage = new ConcurrentSkipListMap<>();
     private final ConcurrentLinkedDeque<SSTable> ssTables = new ConcurrentLinkedDeque<>();
     private final DAOConfig config;
@@ -80,7 +80,7 @@ public class LsmDAO implements DAO {
     public void upsert(@Nonnull Record record) {
         synchronized (this) {
             memoryConsumption += sizeOf(record);
-            if (memoryConsumption > memoryLimit) {
+            if (memoryConsumption > MEMORY_LIMIT) {
                 try {
                     flush();
                 } catch (IOException e) {
@@ -128,7 +128,6 @@ public class LsmDAO implements DAO {
 
 
     static class MemoryStorageIterator implements Iterator<Record> {
-
         private final Iterator<Record> iterator;
 
         private Record next;

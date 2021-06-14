@@ -86,13 +86,13 @@ public interface DAO extends Closeable {
         public MergedRecordIterator(Iterator<Record> left, Iterator<Record> right) {
             this.left = left;
             this.right = right;
-            leftNext = left.hasNext() ? left.next() : null;
+            leftNext = getNextRecord(left);
             while (leftNext != null && leftNext.isTombstone()) {
-                leftNext = left.hasNext() ? left.next() : null;
+                leftNext = getNextRecord(left);
             }
-            rightNext = right.hasNext() ? right.next() : null;
+            rightNext = getNextRecord(right);
             while (rightNext != null && rightNext.isTombstone()) {
-                rightNext = right.hasNext() ? right.next() : null;
+                rightNext = getNextRecord(right);
             }
         }
 
@@ -116,27 +116,31 @@ public interface DAO extends Closeable {
                 int compareResult = leftNext.getKey().compareTo(rightNext.getKey());
                 if (compareResult < 0) {
                     toReturn = leftNext;
-                    leftNext = left.hasNext() ? left.next() : null;
+                    leftNext = getNextRecord(left);
                     return toReturn;
                 } else if (compareResult > 0) {
                     toReturn = rightNext;
-                    rightNext = right.hasNext() ? right.next() : null;
+                    rightNext = getNextRecord(right);
                     return toReturn;
                 } else {
                     toReturn = rightNext;
-                    leftNext = left.hasNext() ? left.next() : null;
-                    rightNext = right.hasNext() ? right.next() : null;
+                    leftNext = getNextRecord(left);
+                    rightNext = getNextRecord(right);
                     return toReturn;
                 }
             }
             if (leftNext == null) {
                 toReturn = rightNext;
-                rightNext = right.hasNext() ? right.next() : null;
+                rightNext = getNextRecord(right);
             } else {
                 toReturn = leftNext;
-                leftNext = left.hasNext() ? left.next() : null;
+                leftNext = getNextRecord(left);
             }
             return toReturn;
+        }
+
+        private Record getNextRecord(Iterator<Record> iterator) {
+            return iterator.hasNext() ? iterator.next() : null;
         }
     }
 

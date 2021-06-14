@@ -86,10 +86,10 @@ class SSTable {
 
     private static void writeInt(ByteBuffer value, WritableByteChannel channel, ByteBuffer tmp) throws IOException {
         tmp.position(0);
-        if (value != null) {
-            tmp.putInt(value.remaining());
-        } else {
+        if (value == null) {
             tmp.putInt(-1);
+        } else {
+            tmp.putInt(value.remaining());
         }
         tmp.position(0);
         channel.write(tmp);
@@ -119,7 +119,8 @@ class SSTable {
 
         int fromKeyPosition = findKeyPosition(fromKey);
         int toKeyPosition = findKeyPosition(toKey);
-        return new SSTableIterator(mappedByteBuffer.position(fromKeyPosition).slice().limit(toKeyPosition - fromKeyPosition).asReadOnlyBuffer());
+        return new SSTableIterator(mappedByteBuffer.position(fromKeyPosition).slice()
+                .limit(toKeyPosition - fromKeyPosition).asReadOnlyBuffer());
     }
 
     private int findKeyPosition(ByteBuffer key) {
@@ -127,7 +128,6 @@ class SSTable {
 
         while (mappedByteBufferDuplicate.hasRemaining()) {
             int size = mappedByteBufferDuplicate.getInt();
-            int curPos = mappedByteBufferDuplicate.position();
             ByteBuffer current = mappedByteBufferDuplicate.slice();
             if (size < current.capacity()) {
                 current.limit(size);
@@ -136,7 +136,7 @@ class SSTable {
                 return mappedByteBufferDuplicate.position();
             }
 
-            mappedByteBufferDuplicate.position(curPos + size);
+            mappedByteBufferDuplicate.position(mappedByteBufferDuplicate.position() + size);
         }
 
         return mappedByteBufferDuplicate.position();
@@ -185,7 +185,9 @@ class SSTable {
 
             int valueSize = byteBuffer.getInt();
             ByteBuffer value;
-            if (valueSize != -1) {
+            if (valueSize == -1) {
+                nextRecord = Record.tombstone(key);
+            } else {
                 value = byteBuffer.slice();
                 if (valueSize < value.capacity()) {
                     value.limit(valueSize);
@@ -195,8 +197,6 @@ class SSTable {
                 byteBuffer.position(Math.min(byteBuffer.position() + valueSize, byteBuffer.limit()));
 
                 nextRecord = Record.of(key, value);
-            } else {
-                nextRecord = Record.tombstone(key);
             }
         }
     }
