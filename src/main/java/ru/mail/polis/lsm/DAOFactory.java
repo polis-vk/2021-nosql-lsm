@@ -2,7 +2,7 @@ package ru.mail.polis.lsm;
 
 import java.io.IOException;
 
-public class DAOFactory {
+public final class DAOFactory {
 
     private DAOFactory() {
         // Only static methods
