@@ -2,6 +2,9 @@ package ru.mail.polis.lsm;
 
 import javax.annotation.Nullable;
 import java.nio.ByteBuffer;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
 
 @SuppressWarnings("JavaLangClash")
 public class Record {
@@ -28,6 +31,16 @@ public class Record {
 
     public ByteBuffer getValue() {
         return value == null ? null : value.asReadOnlyBuffer();
+    }
+
+    /**
+     * Key-value record.
+     */
+    public int getSize() {
+        int result = 0;
+        result += key == null ? 0 : key.capacity();
+        result += value == null ? 0 : value.capacity();
+        return result;
     }
 
     public boolean isTombstone() {

@@ -34,8 +34,14 @@ public interface DAO extends Closeable {
         return result;
     }
 
+    /**
+     * Merge iterators.
+     *
+     * @param iterators list of iterators
+     * @return merged iterator
+     */
     static Iterator<Record> merge(List<Iterator<Record>> iterators) {
-        throw new UnsupportedOperationException("Implement me");
+        return new MergeIterator(iterators);
     }
 
 }
