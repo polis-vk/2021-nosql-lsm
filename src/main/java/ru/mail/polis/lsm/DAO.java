@@ -4,9 +4,10 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.io.Closeable;
 import java.nio.ByteBuffer;
-import java.util.*;
-import java.util.concurrent.ConcurrentSkipListMap;
-import java.util.stream.StreamSupport;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.List;
+import java.util.NoSuchElementException;
 
 /**
  * Minimal database API.
