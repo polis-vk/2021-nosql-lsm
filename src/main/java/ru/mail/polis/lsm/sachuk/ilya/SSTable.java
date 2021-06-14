@@ -37,7 +37,8 @@ class SSTable {
     private final Path indexPath;
     private final SortedMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
     private MappedByteBuffer mappedByteBuffer;
-    private List<Long> index;
+    private MappedByteBuffer indexByteBuffer;
+    private List<Long> indexList = new ArrayList<>();
 
 
     SSTable(Path savePath, Path indexPath) throws IOException {
@@ -96,18 +97,20 @@ class SSTable {
                     StandardOpenOption.TRUNCATE_EXISTING)) {
 
                 ByteBuffer size = ByteBuffer.allocate(Integer.BYTES);
-                ByteBuffer longSize = ByteBuffer.allocate(Integer.BYTES);
+                ByteBuffer longSize = ByteBuffer.allocate(Long.BYTES);
 
                 while (iterators.hasNext()) {
 
                     //indexPath
                     long indexPositionToRead = saveFileChannel.position();
 
-                    ByteBuffer offset = ByteBuffer.allocate(Long.BYTES).putLong(indexPositionToRead);
-                    offset.position(0);
+//                    ByteBuffer offset = ByteBuffer.allocate(Long.BYTES).putLong(indexPositionToRead);
+                    ByteBuffer offset = ByteBuffer.wrap(ByteBuffer.allocate(Long.BYTES).putLong(indexPositionToRead).array());
+//                    offset.position(0);
 
                     //offset
-                    writeInt(offset, indexFileChanel, longSize);
+                    indexFileChanel.write(offset);
+//                    writeInt(offset, indexFileChanel, longSize);
 
                     //savePath
                     Record record = iterators.next();
@@ -137,28 +140,48 @@ class SSTable {
 
     void close() throws IOException {
         if (mappedByteBuffer != null) {
-            clean();
+            clean(mappedByteBuffer);
         }
+
+        if (indexByteBuffer != null) {
+            clean(indexByteBuffer);
+            indexByteBuffer.clear();
+            indexList.clear();
+        }
+
     }
 
     private void restoreStorage() throws IOException {
-        try (FileChannel fileChannel = FileChannel.open(savePath, StandardOpenOption.READ)) {
+        try (FileChannel saveFileChannel = FileChannel.open(savePath, StandardOpenOption.READ)) {
+            try (FileChannel indexFileChannel = FileChannel.open(indexPath, StandardOpenOption.READ)) {
 
-            mappedByteBuffer = fileChannel.map(FileChannel.MapMode.READ_ONLY, 0, fileChannel.size());
+                mappedByteBuffer = saveFileChannel.map(FileChannel.MapMode.READ_ONLY, 0, saveFileChannel.size());
+                indexByteBuffer = indexFileChannel.map(FileChannel.MapMode.READ_ONLY, 0, indexFileChannel.size());
 
-            while (mappedByteBuffer.hasRemaining()) {
-                ByteBuffer keyByteBuffer = readFromFile(mappedByteBuffer);
-                ByteBuffer valueByteBuffer = readFromFile(mappedByteBuffer);
+                while (indexByteBuffer.hasRemaining()) {
 
-                Record record;
-                if (StandardCharsets.UTF_8.newDecoder().decode(valueByteBuffer).toString().compareTo(NULL_VALUE) == 0) {
-                    record = Record.tombstone(keyByteBuffer);
-                } else {
-                    valueByteBuffer.position(0);
-                    record = Record.of(keyByteBuffer, valueByteBuffer);
+//                    int length = indexByteBuffer.getInt();
+//                    ByteBuffer byteBuffer = indexByteBuffer.slice().limit(length).asReadOnlyBuffer();
+//                    indexByteBuffer.position(indexByteBuffer.position() + length);
+//
+//                    indexList.add(byteBuffer);
+                    indexList.add(indexByteBuffer.getLong());
                 }
 
-                storage.put(keyByteBuffer, record);
+                while (mappedByteBuffer.hasRemaining()) {
+                    ByteBuffer keyByteBuffer = readFromFile(mappedByteBuffer);
+                    ByteBuffer valueByteBuffer = readFromFile(mappedByteBuffer);
+
+                    Record record;
+                    if (StandardCharsets.UTF_8.newDecoder().decode(valueByteBuffer).toString().compareTo(NULL_VALUE) == 0) {
+                        record = Record.tombstone(keyByteBuffer);
+                    } else {
+                        valueByteBuffer.position(0);
+                        record = Record.of(keyByteBuffer, valueByteBuffer);
+                    }
+
+                    storage.put(keyByteBuffer, record);
+                }
             }
         }
     }
@@ -180,7 +203,7 @@ class SSTable {
         channel.write(value);
     }
 
-    private void clean() throws IOException {
+    private void clean(MappedByteBuffer mappedByteBuffer) throws IOException {
         try {
             Class<?> unsafeClass = Class.forName("sun.misc.Unsafe");
             Field unsafeField = unsafeClass.getDeclaredField("theUnsafe");
