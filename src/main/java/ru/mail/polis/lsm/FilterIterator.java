@@ -5,7 +5,7 @@ import java.util.Iterator;
 
 public class FilterIterator implements Iterator<Record> {
     private final Iterator<Record> iter;
-    private Record current = null;
+    private Record current;
 
     public FilterIterator(Iterator<Record> iterator) {
         this.iter = iterator;
