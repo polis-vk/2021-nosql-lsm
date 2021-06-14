@@ -2,6 +2,7 @@ package ru.mail.polis.lsm;
 
 import javax.annotation.Nullable;
 import java.io.Closeable;
+import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.Iterator;
@@ -13,7 +14,7 @@ import java.util.List;
 public interface DAO extends Closeable {
     Iterator<Record> range(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey);
 
-    void upsert(Record record);
+    void upsert(Record record) throws UncheckedIOException;
 
     /**
      * Appends {@code Byte.MIN_VALUE} to {@code buffer}.
@@ -71,22 +72,28 @@ public interface DAO extends Closeable {
             return left;
         }
 
-        return new MergedRecordIterator<>(left, right);
+        return new MergedRecordIterator(left, right);
     }
 
-    class MergedRecordIterator<E extends Record> implements Iterator<E> {
+    class MergedRecordIterator implements Iterator<Record> {
 
-        private final Iterator<E> left;
-        private final Iterator<E> right;
+        private final Iterator<Record> left;
+        private final Iterator<Record> right;
 
-        private E leftNext;
-        private E rightNext;
+        private Record leftNext;
+        private Record rightNext;
 
-        public MergedRecordIterator(Iterator<E> left, Iterator<E> right) {
+        public MergedRecordIterator(Iterator<Record> left, Iterator<Record> right) {
             this.left = left;
             this.right = right;
             leftNext = left.hasNext() ? left.next() : null;
+            while (leftNext != null && leftNext.isTombstone()) {
+                leftNext = left.hasNext() ? left.next() : null;
+            }
             rightNext = right.hasNext() ? right.next() : null;
+            while (rightNext != null && rightNext.isTombstone()) {
+                rightNext = right.hasNext() ? right.next() : null;
+            }
         }
 
         @Override
@@ -95,8 +102,16 @@ public interface DAO extends Closeable {
         }
 
         @Override
-        public E next() {
-            E toReturn;
+        public Record next() {
+            Record toReturn = getRecordToReturn();
+            while (toReturn != null && toReturn.isTombstone()) {
+                toReturn = getRecordToReturn();
+            }
+            return toReturn;
+        }
+
+        private Record getRecordToReturn() {
+            Record toReturn;
             if (leftNext != null && rightNext != null) {
                 int compareResult = leftNext.getKey().compareTo(rightNext.getKey());
                 if (compareResult < 0) {
