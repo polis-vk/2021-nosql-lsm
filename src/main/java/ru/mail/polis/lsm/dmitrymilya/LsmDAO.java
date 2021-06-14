@@ -126,7 +126,6 @@ public class LsmDAO implements DAO {
         }
     }
 
-
     static class MemoryStorageIterator implements Iterator<Record> {
         private final Iterator<Record> iterator;
 
