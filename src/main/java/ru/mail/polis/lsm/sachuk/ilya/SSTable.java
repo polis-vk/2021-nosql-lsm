@@ -108,10 +108,13 @@ class SSTable {
                 ByteBuffer keyByteBuffer = readFromFile(mappedByteBuffer);
                 ByteBuffer valueByteBuffer = readFromFile(mappedByteBuffer);
 
-                Record record = StandardCharsets.UTF_8.newDecoder().decode(valueByteBuffer.duplicate()).toString().compareTo(NULL_VALUE) == 0
-                        ? Record.tombstone(keyByteBuffer)
-                        : Record.of(keyByteBuffer, valueByteBuffer);
-
+                Record record;
+                if (StandardCharsets.UTF_8.newDecoder().decode(valueByteBuffer).toString().compareTo(NULL_VALUE) == 0) {
+                    record = Record.tombstone(keyByteBuffer);
+                } else {
+                    valueByteBuffer.position(0);
+                    record = Record.of(keyByteBuffer, valueByteBuffer);
+                }
 
                 storage.put(keyByteBuffer, record);
             }
