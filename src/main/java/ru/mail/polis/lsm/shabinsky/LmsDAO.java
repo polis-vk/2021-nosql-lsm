@@ -133,6 +133,7 @@ public class LmsDAO implements DAO {
 
 
     private SortedMap<ByteBuffer, Record> map(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
+
         if (fromKey == null && toKey == null) {
             return memoryStorage;
         }
