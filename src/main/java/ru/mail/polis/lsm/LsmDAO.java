@@ -7,7 +7,12 @@ import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
 import java.nio.file.Path;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.List;
+import java.util.NoSuchElementException;
+import java.util.SortedMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ConcurrentSkipListMap;
 
@@ -15,6 +20,12 @@ public class LsmDAO implements DAO {
 
     private static final Method CLEAN;
     private static final String SAVE_FILE_NAME = "file_";
+    private static final int MEMORY_SIZE = 1024 * 1024 * 32;
+
+    private final ConcurrentLinkedDeque<SSTable> ssTables = new ConcurrentLinkedDeque<>();
+    private final SortedMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
+    private final DAOConfig config;
+    private int memoryConsumption;
 
     static {
         try {
@@ -25,12 +36,6 @@ public class LsmDAO implements DAO {
             throw new IllegalStateException(e);
         }
     }
-
-    private final ConcurrentLinkedDeque<SSTable> ssTables = new ConcurrentLinkedDeque<>();
-    private final SortedMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
-    private final DAOConfig config;
-    private final int MEMORY_SIZE = 1024 * 1024 * 32;
-    private int memoryConsumption;
 
     /**
      * Implementation of DAO that save data to the memory.
@@ -64,10 +69,10 @@ public class LsmDAO implements DAO {
             List<Iterator<Record>> iterators = new ArrayList<>();
 
             for (SSTable ssTable : ssTables) {
-                    iterators.add(ssTable.range(fromKey, toKey));
+                iterators.add(ssTable.range(fromKey, toKey));
             }
 
-            if(!storage.isEmpty()) {
+            if (!storage.isEmpty()) {
                 iterators.add(map(fromKey, toKey).values().iterator());
             }
 
@@ -258,7 +263,7 @@ public class LsmDAO implements DAO {
 
         @Override
         public Record next() {
-            if(!hasNext()) {
+            if (!hasNext()) {
                 throw new NoSuchElementException();
             }
             Record buffer = peek;

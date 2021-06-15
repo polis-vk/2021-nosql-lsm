@@ -20,6 +20,8 @@ import java.util.concurrent.ConcurrentSkipListMap;
 public class SSTable implements Closeable, Comparable<SSTable> {
 
     private static final Method CLEAN;
+    private static final String SAVE_FILE_NAME = "file_";
+    private static final String TEMP_EXTENSION = "_temp";
 
     static {
         try {
@@ -32,13 +34,8 @@ public class SSTable implements Closeable, Comparable<SSTable> {
     }
 
     private final SortedMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
-
     private final MappedByteBuffer mmap;
-
     private final Path compareName;
-
-    private static final String SAVE_FILE_NAME = "file_";
-    private static final String TEMP_EXTENSION = "_temp";
 
     /**
      * Implementation of DAO that save data to the memory.
@@ -50,6 +47,10 @@ public class SSTable implements Closeable, Comparable<SSTable> {
         compareName = file;
     }
 
+
+    /**
+     * Static function that returns sorted ssTableList
+     */
     public static List<SSTable> loadFromDir(Path dir) throws IOException {
         List<SSTable> ssTableList = new ArrayList<>();
         for (File file : Objects.requireNonNull(dir.toFile().listFiles())) {
@@ -61,6 +62,9 @@ public class SSTable implements Closeable, Comparable<SSTable> {
         return ssTableList;
     }
 
+    /**
+     * Function that writes data from a table to disk
+     */
     public static SSTable write(Iterator<Record> iterator, Path fileName) throws IOException {
         Path tempFileName = Path.of(fileName.toString() + TEMP_EXTENSION);
         try (FileChannel fileChannel = FileChannel.open(
@@ -87,7 +91,8 @@ public class SSTable implements Closeable, Comparable<SSTable> {
         writeValue(record.getValue(), fileChannel, size);
     }
 
-    private static void writeValue(ByteBuffer value, WritableByteChannel fileChannel, ByteBuffer temp) throws IOException {
+    private static void writeValue(ByteBuffer value, WritableByteChannel fileChannel, ByteBuffer temp)
+            throws IOException {
         temp.position(0);
         temp.putInt(value == null ? -1 : value.remaining());
         temp.position(0);
@@ -97,6 +102,9 @@ public class SSTable implements Closeable, Comparable<SSTable> {
         }
     }
 
+    /**
+     * Function that return RangedIterator
+     */
     public Iterator<Record> range(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
         synchronized (this) {
             if (fromKey != null && toKey != null && fromKey.compareTo(toKey) > 0) {
@@ -106,6 +114,9 @@ public class SSTable implements Closeable, Comparable<SSTable> {
         }
     }
 
+    /**
+     * Function that clean mmap
+     */
     public void close() throws IOException {
         if (mmap != null) {
             try {
@@ -156,34 +167,38 @@ public class SSTable implements Closeable, Comparable<SSTable> {
             updatePeek();
         }
 
+        private void increasePeekToFromKey(ByteBuffer key, ByteBuffer value) {
+            while (fromKey != null && fromKey.compareTo(key) > 0) {
+                if (buffer.hasRemaining()) {
+                    key = readValue();
+                    value = readValue();
+                    if (key == null) {
+                        throw new NoSuchElementException();
+                    }
+                    if (value == null) {
+                        peek = Record.tombstone(key);
+                    } else {
+                        peek = Record.of(key, value);
+                    }
+                } else {
+                    peek = null;
+                }
+            }
+        }
+
         private void updatePeek() {
             if (buffer.hasRemaining()) {
                 ByteBuffer key = readValue();
                 ByteBuffer value = readValue();
                 if (key == null) {
-                    throw new NullPointerException();
+                    throw new NoSuchElementException();
                 }
                 if (value == null) {
                     peek = Record.tombstone(key);
                 } else {
                     peek = Record.of(key, value);
                 }
-                while (fromKey != null && fromKey.compareTo(key) > 0) {
-                    if (buffer.hasRemaining()) {
-                        key = readValue();
-                        value = readValue();
-                        if (key == null) {
-                            throw new NullPointerException();
-                        }
-                        if (value == null) {
-                            peek = Record.tombstone(key);
-                        } else {
-                            peek = Record.of(key, value);
-                        }
-                    } else {
-                        peek = null;
-                    }
-                }
+                increasePeekToFromKey(key, value);
 
             } else {
                 peek = null;
@@ -210,7 +225,7 @@ public class SSTable implements Closeable, Comparable<SSTable> {
 
         private ByteBuffer readValue() {
             int valueSize = buffer.getInt();
-            if(valueSize < 0) {
+            if (valueSize < 0) {
                 return null;
             }
             ByteBuffer value = buffer.slice().limit(valueSize).slice();
