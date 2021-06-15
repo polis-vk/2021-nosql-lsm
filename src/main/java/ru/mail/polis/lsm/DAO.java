@@ -42,7 +42,7 @@ public interface DAO extends Closeable {
      * @param iterators List
      * @return Iterator
      */
-    public static Iterator<Record> merge(List<Iterator<Record>> iterators) {
+    static Iterator<Record> merge(List<Iterator<Record>> iterators) {
         return new MergeRecordIterator(iterators);
     }
 }

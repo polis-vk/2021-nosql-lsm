@@ -3,14 +3,14 @@ package ru.mail.polis.lsm.shabinsky;
 import ru.mail.polis.lsm.*;
 
 import javax.annotation.Nullable;
-import java.io.File;
+import javax.annotation.concurrent.GuardedBy;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.channels.WritableByteChannel;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.stream.Collectors;
 
 public class LmsDAO implements DAO {
 
@@ -19,9 +19,11 @@ public class LmsDAO implements DAO {
 
     private final DAOConfig config;
 
-    private final long MEMORY_LIMIT = 127 * 1024 * 1024;
-    private long memorySize = 0;
-    private Integer generation;
+    private final long MEMORY_LIMIT = 20 * 1024 * 1024;
+    private long memorySize;
+
+    @GuardedBy("this")
+    private Integer genIndex;
 
     /**
      * NotJustInMemoryDAO constructor.
@@ -31,63 +33,91 @@ public class LmsDAO implements DAO {
      */
     public LmsDAO(DAOConfig config) throws IOException {
         this.config = config;
-        tables.addAll(SSTable.loadFromDir(config.getDir()));
+        List<SSTable> list = SSTable.loadFromDir(config.getDir());
+        this.genIndex = list.size();
+        tables.addAll(list);
     }
 
     @Override
     public Iterator<Record> range(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
         synchronized (this) {
-            Iterator<Record> sstableRange;
-            sstableRange = sstableRange(fromKey, toKey);
-            Iterator<Record> memoryRange = map(fromKey, toKey).values().iterator();
-            return new MergeRecordIterator(List.of(sstableRange, memoryRange));
+            List<Iterator<Record>> iteratorList = sstableRange(fromKey, toKey);
+            if (!memoryStorage.isEmpty()) {
+                Iterator<Record> memoryRange = map(fromKey, toKey).values().stream()
+                    .filter(record -> !record.isTombstone())
+                    .collect(Collectors.toList())
+                    .iterator();
+                iteratorList.add(memoryRange);
+            }
+
+            return new MergeRecordIterator(iteratorList);
         }
     }
 
     @Override
     public void upsert(Record record) {
         synchronized (this) {
-            memorySize += record.getKey().remaining() + record.getValue().remaining();
-            if (memorySize > MEMORY_LIMIT) {
+
+            updateMemorySize(record);
+            if (memorySize >= MEMORY_LIMIT) {
                 try {
                     flush();
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
             }
-        }
-        if (record.getValue() == null) {
-            memoryStorage.remove(record.getKey());
-        } else {
+
+            if (memoryStorage.get(record.getKey()) != null) {
+                memoryStorage.remove(record.getKey());
+            }
             memoryStorage.put(record.getKey(), record);
         }
     }
 
-    @Override
-    public void close() throws IOException {
-        flush();
+    private void updateMemorySize(Record record) {
+        Record returnRecord = memoryStorage.get(record.getKey());
+        boolean exist = returnRecord != null;
+
+        if (record.isTombstone()) {
+            if (exist) {
+                memorySize -= (record.getKey().remaining() + 2 * Integer.BYTES);
+            } else {
+                memorySize += record.getKey().remaining() + 2 * Integer.BYTES;
+            }
+        } else {
+            if (exist) {
+                memorySize -= (returnRecord.getKey().remaining() + returnRecord.getValue().remaining() + 2 * Integer.BYTES);
+            }
+            memorySize += record.getKey().remaining() + record.getValue().remaining() + 2 * Integer.BYTES;
+        }
     }
 
+    @GuardedBy("this")
     public void flush() throws IOException {
-        SSTable ssTable = SSTable.write(
-            memoryStorage.values().iterator(),
-            config.getDir().resolve(generation.toString() + ".tmp"));
+        Path dir = config.getDir();
+        String fileName = SSTable.NAME + genIndex++;
 
+        SSTable ssTable = SSTable.write(memoryStorage.values().iterator(), dir, fileName);
         tables.add(ssTable);
-        /*
-            TODO
-            something
-         */
 
+        memorySize = 0;
         memoryStorage.clear();
     }
 
-    private Iterator<Record> sstableRange(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
+    @Override
+    public void close() throws IOException {
+        synchronized (this) {
+            if (!memoryStorage.isEmpty()) flush();
+            for (SSTable ssTable : tables) ssTable.close();
+        }
+    }
+
+    private List<Iterator<Record>> sstableRange(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
         List<Iterator<Record>> iterators = new ArrayList<>(tables.size());
         for (SSTable ssTable : tables) {
             iterators.add(ssTable.range(fromKey, toKey));
         }
-        return new MergeRecordIterator(iterators);
+        return iterators;
     }
 
 
