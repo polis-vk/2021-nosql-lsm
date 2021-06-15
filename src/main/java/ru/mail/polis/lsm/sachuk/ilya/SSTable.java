@@ -96,22 +96,12 @@ class SSTable {
                     StandardOpenOption.TRUNCATE_EXISTING)) {
 
                 ByteBuffer size = ByteBuffer.allocate(Integer.BYTES);
-                ByteBuffer longSize = ByteBuffer.allocate(Long.BYTES);
 
                 while (iterators.hasNext()) {
-
-                    //indexPath
                     long indexPositionToRead = saveFileChannel.position();
-
-//                    ByteBuffer offset = ByteBuffer.allocate(Long.BYTES).putLong(indexPositionToRead);
                     ByteBuffer offset = ByteBuffer.wrap(ByteBuffer.allocate(Long.BYTES).putLong(indexPositionToRead).array());
-//                    offset.position(0);
-
-                    //offset
                     indexFileChanel.write(offset);
-//                    writeInt(offset, indexFileChanel, longSize);
 
-                    //savePath
                     Record record = iterators.next();
 
                     ByteBuffer value = record.getValue() != null
@@ -195,27 +185,8 @@ class SSTable {
                 indexByteBuffer = indexFileChannel.map(FileChannel.MapMode.READ_ONLY, 0, indexFileChannel.size());
 
                 while (indexByteBuffer.hasRemaining()) {
-
-//                    int length = indexByteBuffer.getInt();
-//                    ByteBuffer byteBuffer = indexByteBuffer.slice().limit(length).asReadOnlyBuffer();
-//                    indexByteBuffer.position(indexByteBuffer.position() + length);
-//
-//                    indexList.add(byteBuffer);
                     indexList.add(indexByteBuffer.getLong());
                 }
-
-//                while (mappedByteBuffer.hasRemaining()) {
-//                    ByteBuffer keyByteBuffer = readFromFile(mappedByteBuffer);
-//                    ByteBuffer valueByteBuffer = readFromFile(mappedByteBuffer);
-//
-//                    Record record;
-//                    if (StandardCharsets.UTF_8.newDecoder().decode(valueByteBuffer).toString().compareTo(NULL_VALUE) == 0) {
-//                        record = Record.tombstone(keyByteBuffer);
-//                    } else {
-//                        valueByteBuffer.position(0);
-//                        record = Record.of(keyByteBuffer, valueByteBuffer);
-//                    }
-//                }
             }
         }
     }
