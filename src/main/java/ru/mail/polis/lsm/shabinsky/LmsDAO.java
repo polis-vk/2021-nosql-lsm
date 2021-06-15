@@ -131,9 +131,7 @@ public class LmsDAO implements DAO {
         return iterators;
     }
 
-
     private SortedMap<ByteBuffer, Record> map(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
-
         if (fromKey == null && toKey == null) {
             return memoryStorage;
         }
@@ -143,7 +141,6 @@ public class LmsDAO implements DAO {
         if (toKey == null) {
             return memoryStorage.tailMap(fromKey);
         }
-
         return memoryStorage.subMap(fromKey, toKey);
     }
 }
