@@ -156,7 +156,7 @@ class PersistenceTest {
             assertFalse(range.hasNext());
         }
     }
-   
+
     @Test
     void hugeRecordsSearch(@TempDir Path data) throws IOException {
         // Reference value
