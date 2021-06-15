@@ -23,6 +23,10 @@ public class SSTable implements Closeable, Comparable<SSTable> {
     private static final String SAVE_FILE_NAME = "file_";
     private static final String TEMP_EXTENSION = "_temp";
 
+    private final SortedMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
+    private final MappedByteBuffer mmap;
+    private final Path compareName;
+
     static {
         try {
             Class<?> fileChannelImplClass = Class.forName("sun.nio.ch.FileChannelImpl");
@@ -33,9 +37,7 @@ public class SSTable implements Closeable, Comparable<SSTable> {
         }
     }
 
-    private final SortedMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
-    private final MappedByteBuffer mmap;
-    private final Path compareName;
+
 
     /**
      * Implementation of DAO that save data to the memory.

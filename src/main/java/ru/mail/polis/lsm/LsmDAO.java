@@ -83,7 +83,6 @@ public class LsmDAO implements DAO {
     @Override
     public void upsert(Record record) {
         synchronized (this) {
-
             memoryConsumption += sizeOf(record);
             storage.put(record.getKey(), record);
 
