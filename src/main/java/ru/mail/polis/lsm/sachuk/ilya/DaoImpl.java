@@ -28,9 +28,8 @@ public class DaoImpl implements DAO {
     private final SortedMap<ByteBuffer, Record> memoryStorage = new ConcurrentSkipListMap<>();
     private final List<SSTable> ssTables = new ArrayList<>();
 
-    private long memoryConsumption = 0;
+    private long memoryConsumption;
     private int nextSSTableNumber;
-
 
     /**
      * Constructor that initialize path and restore storage.
@@ -56,7 +55,11 @@ public class DaoImpl implements DAO {
             }
             Iterator<Record> memoryRange = map(fromKey, toKey).values().iterator();
             return StreamSupport
-                    .stream(Spliterators.spliteratorUnknownSize(mergeTwo(ssTableRanges, memoryRange), Spliterator.ORDERED), false)
+                    .stream(Spliterators.spliteratorUnknownSize(
+                            mergeTwo(ssTableRanges, memoryRange),
+                            Spliterator.ORDERED),
+                            false
+                    )
                     .filter(record -> !record.isTombstone())
                     .iterator();
         }
@@ -114,7 +117,8 @@ public class DaoImpl implements DAO {
 
     }
 
-    private Iterator<Record> ssTableRanges(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) throws IOException {
+    private Iterator<Record> ssTableRanges(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey)
+            throws IOException {
         List<Iterator<Record>> iterators = new ArrayList<>(ssTables.size());
 
         for (SSTable ssTable : ssTables) {
@@ -169,7 +173,6 @@ public class DaoImpl implements DAO {
 
                 leftRecord = getNext(leftIterator, leftRecord);
                 rightRecord = getNext(rightIterator, rightRecord);
-
 
                 if (leftRecord == null) {
                     return getRight();

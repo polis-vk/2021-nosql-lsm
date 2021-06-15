@@ -46,7 +46,6 @@ class SSTable {
     private MappedByteBuffer mappedByteBuffer;
     private MappedByteBuffer indexByteBuffer;
 
-
     SSTable(Path savePath, Path indexPath) throws IOException {
         this.savePath = savePath;
         this.indexPath = indexPath;
@@ -113,9 +112,9 @@ class SSTable {
 
                     Record record = iterators.next();
 
-                    ByteBuffer value = record.getValue() != null
-                            ? record.getValue()
-                            : ByteBuffer.wrap(NULL_VALUE.getBytes(StandardCharsets.UTF_8));
+                    ByteBuffer value = record.getValue() == null
+                            ? ByteBuffer.wrap(NULL_VALUE.getBytes(StandardCharsets.UTF_8))
+                            : record.getValue();
 
                     writeInt(record.getKey(), saveFileChannel, size);
                     writeInt(value, saveFileChannel, size);
