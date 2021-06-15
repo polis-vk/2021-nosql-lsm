@@ -1,4 +1,4 @@
-package ru.mail.polis.lsm.segu.sstable;
+package ru.mail.polis.lsm.segu.model;
 
 import java.nio.file.Path;
 import java.util.Objects;

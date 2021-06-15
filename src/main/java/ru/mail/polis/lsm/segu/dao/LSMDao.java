@@ -3,9 +3,9 @@ package ru.mail.polis.lsm.segu.dao;
 import ru.mail.polis.lsm.DAO;
 import ru.mail.polis.lsm.DAOConfig;
 import ru.mail.polis.lsm.Record;
-import ru.mail.polis.lsm.segu.sstable.SSTable;
-import ru.mail.polis.lsm.segu.sstable.SSTablePath;
-import ru.mail.polis.lsm.segu.sstable.SSTableService;
+import ru.mail.polis.lsm.segu.model.SSTable;
+import ru.mail.polis.lsm.segu.model.SSTablePath;
+import ru.mail.polis.lsm.segu.service.SSTableService;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
@@ -57,13 +57,28 @@ public class LSMDao implements DAO {
 
     @Override
     public void upsert(final Record record) {
-        // Условие по трешхолду
-        storage.put(record.getKey(), record);
+        synchronized (this) {
+            if (storageSize >= threshold) {
+                try {
+                    flush();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                    System.err.println("Failed to flush");
+                }
+                clear();
+            } else {
+                storage.put(record.getKey(), record);
+                storageSize += record.size();
+            }
+        }
     }
 
     @Override
     public void close() throws IOException {
-        flush();
+        synchronized (this) {
+            flush();
+            clear();
+        }
     }
 
     private void flush() throws IOException {
@@ -71,7 +86,12 @@ public class LSMDao implements DAO {
                 ssTableNextIndex, SSTable.FILE_PREFIX, SSTable.INDEX_FILE_PREFIX);
         ssTableNextIndex++;
         SSTable ssTable = new SSTable(ssTablePath.getFilePath(), ssTablePath.getIndexFilePath(), storage);
-        ssTableService.write(ssTable);
+        ssTableService.writeTableAndIndexFile(ssTable);
+    }
+
+    private void clear() {
+        storage.clear();
+        storageSize = 0;
     }
 
     private SortedMap<ByteBuffer, Record> map(@Nullable final ByteBuffer fromKey, @Nullable final ByteBuffer toKey) {
@@ -86,4 +106,6 @@ public class LSMDao implements DAO {
         }
         return storage.subMap(fromKey, toKey);
     }
+
+
 }

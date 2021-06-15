@@ -1,7 +1,9 @@
-package ru.mail.polis.lsm.segu.sstable;
+package ru.mail.polis.lsm.segu.service;
 
 import ru.mail.polis.lsm.DAOConfig;
 import ru.mail.polis.lsm.Record;
+import ru.mail.polis.lsm.segu.model.SSTable;
+import ru.mail.polis.lsm.segu.model.SSTablePath;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
@@ -16,9 +18,9 @@ import java.nio.file.StandardOpenOption;
 public class SSTableService {
 
     private MappedByteBuffer mappedByteBuffer;
-    private final Method CLEAN;
+    private static final Method CLEAN;
 
-    {
+    static {
         Class<?> clazz;
         try {
             clazz = Class.forName("sun.nio.ch.FileChannelImpl");
@@ -29,25 +31,30 @@ public class SSTableService {
         }
     }
 
-    public void load(SSTable ssTable, Path path) {
+    public void loadTableFile(SSTable ssTable, Path path) {
 
         cleanMappedByteBuffer(mappedByteBuffer);
     }
 
-    public void write(SSTable ssTable) throws IOException {
+    public void writeTableAndIndexFile(SSTable ssTable) throws IOException {
+        int index = 0;
+        int currentOffset = 0;
         try (FileChannel fileChannel = FileChannel.open(ssTable.getFilePath(),
                 StandardOpenOption.TRUNCATE_EXISTING,
                 StandardOpenOption.CREATE,
                 StandardOpenOption.WRITE)) {
             final ByteBuffer size = ByteBuffer.allocate(Integer.BYTES);
             for (final Record record : ssTable.getStorage().values()) {
-                writeValue(fileChannel, record.getKey(), size);
-                writeValue(fileChannel, record.getValue(), size);
+                writeValueToTableFile(fileChannel, record.getKey(), size);
+                writeValueToTableFile(fileChannel, record.getValue(), size);
+                writeValueToIndexFile(index, record.getKey(), currentOffset); // TODO
+                index++;
+                currentOffset += record.size();
             }
         }
     }
 
-    private void writeValue(FileChannel fileChannel, @Nullable ByteBuffer value, ByteBuffer size) throws IOException {
+    private void writeValueToTableFile(FileChannel fileChannel, @Nullable ByteBuffer value, ByteBuffer size) throws IOException {
         if (value == null) {
             writeSize(fileChannel, size, -1);
         } else {
@@ -61,6 +68,10 @@ public class SSTableService {
         sizeBuffer.putInt(size);
         sizeBuffer.position(0);
         fileChannel.write(sizeBuffer);
+    }
+
+    private void writeValueToIndexFile(int index, ByteBuffer key, Integer offset) {
+
     }
 
     public void cleanMappedByteBuffer(@Nullable MappedByteBuffer mappedByteBuffer) {
