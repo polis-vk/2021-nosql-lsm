@@ -12,6 +12,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Iterator;
 import java.util.SortedMap;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ConcurrentSkipListMap;
 
 /**
@@ -22,14 +23,14 @@ public class LSMDao implements DAO {
 
     private final SSTableService ssTableService = new SSTableService();
 
+    private final ConcurrentLinkedDeque<SSTable> ssTables = new ConcurrentLinkedDeque<>();
     private final SortedMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
     private int storageSize;
+
     private final DAOConfig config;
 
     private static final int DEFAULT_THRESHOLD = 1024 * 1024 * 500; // 500 MB
     private final int threshold;
-
-
     private int ssTableNextIndex = 0;
 
 
@@ -86,6 +87,7 @@ public class LSMDao implements DAO {
                 ssTableNextIndex, SSTable.FILE_PREFIX, SSTable.INDEX_FILE_PREFIX);
         ssTableNextIndex++;
         SSTable ssTable = new SSTable(ssTablePath.getFilePath(), ssTablePath.getIndexFilePath(), storage);
+        ssTables.add(ssTable);
         ssTableService.writeTableAndIndexFile(ssTable);
     }
 
