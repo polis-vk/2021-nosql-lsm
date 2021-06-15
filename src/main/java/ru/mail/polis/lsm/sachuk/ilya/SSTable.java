@@ -13,11 +13,7 @@ import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.WritableByteChannel;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
-import java.nio.file.StandardOpenOption;
+import java.nio.file.*;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -60,11 +56,19 @@ class SSTable {
 
 
         try (Stream<Path> streamPaths = Files.walk(Paths.get(dir.toUri()))) {
-            savePaths = streamPaths.filter(path -> path.toString().endsWith(".save")).collect(Collectors.toList()).iterator();
+            savePaths = streamPaths.filter(path -> path.toString().endsWith(".save"))
+                    .collect(Collectors.toList())
+                    .stream()
+                    .sorted()
+                    .iterator();
         }
 
         try (Stream<Path> streamPaths = Files.walk(Paths.get(dir.toUri()))) {
-            indexPaths = streamPaths.filter(path -> path.toString().endsWith(".index")).collect(Collectors.toList()).iterator();
+            indexPaths = streamPaths.filter(path -> path.toString().endsWith(".index"))
+                    .collect(Collectors.toList())
+                    .stream()
+                    .sorted()
+                    .iterator();
         }
 
         while (savePaths.hasNext() && indexPaths.hasNext()) {
@@ -84,6 +88,9 @@ class SSTable {
 
         Path tmpSavePath = dir.resolve(SAVE_FILE + "_" + TMP_FILE);
         Path tmpIndexPath = dir.resolve(INDEX_FILE + "_" + TMP_FILE);
+
+        Files.deleteIfExists(tmpSavePath);
+        Files.deleteIfExists(tmpIndexPath);
 
         try (FileChannel saveFileChannel = FileChannel.open(
                 tmpSavePath,
