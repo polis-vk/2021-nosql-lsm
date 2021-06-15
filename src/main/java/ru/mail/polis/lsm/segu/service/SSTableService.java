@@ -25,7 +25,7 @@ import java.util.stream.Collectors;
 
 public class SSTableService {
 
-    private MappedByteBuffer mappedByteBuffer;
+    private static MappedByteBuffer mappedByteBuffer;
     private static final Method CLEAN;
 
     static {
@@ -149,9 +149,8 @@ public class SSTableService {
     /**
      * Clean MappedByteBuffer.
      *
-     * @param mappedByteBuffer - byte buffer
      */
-    public void cleanMappedByteBuffer(@Nullable MappedByteBuffer mappedByteBuffer) {
+    public static void cleanMappedByteBuffer() {
         if (mappedByteBuffer != null) {
             try {
                 CLEAN.invoke(null, mappedByteBuffer);

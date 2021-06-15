@@ -12,6 +12,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Comparator;
 import java.util.Deque;
 import java.util.Iterator;
 import java.util.SortedMap;
@@ -33,7 +34,7 @@ public class LSMDao implements DAO {
 
     private final DAOConfig config;
 
-    private static final int DEFAULT_THRESHOLD = 1024 * 1024 * 10; // 500 MB
+    private static final int DEFAULT_THRESHOLD = 1024 * 1024 * 32;
     private final int threshold;
     private int ssTableNextIndex = 0;
 
@@ -63,6 +64,7 @@ public class LSMDao implements DAO {
     private void initTables() throws IOException {
         try (Stream<Path> stream = Files.list(config.getDir())) {
             stream.filter(file -> !Files.isDirectory(file))
+                    .sorted(Comparator.comparingInt(file -> Integer.parseInt(file.getFileName().toString().substring(5))))
                     .map(SSTable::new)
                     .forEach(ssTables::add);
         }
@@ -99,6 +101,7 @@ public class LSMDao implements DAO {
         synchronized (this) {
             flush();
             clear();
+            SSTableService.cleanMappedByteBuffer();
         }
     }
 
