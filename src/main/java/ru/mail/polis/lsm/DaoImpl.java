@@ -71,6 +71,7 @@ public class DaoImpl implements DAO {
     @Override
     public void upsert(Record record) {
         synchronized (this) {
+            map.put(record.getKey(), record);
             memoryConsumption += record.getSize();
             if (memoryConsumption > MEMORY_LIMIT) {
                 try {
@@ -79,7 +80,6 @@ public class DaoImpl implements DAO {
                     throw new UncheckedIOException(e);
                 }
             }
-            map.put(record.getKey(), record);
 
         }
     }
