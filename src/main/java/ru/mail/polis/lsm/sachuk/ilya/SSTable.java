@@ -20,6 +20,7 @@ import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
@@ -30,7 +31,11 @@ import java.util.stream.Stream;
 class SSTable {
 
     private static final String SAVE_FILE = "SSTABLE";
+    private static final String SAVE_FILE_END = ".save";
+
     private static final String INDEX_FILE = "INDEX";
+    private static final String INDEX_FILE_END = ".index";
+
     private static final String TMP_FILE = "TMP";
     private static final String NULL_VALUE = "NULL_VALUE";
 
@@ -50,6 +55,11 @@ class SSTable {
     }
 
     Iterator<Record> range(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) throws IOException {
+
+        if (fromKey != null && toKey != null && byteBufferToString(fromKey).compareTo(byteBufferToString(toKey)) == 0) {
+            return Collections.emptyIterator();
+        }
+
         return new SSTableIterator(binarySearchKey(indexList, fromKey), toKey);
     }
 
@@ -57,27 +67,8 @@ class SSTable {
 
         List<SSTable> listSSTables = new ArrayList<>();
 
-        Iterator<Path> savePaths;
-        Iterator<Path> indexPaths;
-
-
-        try (Stream<Path> streamPaths = Files.walk(Paths.get(dir.toUri()))) {
-            savePaths = streamPaths.filter(path -> path.toString().endsWith(".save"))
-                    .collect(Collectors.toList())
-                    .stream()
-                    .sorted(Comparator.comparing(o -> getFileNumber(o, ".save")))
-                    .collect(Collectors.toList())
-                    .iterator();
-        }
-
-        try (Stream<Path> streamPaths = Files.walk(Paths.get(dir.toUri()))) {
-            indexPaths = streamPaths.filter(path -> path.toString().endsWith(".index"))
-                    .collect(Collectors.toList())
-                    .stream()
-                    .sorted(Comparator.comparing(o -> getFileNumber(o, ".index")))
-                    .collect(Collectors.toList())
-                    .iterator();
-        }
+        Iterator<Path> savePaths = getPathIterator(dir, SAVE_FILE_END);
+        Iterator<Path> indexPaths = getPathIterator(dir, INDEX_FILE_END);
 
         while (savePaths.hasNext() && indexPaths.hasNext()) {
             Path savePath = savePaths.next();
@@ -91,8 +82,8 @@ class SSTable {
 
     static SSTable save(Iterator<Record> iterators, Path dir, int fileNumber) throws IOException {
 
-        Path savePath = dir.resolve(SAVE_FILE + fileNumber + ".save");
-        Path indexPath = dir.resolve(INDEX_FILE + fileNumber + ".index");
+        Path savePath = dir.resolve(SAVE_FILE + fileNumber + SAVE_FILE_END);
+        Path indexPath = dir.resolve(INDEX_FILE + fileNumber + INDEX_FILE_END);
 
         Path tmpSavePath = dir.resolve(SAVE_FILE + "_" + TMP_FILE);
         Path tmpIndexPath = dir.resolve(INDEX_FILE + "_" + TMP_FILE);
@@ -114,11 +105,14 @@ class SSTable {
 
                 while (iterators.hasNext()) {
                     long indexPositionToRead = saveFileChannel.position();
-                    ByteBuffer offset = ByteBuffer.wrap(ByteBuffer.allocate(Long.BYTES).putLong(indexPositionToRead).array());
+                    ByteBuffer offset = ByteBuffer.wrap(
+                            ByteBuffer.allocate(Long.BYTES).putLong(indexPositionToRead).array()
+                    );
+
                     indexFileChanel.write(offset);
 
-                    Record record = iterators.next();
 
+                    Record record = iterators.next();
                     ByteBuffer value = record.getValue() != null
                             ? record.getValue()
                             : ByteBuffer.wrap(NULL_VALUE.getBytes(StandardCharsets.UTF_8));
@@ -166,11 +160,13 @@ class SSTable {
 
         String keyStringToFind = byteBufferToString(keyToFind);
 
-        int positionToRead = 0;
+        int positionToRead;
+
+        int middle = (start + end) / 2;
 
         while (start <= end) {
 
-            int middle = (start + end) / 2;
+            middle = (start + end) / 2;
 
             positionToRead = indexList.get(middle).intValue();
 
@@ -184,20 +180,39 @@ class SSTable {
                 return positionToRead;
             } else if (keyStringToFind.compareTo(keyString) > 0) {
                 start = middle + 1;
+
+                if (start > end && keyStringToFind.compareTo(keyString) > 0) {
+
+                    if (start == indexList.size()) {
+                        return -1;
+                    }
+
+                    if (start < indexList.size()) {
+                        return start;
+                    }
+                }
             } else {
                 end = middle - 1;
             }
 
         }
-        return positionToRead;
+        return indexList.get(middle).intValue();
     }
 
     private void restoreStorage() throws IOException {
         try (FileChannel saveFileChannel = FileChannel.open(savePath, StandardOpenOption.READ)) {
             try (FileChannel indexFileChannel = FileChannel.open(indexPath, StandardOpenOption.READ)) {
 
-                mappedByteBuffer = saveFileChannel.map(FileChannel.MapMode.READ_ONLY, 0, saveFileChannel.size());
-                indexByteBuffer = indexFileChannel.map(FileChannel.MapMode.READ_ONLY, 0, indexFileChannel.size());
+                mappedByteBuffer = saveFileChannel.map(
+                        FileChannel.MapMode.READ_ONLY,
+                        0,
+                        saveFileChannel.size()
+                );
+                indexByteBuffer = indexFileChannel.map(
+                        FileChannel.MapMode.READ_ONLY,
+                        0,
+                        indexFileChannel.size()
+                );
 
                 while (indexByteBuffer.hasRemaining()) {
                     indexList.add(indexByteBuffer.getLong());
@@ -238,7 +253,23 @@ class SSTable {
     }
 
     private String byteBufferToString(ByteBuffer buffer) {
-        return StandardCharsets.UTF_8.decode(buffer).toString();
+        buffer.position(0);
+        String value = StandardCharsets.UTF_8.decode(buffer).toString();
+        buffer.position(0);
+        return value;
+    }
+
+    private static Iterator<Path> getPathIterator(Path dir, String pathEnd) throws IOException {
+        Iterator<Path> paths;
+        try (Stream<Path> streamPaths = Files.walk(Paths.get(dir.toUri()))) {
+            paths = streamPaths.filter(path -> path.toString().endsWith(pathEnd))
+                    .collect(Collectors.toList())
+                    .stream()
+                    .sorted(Comparator.comparing(o -> getFileNumber(o, pathEnd)))
+                    .collect(Collectors.toList())
+                    .iterator();
+        }
+        return paths;
     }
 
     private static Integer getFileNumber(Path path, String endFile) {
@@ -267,22 +298,19 @@ class SSTable {
     }
 
     class SSTableIterator implements Iterator<Record> {
-
-        private int positionToStartRead;
-        private ByteBuffer keyToRead;
-        private String keyToReadString;
-        private boolean readToEnd = false;
+        private final String keyToReadString;
+        private final boolean readToEnd;
 
         SSTableIterator(int positionToStartRead, ByteBuffer keyToRead) {
-            this.positionToStartRead = positionToStartRead;
-            this.keyToRead = keyToRead;
             this.keyToReadString = keyToRead == null ? null : byteBufferToString(keyToRead);
 
             readToEnd = keyToRead == null;
 
-            mappedByteBuffer.position(positionToStartRead);
-
-
+            if (positionToStartRead == -1) {
+                mappedByteBuffer.position(mappedByteBuffer.limit());
+            } else {
+                mappedByteBuffer.position(positionToStartRead);
+            }
         }
 
         @Override
