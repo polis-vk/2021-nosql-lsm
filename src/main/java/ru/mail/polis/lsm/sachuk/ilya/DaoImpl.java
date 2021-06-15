@@ -22,7 +22,7 @@ import java.util.stream.StreamSupport;
 
 public class DaoImpl implements DAO {
 
-    private static final long LIMIT = 16L * 1024 * 1024;
+    private static final long LIMIT = (long) 1024 * 1024;
 
     private final DAOConfig config;
     private final SortedMap<ByteBuffer, Record> memoryStorage = new ConcurrentSkipListMap<>();
@@ -124,7 +124,7 @@ public class DaoImpl implements DAO {
     }
 
     private int sizeOf(Record record) {
-        return record.getKey().remaining() + (record.isTombstone() ? 0 : record.getKey().remaining());
+        return record.getKey().capacity() + (record.isTombstone() ? 0 : record.getKey().capacity());
     }
 
     /**
@@ -214,6 +214,3 @@ public class DaoImpl implements DAO {
         };
     }
 }
-
-//найти место с которого читать
-//когда в
