@@ -37,7 +37,6 @@ public class LSMDao implements DAO {
     private final int threshold;
     private int ssTableNextIndex = 0;
 
-
     /**
      * Constructor.
      *
@@ -48,6 +47,12 @@ public class LSMDao implements DAO {
         this(config, DEFAULT_THRESHOLD);
     }
 
+    /**
+     * Constructor of LSMDao.
+     * @param config - Dao config
+     * @param threshold - threshold
+     * @throws IOException - it throws IO exception
+     */
     public LSMDao(DAOConfig config, int threshold) throws IOException {
         this.config = config;
         this.threshold = threshold;
@@ -101,7 +106,7 @@ public class LSMDao implements DAO {
                 ssTableNextIndex, SSTable.FILE_PREFIX, SSTable.INDEX_FILE_PREFIX);
         ssTableNextIndex++;
         SSTable ssTable = new SSTable(ssTablePath.getFilePath(), ssTablePath.getIndexFilePath());
-        ssTableService.writeTableAndIndexFile(ssTable, storage.values());
+        ssTableService.writeTable(ssTable, storage.values());
         ssTables.add(ssTable);
     }
 

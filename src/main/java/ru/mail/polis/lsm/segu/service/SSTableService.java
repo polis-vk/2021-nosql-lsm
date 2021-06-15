@@ -37,7 +37,14 @@ public class SSTableService {
 
     private final ByteBuffer defaultIntBuffer = ByteBuffer.allocate(Integer.BYTES);
 
-    public void writeTableAndIndexFile(SSTable ssTable, Collection<Record> storage) throws IOException {
+    /**
+     * Write SS Table to disk.
+     *
+     * @param ssTable - ss table object
+     * @param storage - current storage
+     * @throws IOException - it throws IO exception
+     */
+    public void writeTable(SSTable ssTable, Collection<Record> storage) throws IOException {
         int index = 0;
         int currentOffset = 0;
         try (FileChannel fileChannel = FileChannel.open(ssTable.getFilePath(),
@@ -52,7 +59,7 @@ public class SSTableService {
                 writeValueToTableFile(fileChannel, recordKey);
                 writeValueToTableFile(fileChannel, recordValue);
 
-                IndexRecord indexRecord = new IndexRecord(index, currentOffset);
+                //IndexRecord indexRecord = new IndexRecord(index, currentOffset);
                 //writeValueToIndexFile(indexFileChannel, indexRecord); // Currently not implemented
 
                 index++;
@@ -61,6 +68,15 @@ public class SSTableService {
         }
     }
 
+    /**
+     * Get range.
+     *
+     * @param ssTablesDeque         - ss tables
+     * @param rangedStorageIterator - storage iterator
+     * @param from                  - from key
+     * @param to                    - to key
+     * @return merged iterator in range
+     */
     public Iterator<Record> getRange(Deque<SSTable> ssTablesDeque,
                                      Iterator<Record> rangedStorageIterator, ByteBuffer from, ByteBuffer to) {
         List<Iterator<Record>> rangeIterators = ssTablesDeque.stream()
@@ -100,8 +116,7 @@ public class SSTableService {
                     mappedByteBuffer.position(mappedByteBuffer.position() + valueSize);
                 }
             }
-
-
+            cleanMappedByteBuffer(mappedByteBuffer);
         } catch (IOException e) {
             e.printStackTrace();
             System.err.println("Failed getting range");
@@ -136,20 +151,11 @@ public class SSTableService {
         fileChannel.write(sizeBuffer);
     }
 
-    private void writeValueToIndexFile(FileChannel fileChannel, IndexRecord indexRecord) throws IOException {
-        defaultIntBuffer.position(0);
-
-        defaultIntBuffer.putInt(indexRecord.getIndex());
-        defaultIntBuffer.position(0);
-        fileChannel.write(defaultIntBuffer);
-
-        defaultIntBuffer.position(0);
-
-        defaultIntBuffer.putInt(indexRecord.getOffset());
-        defaultIntBuffer.position(0);
-        fileChannel.write(defaultIntBuffer);
-    }
-
+    /**
+     * Clean MappedByteBuffer.
+     *
+     * @param mappedByteBuffer - byte buffer
+     */
     public void cleanMappedByteBuffer(@Nullable MappedByteBuffer mappedByteBuffer) {
         if (mappedByteBuffer != null) {
             try {
@@ -160,6 +166,15 @@ public class SSTableService {
         }
     }
 
+    /**
+     * Resolve path for DAO.
+     *
+     * @param config      - config
+     * @param index       - index
+     * @param filePrefix  - file prefix
+     * @param indexPrefix - index prefix
+     * @return - path
+     */
     public SSTablePath resolvePath(DAOConfig config, int index, String filePrefix, String indexPrefix) {
         String fileName = filePrefix + index;
         String fileIndexName = indexPrefix + index;

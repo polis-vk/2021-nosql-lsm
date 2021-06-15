@@ -10,7 +10,6 @@ public class SSTable {
     private final Path indexFilePath;
     private final Path filePath;
 
-
     public SSTable(Path filePath, Path indexFilePath) {
         this.filePath = filePath;
         this.indexFilePath = indexFilePath;

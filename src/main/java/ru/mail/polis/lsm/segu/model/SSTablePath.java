@@ -32,12 +32,4 @@ public class SSTablePath {
     public int hashCode() {
         return Objects.hash(filePath, indexFilePath);
     }
-
-    @Override
-    public String toString() {
-        return "SSTablePath{" +
-                "filePath=" + filePath +
-                ", indexFilePath=" + indexFilePath +
-                '}';
-    }
 }

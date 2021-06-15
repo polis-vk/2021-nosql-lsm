@@ -14,7 +14,6 @@ public class Record {
         this.value = value == null ? null : value.asReadOnlyBuffer();
     }
 
-
     public static Record of(ByteBuffer key, ByteBuffer value) {
         return new Record(key.asReadOnlyBuffer(), value.asReadOnlyBuffer());
     }
@@ -35,7 +34,10 @@ public class Record {
         return value == null;
     }
 
-    // Можно перенести в конструктор?
+    /**
+     * Get size of current record.
+     * @return - size in bytes
+     */
     public int size() {
         byte sizePrefix = Integer.BYTES * 2;
         int sizeOfKey = sizeOf(key);

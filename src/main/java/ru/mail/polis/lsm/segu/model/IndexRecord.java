@@ -31,12 +31,4 @@ public class IndexRecord {
     public int hashCode() {
         return Objects.hash(index, offset);
     }
-
-    @Override
-    public String toString() {
-        return "IndexRecord{" +
-                "index=" + index +
-                ", offset=" + offset +
-                '}';
-    }
 }
