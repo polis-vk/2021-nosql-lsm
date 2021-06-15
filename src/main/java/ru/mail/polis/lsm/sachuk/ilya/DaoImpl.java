@@ -22,7 +22,7 @@ import java.util.stream.StreamSupport;
 
 public class DaoImpl implements DAO {
 
-    private static final long LIMIT = (long) 1024 * 1024;
+    private static final long LIMIT = 16L * 1024 * 1024;
 
     private final DAOConfig config;
     private final SortedMap<ByteBuffer, Record> memoryStorage = new ConcurrentSkipListMap<>();
@@ -78,6 +78,7 @@ public class DaoImpl implements DAO {
                 }
             }
         }
+        memoryConsumption += sizeOf(record);
         memoryStorage.put(record.getKey(), record);
     }
 
