@@ -23,10 +23,6 @@ public class SSTable implements Closeable, Comparable<SSTable> {
     private static final String SAVE_FILE_NAME = "file_";
     private static final String TEMP_EXTENSION = "_temp";
 
-    private final SortedMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
-    private final MappedByteBuffer mmap;
-    private final Path compareName;
-
     static {
         try {
             Class<?> fileChannelImplClass = Class.forName("sun.nio.ch.FileChannelImpl");
@@ -37,6 +33,9 @@ public class SSTable implements Closeable, Comparable<SSTable> {
         }
     }
 
+    private final SortedMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
+    private final MappedByteBuffer mmap;
+    private final Path compareName;
 
 
     /**
@@ -49,9 +48,8 @@ public class SSTable implements Closeable, Comparable<SSTable> {
         compareName = file;
     }
 
-
     /**
-     * Static function that returns sorted ssTableList
+     * Static function that returns sorted ssTableList.
      */
     public static List<SSTable> loadFromDir(Path dir) throws IOException {
         List<SSTable> ssTableList = new ArrayList<>();
@@ -65,7 +63,7 @@ public class SSTable implements Closeable, Comparable<SSTable> {
     }
 
     /**
-     * Function that writes data from a table to disk
+     * Function that writes data from a table to disk.
      */
     public static SSTable write(Iterator<Record> iterator, Path fileName) throws IOException {
         Path tempFileName = Path.of(fileName.toString() + TEMP_EXTENSION);
@@ -105,7 +103,7 @@ public class SSTable implements Closeable, Comparable<SSTable> {
     }
 
     /**
-     * Function that return RangedIterator
+     * Function that return RangedIterator.
      */
     public Iterator<Record> range(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
         synchronized (this) {
@@ -117,7 +115,7 @@ public class SSTable implements Closeable, Comparable<SSTable> {
     }
 
     /**
-     * Function that clean mmap
+     * Function that clean mmap.
      */
     public void close() throws IOException {
         if (mmap != null) {
@@ -127,19 +125,6 @@ public class SSTable implements Closeable, Comparable<SSTable> {
                 throw new IOException(e);
             }
         }
-    }
-
-    private SortedMap<ByteBuffer, Record> map(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
-        if (fromKey == null && toKey == null) {
-            return storage;
-        }
-        if (fromKey == null) {
-            return storage.headMap(toKey);
-        }
-        if (toKey == null) {
-            return storage.tailMap(fromKey);
-        }
-        return storage.subMap(fromKey, toKey);
     }
 
     @Override
@@ -159,6 +144,8 @@ public class SSTable implements Closeable, Comparable<SSTable> {
         private final ByteBuffer fromKey;
         private final ByteBuffer toKey;
 
+        private ByteBuffer key;
+        private ByteBuffer value;
         private Record peek;
 
         RangeIterator(ByteBuffer buffer, ByteBuffer fromKey, ByteBuffer toKey) {
@@ -166,32 +153,20 @@ public class SSTable implements Closeable, Comparable<SSTable> {
             this.fromKey = fromKey;
             this.toKey = toKey;
 
-            updatePeek();
+            nextPeek();
         }
 
-        private void increasePeekToFromKey(ByteBuffer key, ByteBuffer value) {
+        private void nextPeek() {
+            updatePeek();
             while (fromKey != null && fromKey.compareTo(key) > 0) {
-                if (buffer.hasRemaining()) {
-                    key = readValue();
-                    value = readValue();
-                    if (key == null) {
-                        throw new NoSuchElementException();
-                    }
-                    if (value == null) {
-                        peek = Record.tombstone(key);
-                    } else {
-                        peek = Record.of(key, value);
-                    }
-                } else {
-                    peek = null;
-                }
+                updatePeek();
             }
         }
 
         private void updatePeek() {
             if (buffer.hasRemaining()) {
-                ByteBuffer key = readValue();
-                ByteBuffer value = readValue();
+                key = readValue();
+                value = readValue();
                 if (key == null) {
                     throw new NoSuchElementException();
                 }
@@ -200,7 +175,6 @@ public class SSTable implements Closeable, Comparable<SSTable> {
                 } else {
                     peek = Record.of(key, value);
                 }
-                increasePeekToFromKey(key, value);
 
             } else {
                 peek = null;
@@ -221,7 +195,7 @@ public class SSTable implements Closeable, Comparable<SSTable> {
                 throw new NoSuchElementException();
             }
             Record buffer = peek;
-            updatePeek();
+            nextPeek();
             return buffer;
         }
 
