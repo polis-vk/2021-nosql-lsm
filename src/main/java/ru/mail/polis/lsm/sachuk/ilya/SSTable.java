@@ -82,8 +82,8 @@ class SSTable {
 
     static SSTable save(Iterator<Record> iterators, Path dir, int fileNumber) throws IOException {
 
-        Path savePath = dir.resolve(SAVE_FILE + fileNumber + SAVE_FILE_END);
-        Path indexPath = dir.resolve(INDEX_FILE + fileNumber + INDEX_FILE_END);
+        final Path savePath = dir.resolve(SAVE_FILE + fileNumber + SAVE_FILE_END);
+        final Path indexPath = dir.resolve(INDEX_FILE + fileNumber + INDEX_FILE_END);
 
         Path tmpSavePath = dir.resolve(SAVE_FILE + "_" + TMP_FILE);
         Path tmpIndexPath = dir.resolve(INDEX_FILE + "_" + TMP_FILE);
@@ -105,14 +105,14 @@ class SSTable {
 
                 while (iterators.hasNext()) {
                     long indexPositionToRead = saveFileChannel.position();
+
                     ByteBuffer offset = ByteBuffer.wrap(
                             ByteBuffer.allocate(Long.BYTES).putLong(indexPositionToRead).array()
                     );
-
                     indexFileChanel.write(offset);
 
-
                     Record record = iterators.next();
+
                     ByteBuffer value = record.getValue() != null
                             ? record.getValue()
                             : ByteBuffer.wrap(NULL_VALUE.getBytes(StandardCharsets.UTF_8));
@@ -125,7 +125,6 @@ class SSTable {
                 indexFileChanel.force(false);
             }
         }
-
 
         Files.deleteIfExists(savePath);
         Files.deleteIfExists(indexPath);
