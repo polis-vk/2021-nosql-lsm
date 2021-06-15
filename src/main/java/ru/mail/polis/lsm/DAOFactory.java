@@ -12,8 +12,8 @@ public final class DAOFactory {
      * Create an instance of {@link DAO} with supplied {@link DAOConfig}.
      */
     public static DAO create(DAOConfig config) throws IOException {
-
-        return new MyDAOImplementation(config);
+        assert config.getDir().toFile().exists();
+        return new LsmDAO(config);
     }
 
 }
