@@ -3,6 +3,7 @@ package ru.mail.polis.lsm.veronika_peutina;
 import ru.mail.polis.lsm.Record;
 
 import javax.annotation.Nullable;
+import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -36,11 +37,8 @@ class SSTable {
         }
     }
 
-    static List<SSTable> loadFromDir(Path dir, int size) throws IOException {
-        List<Path> files = new ArrayList<>();
-        for (int i = 0; i < size; i++) {
-            files.add(dir.resolve("SSTable" + i + ".dat"));
-        }
+    static List<SSTable> loadFromDir(Path dir) throws IOException {
+        List<File> files = List.of(Objects.requireNonNull(dir.toFile().listFiles()));
 
         if (files.size() == 0) {
             return new ArrayList<>();
@@ -48,8 +46,8 @@ class SSTable {
 
         List<SSTable> listSSTables = new ArrayList<>();
 
-        for (Path it : files) {
-            listSSTables.add(new SSTable(it));
+        for (File it : files) {
+            listSSTables.add(new SSTable(it.toPath()));
         }
 
         return listSSTables;

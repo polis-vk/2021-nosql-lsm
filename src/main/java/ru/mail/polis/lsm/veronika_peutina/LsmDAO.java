@@ -26,7 +26,7 @@ public class LsmDAO implements DAO {
     public LsmDAO(DAOConfig config) throws IOException {
         dir = config.getDir();
         memoryConsumption = 0;
-        ssTables.addAll(SSTable.loadFromDir(config.getDir(), ssTables.size()));
+        ssTables.addAll(SSTable.loadFromDir(config.getDir()));
     }
 
     private Path getNewName(Path dir) {
@@ -126,10 +126,8 @@ public class LsmDAO implements DAO {
                 if (!hasNext()) {
                     throw new NoSuchElementException("No elements");
                 }
-
                 leftRecord = getNext(left, leftRecord);
                 rightRecord = getNext(right, rightRecord);
-
                 if (leftRecord == null) {
                     return consumeRight();
                 }
@@ -172,7 +170,6 @@ public class LsmDAO implements DAO {
         };
     }
 
-
     public static Iterator<Record> merge(List<Iterator<Record>> iterators) {
         if (iterators.size() == 0) {
             return Collections.emptyIterator();
@@ -187,5 +184,4 @@ public class LsmDAO implements DAO {
         Iterator<Record> right = merge(iterators.subList(iterators.size() / 2, iterators.size()));
         return mergeTwoIterators(left, right);
     }
-
 }
