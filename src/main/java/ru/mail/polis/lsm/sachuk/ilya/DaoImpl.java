@@ -111,7 +111,8 @@ public class DaoImpl implements DAO {
         SSTable ssTable = SSTable.save(
                 memoryStorage.values().iterator(),
                 config.getDir(),
-                nextSSTableNumber++);
+                nextSSTableNumber++
+        );
 
         ssTables.add(ssTable);
         memoryStorage.clear();
@@ -129,7 +130,7 @@ public class DaoImpl implements DAO {
     }
 
     private int sizeOf(Record record) {
-        return record.getKey().capacity() + (record.isTombstone() ? 0 : record.getKey().capacity());
+        return 8 + record.getKey().capacity() + (record.isTombstone() ? 0 : record.getKey().capacity());
     }
 
     /**
