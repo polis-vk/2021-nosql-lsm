@@ -14,7 +14,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.NoSuchElementException;
 
 public class SSTable {
 
@@ -39,6 +42,13 @@ public class SSTable {
     private final MappedByteBuffer mmapOffsets;
     private final Integer count;
 
+    /**
+     * Load from Dir.
+     *
+     * @param dir Path
+     * @return List
+     * @throws IOException exception
+     */
     public static List<SSTable> loadFromDir(Path dir) throws IOException {
         List<SSTable> tables = new ArrayList<>();
 
@@ -62,12 +72,18 @@ public class SSTable {
         return tables;
     }
 
+    /**
+     * Write.
+     *
+     * @param records  Records
+     * @param path     Path
+     * @param fileName String
+     * @return SSTable
+     * @throws IOException exception
+     */
     public static SSTable write(Iterator<Record> records, Path path, String fileName) throws IOException {
         Path saveFileName = path.resolve(fileName + SAVE);
         Path tmpFileName = path.resolve(fileName + TEMP);
-
-        Path saveIdxFileName = path.resolve(fileName + IDX + SAVE);
-        Path tmpIdxFileName = path.resolve(fileName + IDX + TEMP);
 
         List<Integer> offsets = new ArrayList<>();
         try (FileChannel fileChannel = FileChannel.open(
@@ -87,8 +103,7 @@ public class SSTable {
                 writeInt(record.getValue(), fileChannel, size);
 
                 offset +=
-                    Integer.BYTES + record.getKey().remaining() +
-                        Integer.BYTES;
+                    Integer.BYTES + record.getKey().remaining() + Integer.BYTES;
 
                 if (!record.isTombstone()) offset += record.getValue().remaining();
             }
@@ -97,6 +112,9 @@ public class SSTable {
         }
         Files.deleteIfExists(saveFileName);
         Files.move(tmpFileName, saveFileName, StandardCopyOption.ATOMIC_MOVE);
+
+        Path saveIdxFileName = path.resolve(fileName + IDX + SAVE);
+        Path tmpIdxFileName = path.resolve(fileName + IDX + TEMP);
 
         try (FileChannel fileChannel = FileChannel.open(
             tmpIdxFileName,
@@ -110,7 +128,7 @@ public class SSTable {
                 fileChannel.write(buffer);
             }
 
-            ByteBuffer buffer =ByteBuffer.allocate(Integer.BYTES).putInt(offsets.size());
+            ByteBuffer buffer = ByteBuffer.allocate(Integer.BYTES).putInt(offsets.size());
             buffer.position(0);
             fileChannel.write(buffer);
 
@@ -122,7 +140,8 @@ public class SSTable {
         return new SSTable(path, fileName);
     }
 
-    private static void writeInt(@Nullable ByteBuffer value, WritableByteChannel channel, ByteBuffer tmp) throws IOException {
+    private static void
+    writeInt(@Nullable ByteBuffer value, WritableByteChannel channel, ByteBuffer tmp) throws IOException {
         if (value == null) {
             tmp.position(0);
             tmp.putInt(0);
@@ -137,6 +156,13 @@ public class SSTable {
         }
     }
 
+    /**
+     * SSTable.
+     *
+     * @param path     Path
+     * @param fileName String
+     * @throws IOException exception
+     */
     public SSTable(Path path, String fileName) throws IOException {
         Path saveFileName = path.resolve(fileName + SAVE);
         Path tmpFileName = path.resolve(fileName + TEMP);
@@ -260,6 +286,11 @@ public class SSTable {
         return low;
     }
 
+    /**
+     * Close.
+     *
+     * @throws IOException exception
+     */
     public void close() throws IOException {
         try {
             if (mmapRec != null) CLEAN.invoke(null, mmapRec);

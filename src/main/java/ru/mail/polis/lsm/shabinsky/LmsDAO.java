@@ -1,13 +1,18 @@
 package ru.mail.polis.lsm.shabinsky;
 
-import ru.mail.polis.lsm.*;
+import ru.mail.polis.lsm.DAO;
+import ru.mail.polis.lsm.DAOConfig;
+import ru.mail.polis.lsm.Record;
 
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.GuardedBy;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.file.Path;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.SortedMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.stream.Collectors;
@@ -19,7 +24,7 @@ public class LmsDAO implements DAO {
 
     private final DAOConfig config;
 
-    private final long MEMORY_LIMIT = 20 * 1024 * 1024;
+    private final long MEM_LIM = 20 * 1024 * 1024;
     private long memorySize;
 
     @GuardedBy("this")
@@ -59,7 +64,7 @@ public class LmsDAO implements DAO {
         synchronized (this) {
 
             updateMemorySize(record);
-            if (memorySize >= MEMORY_LIMIT) {
+            if (memorySize >= MEM_LIM) {
                 try {
                     flush();
                 } catch (IOException e) {
@@ -86,12 +91,18 @@ public class LmsDAO implements DAO {
             }
         } else {
             if (exist) {
-                memorySize -= (returnRecord.getKey().remaining() + returnRecord.getValue().remaining() + 2 * Integer.BYTES);
+                memorySize -=
+                    (returnRecord.getKey().remaining() + returnRecord.getValue().remaining() + 2 * Integer.BYTES);
             }
             memorySize += record.getKey().remaining() + record.getValue().remaining() + 2 * Integer.BYTES;
         }
     }
 
+    /**
+     * GuardedBy("this").
+     *
+     * @throws IOException exception
+     */
     @GuardedBy("this")
     public void flush() throws IOException {
         Path dir = config.getDir();
@@ -131,6 +142,7 @@ public class LmsDAO implements DAO {
         if (toKey == null) {
             return memoryStorage.tailMap(fromKey);
         }
+
         return memoryStorage.subMap(fromKey, toKey);
     }
 }

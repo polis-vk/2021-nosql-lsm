@@ -2,7 +2,6 @@ package ru.mail.polis.lsm.shabinsky;
 
 import ru.mail.polis.lsm.Record;
 
-import java.nio.ByteBuffer;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
@@ -39,6 +38,11 @@ public class PeekRecordIterator implements Iterator<Record>, Comparable<PeekReco
         return now;
     }
 
+    /**
+     * Peek.
+     *
+     * @return Record
+     */
     public Record peek() {
         if (current != null) return current;
         if (!delegate.hasNext()) return null;
@@ -53,9 +57,7 @@ public class PeekRecordIterator implements Iterator<Record>, Comparable<PeekReco
 
     @Override
     public int compareTo(PeekRecordIterator o) {
-        ByteBuffer thisR = this.peek().getKey();
-        ByteBuffer oR = o.peek().getKey();
-        int compareKeyASC = thisR.compareTo(oR);
+        int compareKeyASC = this.peek().getKey().compareTo(o.peek().getKey());
         int compareNumberDESC = o.getNumber().compareTo(this.getNumber());
         return compareKeyASC == 0 ? compareNumberDESC : compareKeyASC;
     }

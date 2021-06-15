@@ -16,6 +16,11 @@ public class MergeRecordIterator implements Iterator<Record> {
 
     private final Queue<PeekRecordIterator> queue = new PriorityQueue<>();
 
+    /**
+     * MergeIterator constructor.
+     *
+     * @param iterators iterators
+     */
     public MergeRecordIterator(List<Iterator<Record>> iterators) {
         IntStream
             .range(0, iterators.size())
