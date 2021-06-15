@@ -54,13 +54,17 @@ class Utils {
         Random random = new Random(size);
         byte[] result = new byte[size];
         for (int i = 0; i < result.length; i++) {
-            result[i] = (byte) ('A' + (random.nextInt() % 26));
+            result[i] = (byte) ('A' + random.nextInt(26));
         }
         return result;
     }
 
     static ByteBuffer keyWithSuffix(int key, byte[] suffix) {
-        byte[] keyBytes = (KEY_PREFIX + "_" + key).getBytes(StandardCharsets.UTF_8);
+        String binary = Long.toBinaryString(key);
+        int leadingN = 64 - binary.length();
+        String builder = "0".repeat(leadingN) + binary;
+
+        byte[] keyBytes = (KEY_PREFIX + "_" + builder).getBytes(StandardCharsets.UTF_8);
         byte[] result = new byte[keyBytes.length + suffix.length];
         System.arraycopy(keyBytes, 0, result, 0, keyBytes.length);
         System.arraycopy(suffix, 0, result, keyBytes.length, suffix.length);
