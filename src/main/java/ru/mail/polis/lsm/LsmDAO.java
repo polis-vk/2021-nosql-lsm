@@ -7,12 +7,7 @@ import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.List;
-import java.util.NoSuchElementException;
-import java.util.SortedMap;
+import java.util.*;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ConcurrentSkipListMap;
 
@@ -21,11 +16,6 @@ public class LsmDAO implements DAO {
     private static final Method CLEAN;
     private static final String SAVE_FILE_NAME = "file_";
     private static final int MEMORY_SIZE = 1024 * 1024 * 32;
-
-    private final ConcurrentLinkedDeque<SSTable> ssTables = new ConcurrentLinkedDeque<>();
-    private final SortedMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
-    private final DAOConfig config;
-    private int memoryConsumption;
 
     static {
         try {
@@ -37,13 +27,18 @@ public class LsmDAO implements DAO {
         }
     }
 
+    private final ConcurrentLinkedDeque<SSTable> ssTables = new ConcurrentLinkedDeque<>();
+    private final SortedMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
+    private final DAOConfig config;
+    private int memoryConsumption;
+
     /**
      * Implementation of DAO that save data to the memory.
      */
     public LsmDAO(DAOConfig config) throws IOException {
         this.config = config;
-        List<SSTable> ssTables = SSTable.loadFromDir(config.getDir());
-        this.ssTables.addAll(ssTables);
+        List<SSTable> listOfSSTable = SSTable.loadFromDir(config.getDir());
+        this.ssTables.addAll(listOfSSTable);
         memoryConsumption = 0;
     }
 

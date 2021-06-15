@@ -20,8 +20,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Objects;
-import java.util.SortedMap;
-import java.util.concurrent.ConcurrentSkipListMap;
 
 public class SSTable implements Closeable, Comparable<SSTable> {
 
@@ -39,10 +37,8 @@ public class SSTable implements Closeable, Comparable<SSTable> {
         }
     }
 
-    private final SortedMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
     private final MappedByteBuffer mmap;
     private final Path compareName;
-
 
     /**
      * Implementation of DAO that save data to the memory.
@@ -146,7 +142,7 @@ public class SSTable implements Closeable, Comparable<SSTable> {
 
     static class RangeIterator implements Iterator<Record> {
 
-        private final ByteBuffer buffer;
+        private final ByteBuffer mmapBuffer;
         private final ByteBuffer fromKey;
         private final ByteBuffer toKey;
 
@@ -154,8 +150,8 @@ public class SSTable implements Closeable, Comparable<SSTable> {
         private ByteBuffer value;
         private Record peek;
 
-        RangeIterator(ByteBuffer buffer, ByteBuffer fromKey, ByteBuffer toKey) {
-            this.buffer = buffer;
+        RangeIterator(ByteBuffer mmapBuffer, ByteBuffer fromKey, ByteBuffer toKey) {
+            this.mmapBuffer = mmapBuffer;
             this.fromKey = fromKey;
             this.toKey = toKey;
 
@@ -170,7 +166,7 @@ public class SSTable implements Closeable, Comparable<SSTable> {
         }
 
         private void updatePeek() {
-            if (buffer.hasRemaining()) {
+            if (mmapBuffer.hasRemaining()) {
                 key = readValue();
                 value = readValue();
                 if (key == null) {
@@ -206,13 +202,13 @@ public class SSTable implements Closeable, Comparable<SSTable> {
         }
 
         private ByteBuffer readValue() {
-            int valueSize = buffer.getInt();
+            int valueSize = mmapBuffer.getInt();
             if (valueSize < 0) {
                 return null;
             }
-            ByteBuffer value = buffer.slice().limit(valueSize).slice();
-            buffer.position(buffer.position() + valueSize);
-            return value;
+            ByteBuffer tempBuffer = mmapBuffer.slice().limit(valueSize).slice();
+            mmapBuffer.position(mmapBuffer.position() + valueSize);
+            return tempBuffer;
         }
     }
 
