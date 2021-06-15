@@ -223,7 +223,7 @@ public class SSTable implements Closeable {
 
         final ByteBuffer buffer;
 
-        static public SSTableIterator emptyIterator() {
+        static SSTableIterator emptyIterator() {
             return new SSTableIterator(ByteBuffer.allocate(0));
         }
 
