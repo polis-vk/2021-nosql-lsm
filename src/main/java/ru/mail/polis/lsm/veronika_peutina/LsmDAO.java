@@ -113,7 +113,6 @@ public class LsmDAO implements DAO {
     private static Iterator<Record> mergeTwoIterators(Iterator<Record> left, Iterator<Record> right) {
 
         return new Iterator<>() {
-
             Record leftRecord;
             Record rightRecord;
 
@@ -160,7 +159,6 @@ public class LsmDAO implements DAO {
                 rightRecord = null;
                 return tmp;
             }
-
 
             private Record getNext(Iterator<Record> iterator, @Nullable Record current) {
                 if (current != null) {

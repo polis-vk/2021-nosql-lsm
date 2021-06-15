@@ -3,7 +3,6 @@ package ru.mail.polis.lsm.veronika_peutina;
 import ru.mail.polis.lsm.Record;
 
 import javax.annotation.Nullable;
-import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -28,7 +27,6 @@ class SSTable {
             throw new IllegalStateException(e);
         }
     }
-
 
     private final MappedByteBuffer map;
 
@@ -83,7 +81,7 @@ class SSTable {
             CLEAN.invoke(null, map);
 
         } catch (InvocationTargetException | IllegalAccessException e) {
-            throw new IOException();
+            throw new IOException(e);
         }
     }
 
@@ -97,8 +95,8 @@ class SSTable {
                 StandardOpenOption.TRUNCATE_EXISTING
         )) {
             ByteBuffer size = ByteBuffer.allocate(Integer.BYTES);
-            for (Iterator<Record> it = recordIterator; it.hasNext(); ) {
-                Record record = it.next();
+            for (; recordIterator.hasNext(); ) {
+                Record record = recordIterator.next();
                 writeRecord(record, fileChannel, size);
             }
             fileChannel.force(false);
