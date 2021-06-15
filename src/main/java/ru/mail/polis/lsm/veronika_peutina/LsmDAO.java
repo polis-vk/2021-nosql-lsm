@@ -8,9 +8,7 @@ import javax.annotation.Nullable;
 import javax.annotation.concurrent.GuardedBy;
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
-import java.nio.MappedByteBuffer;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.ConcurrentLinkedDeque;
@@ -18,17 +16,6 @@ import java.util.concurrent.ConcurrentSkipListMap;
 
 
 public class LsmDAO implements DAO {
-    private static final Method CLEAN;
-
-    static {
-        try {
-            Class<?> aClass = Class.forName("sun.nio.ch.FileChannelImpl");
-            CLEAN = aClass.getDeclaredMethod("unmap", MappedByteBuffer.class);
-            CLEAN.setAccessible(true);
-        } catch (Exception e) {
-            throw new IllegalStateException(e);
-        }
-    }
 
     private final SortedMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
     private int memoryConsumption;
