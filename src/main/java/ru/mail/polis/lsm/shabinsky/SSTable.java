@@ -21,10 +21,10 @@ import java.util.NoSuchElementException;
 
 public class SSTable {
 
-    public final static String NAME = "sstable_";
-    public final static String IDX = "_idx";
-    public final static String SAVE = ".save";
-    public final static String TEMP = ".temp";
+    public static final String NAME = "sstable_";
+    public static final String IDX = "_idx";
+    public static final String SAVE = ".save";
+    public static final String TEMP = ".temp";
 
     private static Method CLEAN;
 

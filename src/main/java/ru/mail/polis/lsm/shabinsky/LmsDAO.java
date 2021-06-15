@@ -24,7 +24,7 @@ public class LmsDAO implements DAO {
 
     private final DAOConfig config;
 
-    private final long MEM_LIM = 20 * 1024 * 1024;
+    private static final long MEM_LIM = 20 * 1024 * 1024;
     private long memorySize;
 
     @GuardedBy("this")
