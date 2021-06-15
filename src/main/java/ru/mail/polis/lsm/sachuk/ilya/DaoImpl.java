@@ -3,6 +3,7 @@ package ru.mail.polis.lsm.sachuk.ilya;
 import ru.mail.polis.lsm.DAO;
 import ru.mail.polis.lsm.DAOConfig;
 import ru.mail.polis.lsm.Record;
+import ru.mail.polis.lsm.sachuk.ilya.iterators.MergeIterator;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
@@ -154,66 +155,6 @@ public class DaoImpl implements DAO {
     }
 
     private static Iterator<Record> mergeTwo(Iterator<Record> leftIterator, Iterator<Record> rightIterator) {
-        return new Iterator<>() {
-
-            private Record leftRecord;
-            private Record rightRecord;
-
-            @Override
-            public boolean hasNext() {
-                return leftIterator.hasNext() || rightIterator.hasNext();
-            }
-
-            @Override
-            public Record next() {
-
-                if (!hasNext()) {
-                    throw new NoSuchElementException();
-                }
-
-                leftRecord = getNext(leftIterator, leftRecord);
-                rightRecord = getNext(rightIterator, rightRecord);
-
-                if (leftRecord == null) {
-                    return getRight();
-                }
-                if (rightRecord == null) {
-                    return getLeft();
-                }
-
-                int compare = leftRecord.getKey().compareTo(rightRecord.getKey());
-
-                if (compare == 0) {
-                    leftRecord = null;
-                    return getRight();
-                } else if (compare < 0) {
-                    return getLeft();
-                } else {
-                    return getRight();
-                }
-            }
-
-            private Record getRight() {
-                Record tmp = rightRecord;
-                rightRecord = null;
-
-                return tmp;
-            }
-
-            private Record getLeft() {
-                Record tmp = leftRecord;
-                leftRecord = null;
-
-                return tmp;
-            }
-
-            private Record getNext(Iterator<Record> iterator, @Nullable Record current) {
-                if (current != null) {
-                    return current;
-                }
-
-                return iterator.hasNext() ? iterator.next() : null;
-            }
-        };
+        return new MergeIterator(leftIterator, rightIterator);
     }
 }
