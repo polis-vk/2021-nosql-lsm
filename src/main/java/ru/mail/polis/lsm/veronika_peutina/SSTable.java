@@ -74,10 +74,8 @@ class SSTable {
         if (map == null) {
             return;
         }
-
         try {
             CLEAN.invoke(null, map);
-
         } catch (InvocationTargetException | IllegalAccessException e) {
             throw new IOException(e);
         }
