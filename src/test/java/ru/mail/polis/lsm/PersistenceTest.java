@@ -157,31 +157,31 @@ class PersistenceTest {
         }
     }
 
-//    @Test
-//    void hugeRecordsSearch(@TempDir Path data) throws IOException {
-//        // Reference value
-//        int size = 1024 * 1024;
-//        byte[] suffix = sizeBasedRandomData(size);
-//        int recordsCount = (int) (TestDaoWrapper.MAX_HEAP * 15 / size);
-//
-//        prepareHugeDao(data, size, suffix);
-//
-//        // Check
-//        try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
-//            int searchStep = 4;
-//
-//            for (int i = 0; i < recordsCount / searchStep; i++) {
-//                ByteBuffer keyFrom = keyWithSuffix(i * searchStep, suffix);
-//                ByteBuffer keyTo = keyWithSuffix(i * searchStep + searchStep, suffix);
-//
-//                Iterator<Record> range = dao.range(keyFrom, keyTo);
-//                for (int j = 0; j < searchStep; j++) {
-//                    verifyNext(suffix, range, i * searchStep + j);
-//                }
-//                assertFalse(range.hasNext());
-//            }
-//        }
-//    }
+    @Test
+    void hugeRecordsSearch(@TempDir Path data) throws IOException {
+        // Reference value
+        int size = 1024 * 1024;
+        byte[] suffix = sizeBasedRandomData(size);
+        int recordsCount = (int) (TestDaoWrapper.MAX_HEAP * 15 / size);
+
+        prepareHugeDao(data, size, suffix);
+
+        // Check
+        try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
+            int searchStep = 4;
+
+            for (int i = 0; i < recordsCount / searchStep; i++) {
+                ByteBuffer keyFrom = keyWithSuffix(i * searchStep, suffix);
+                ByteBuffer keyTo = keyWithSuffix(i * searchStep + searchStep, suffix);
+
+                Iterator<Record> range = dao.range(keyFrom, keyTo);
+                for (int j = 0; j < searchStep; j++) {
+                    verifyNext(suffix, range, i * searchStep + j);
+                }
+                assertFalse(range.hasNext());
+            }
+        }
+    }
 
     private void verifyNext(byte[] suffix, Iterator<Record> range, int index) {
         ByteBuffer key = keyWithSuffix(index, suffix);
