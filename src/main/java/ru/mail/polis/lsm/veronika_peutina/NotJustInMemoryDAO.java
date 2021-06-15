@@ -6,38 +6,67 @@ import ru.mail.polis.lsm.Record;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
+import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
-import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.util.Iterator;
 import java.util.SortedMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 
 public class NotJustInMemoryDAO implements DAO {
-    private final String SAVE_FILE_NAME = "save.dat";
+    private static final Method CLEAN;
+    static {
+        try {
+            Class<?> aClass = Class.forName("sun.nio.ch.FileChannelImpl");
+            CLEAN = aClass.getDeclaredMethod("unmap", MappedByteBuffer.class);
+            CLEAN.setAccessible(true);
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        }
+    }
     private final SortedMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
     private final DAOConfig config;
+    private final Path saveFileName;
+    private final Path tmpFileName;
 
-    public NotJustInMemoryDAO(DAOConfig config) {
+    private final MappedByteBuffer mmap;
+
+    public NotJustInMemoryDAO(DAOConfig config) throws IOException {
         this.config = config;
-        Path pathFile = config.getDir().resolve(SAVE_FILE_NAME);
-        if (!Files.exists(pathFile)) {
-            return;
+        Path dir = config.getDir();
+        saveFileName = dir.resolve("save.dat");
+        tmpFileName = dir.resolve("tmp.dat");
+        if (!Files.exists(saveFileName)) {
+            if (Files.exists(tmpFileName)) {
+                Files.move(tmpFileName, saveFileName, StandardCopyOption.ATOMIC_MOVE);
+            } else {
+                mmap = null;
+                return;
+            }
         }
 
-        try (FileChannel fileChannel = FileChannel.open(pathFile, StandardOpenOption.READ)) {
-            ByteBuffer byteBuffer = ByteBuffer.allocate(Integer.BYTES);
-            while (fileChannel.position() < fileChannel.size()) {
-                Record record = readRecord(fileChannel, byteBuffer);
-                storage.put(record.getKey(), record);
-            }
+        try (FileChannel channel = FileChannel.open(saveFileName, StandardOpenOption.READ)) {
+            mmap = channel.map(FileChannel.MapMode.READ_ONLY, 0, channel.size());
+            while (mmap.hasRemaining()) {
+                int keySize = mmap.getInt();
+                ByteBuffer key = mmap.slice().limit(keySize).asReadOnlyBuffer();
 
-        } catch (IOException e) {
-            System.out.println("Error with read File");
+                mmap.position(mmap.position() + keySize);
+
+                int valueSize = mmap.getInt();
+                ByteBuffer value = mmap.slice().limit(valueSize).asReadOnlyBuffer();
+
+                mmap.position(mmap.position() + valueSize);
+
+                storage.put(key, Record.of(key, value));
+            }
         }
     }
 
@@ -74,17 +103,29 @@ public class NotJustInMemoryDAO implements DAO {
 
     @Override
     public void close() throws IOException {
-        Files.deleteIfExists(config.getDir().resolve(SAVE_FILE_NAME));
-        Path pathFile = config.getDir().resolve(SAVE_FILE_NAME);
-        try (FileChannel fileChannel = FileChannel.open(pathFile,
-                            StandardOpenOption.WRITE, StandardOpenOption.CREATE_NEW)) {
-            ByteBuffer byteBuffer = ByteBuffer.allocate(Integer.BYTES);
-            for (final Record record : storage.values()) {
-                writeRecord(record, fileChannel, byteBuffer);
+        try (FileChannel fileChannel = FileChannel.open(
+                tmpFileName,
+                StandardOpenOption.CREATE_NEW,
+                StandardOpenOption.WRITE,
+                StandardOpenOption.TRUNCATE_EXISTING
+        )) {
+            ByteBuffer size = ByteBuffer.allocate(Integer.BYTES);
+            for (Record record : storage.values()) {
+                writeRecord(record  , fileChannel, size);
             }
-        } catch (IOException e) {
-            System.out.println("Error with write in File");
+            fileChannel.force(false);
         }
+
+        if (mmap != null) {
+            try {
+                CLEAN.invoke(null, mmap);
+            } catch (IllegalAccessException | InvocationTargetException e) {
+                throw new IOException(e);
+            }
+        }
+
+        Files.deleteIfExists(saveFileName);
+        Files.move(tmpFileName, saveFileName, StandardCopyOption.ATOMIC_MOVE);
     }
 
 
@@ -101,25 +142,5 @@ public class NotJustInMemoryDAO implements DAO {
         channel.write(val);
     }
 
-    private Record readRecord(ReadableByteChannel channel, ByteBuffer tmp) throws IOException {
-        return Record.of(readVal(channel, tmp), readVal(channel, tmp));
-    }
-
-    private ByteBuffer readVal(ReadableByteChannel channel, ByteBuffer tmp) throws IOException {
-        tmp.position(0);
-        channel.read(tmp);
-        tmp.position(0);
-        final ByteBuffer byteBuffer = ByteBuffer.allocate(tmp.getInt());
-      //  channel.read(byteBuffer);
-      //  byteBuffer.position(0);
-        while (channel.read(byteBuffer) > 0) {
-            byteBuffer.flip();
-            while (byteBuffer.hasRemaining()) {
-                channel.read(byteBuffer);
-            }
-        }
-        byteBuffer.position(0);
-        return byteBuffer;
-    }
 
 }
