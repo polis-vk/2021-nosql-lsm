@@ -39,7 +39,7 @@ public class Record {
     public int size() {
         byte sizePrefix = Integer.BYTES * 2;
         int sizeOfKey = sizeOf(key);
-        int sizeOfValue = sizeOf(value);
+        int sizeOfValue = isTombstone() ? 0 : sizeOf(value);
         return sizePrefix + sizeOfKey + sizeOfValue;
     }
 

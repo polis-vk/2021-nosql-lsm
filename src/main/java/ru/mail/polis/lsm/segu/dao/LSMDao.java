@@ -10,10 +10,14 @@ import ru.mail.polis.lsm.segu.service.SSTableService;
 import javax.annotation.Nullable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Deque;
 import java.util.Iterator;
 import java.util.SortedMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.stream.Stream;
 
 /**
  * Implementation of NotInMemory DAO.
@@ -23,13 +27,13 @@ public class LSMDao implements DAO {
 
     private final SSTableService ssTableService = new SSTableService();
 
-    private final ConcurrentLinkedDeque<SSTable> ssTables = new ConcurrentLinkedDeque<>();
+    private final Deque<SSTable> ssTables = new ConcurrentLinkedDeque<>();
     private final SortedMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
     private int storageSize;
 
     private final DAOConfig config;
 
-    private static final int DEFAULT_THRESHOLD = 1024 * 1024 * 500; // 500 MB
+    private static final int DEFAULT_THRESHOLD = 1024 * 1024 * 30; // 500 MB
     private final int threshold;
     private int ssTableNextIndex = 0;
 
@@ -40,20 +44,30 @@ public class LSMDao implements DAO {
      * @param config - конфиг
      */
 
-    public LSMDao(DAOConfig config) {
+    public LSMDao(DAOConfig config) throws IOException {
         this(config, DEFAULT_THRESHOLD);
     }
 
-    public LSMDao(DAOConfig config, int threshold) {
+    public LSMDao(DAOConfig config, int threshold) throws IOException {
         this.config = config;
         this.threshold = threshold;
+        initTables();
+    }
+
+    private void initTables() throws IOException {
+        try (Stream<Path> stream = Files.list(config.getDir())) {
+            stream.filter(file -> !Files.isDirectory(file))
+                    .map(SSTable::new)
+                    .forEach(ssTables::add);
+        }
     }
 
     @Override
     public Iterator<Record> range(@Nullable final ByteBuffer fromKey, @Nullable final ByteBuffer toKey) {
-        return map(fromKey, toKey).values().stream()
+        Iterator<Record> currentIterator = map(fromKey, toKey).values().stream()
                 .filter(record -> record.getValue() != null)
                 .iterator();
+        return ssTableService.getRange(ssTables, currentIterator, fromKey, toKey);
     }
 
     @Override
@@ -86,9 +100,9 @@ public class LSMDao implements DAO {
         SSTablePath ssTablePath = ssTableService.resolvePath(config,
                 ssTableNextIndex, SSTable.FILE_PREFIX, SSTable.INDEX_FILE_PREFIX);
         ssTableNextIndex++;
-        SSTable ssTable = new SSTable(ssTablePath.getFilePath(), ssTablePath.getIndexFilePath(), storage);
+        SSTable ssTable = new SSTable(ssTablePath.getFilePath(), ssTablePath.getIndexFilePath());
+        ssTableService.writeTableAndIndexFile(ssTable, storage.values());
         ssTables.add(ssTable);
-        ssTableService.writeTableAndIndexFile(ssTable);
     }
 
     private void clear() {
@@ -108,6 +122,4 @@ public class LSMDao implements DAO {
         }
         return storage.subMap(fromKey, toKey);
     }
-
-
 }

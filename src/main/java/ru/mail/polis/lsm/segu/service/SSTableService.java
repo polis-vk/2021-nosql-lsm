@@ -1,5 +1,6 @@
 package ru.mail.polis.lsm.segu.service;
 
+import ru.mail.polis.lsm.DAO;
 import ru.mail.polis.lsm.DAOConfig;
 import ru.mail.polis.lsm.Record;
 import ru.mail.polis.lsm.segu.model.IndexRecord;
@@ -15,9 +16,8 @@ import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.TreeMap;
+import java.util.*;
+import java.util.stream.Collectors;
 
 public class SSTableService {
 
@@ -37,11 +37,44 @@ public class SSTableService {
 
     private final ByteBuffer defaultIntBuffer = ByteBuffer.allocate(Integer.BYTES);
 
+    public void writeTableAndIndexFile(SSTable ssTable, Collection<Record> storage) throws IOException {
+        int index = 0;
+        int currentOffset = 0;
+        try (FileChannel fileChannel = FileChannel.open(ssTable.getFilePath(),
+                StandardOpenOption.TRUNCATE_EXISTING,
+                StandardOpenOption.CREATE,
+                StandardOpenOption.WRITE)) {
 
-    public Iterator<Record> loadTableFile(SSTable ssTable) throws IOException {
-        TreeMap<ByteBuffer, Record> resultMap = new TreeMap<>();
+            for (final Record record : storage) {
+                ByteBuffer recordKey = record.getKey();
+                ByteBuffer recordValue = record.getValue();
+
+                writeValueToTableFile(fileChannel, recordKey);
+                writeValueToTableFile(fileChannel, recordValue);
+
+                IndexRecord indexRecord = new IndexRecord(index, currentOffset);
+                //writeValueToIndexFile(indexFileChannel, indexRecord); // Currently not implemented
+
+                index++;
+                currentOffset += record.size();
+            }
+        }
+    }
+
+    public Iterator<Record> getRange(Deque<SSTable> ssTablesDeque,
+                                     Iterator<Record> rangedStorageIterator, ByteBuffer from, ByteBuffer to) {
+        List<Iterator<Record>> rangeIterators = ssTablesDeque.stream()
+                .map(ssTable -> getRange(ssTable, from, to))
+                .collect(Collectors.toList());
+        rangeIterators.add(rangedStorageIterator);
+        return DAO.merge(rangeIterators);
+    }
+
+    private Iterator<Record> getRange(SSTable ssTable, ByteBuffer from, ByteBuffer to) {
+        SortedMap<ByteBuffer, Record> resultMap = new TreeMap<>();
         try (FileChannel fileChannel = FileChannel.open(ssTable.getFilePath(), StandardOpenOption.READ)) {
             mappedByteBuffer = fileChannel.map(FileChannel.MapMode.READ_ONLY, 0, fileChannel.size());
+
             while (mappedByteBuffer.hasRemaining()) {
                 int keySize = mappedByteBuffer.getInt();
                 ByteBuffer key = mappedByteBuffer.slice().limit(keySize).asReadOnlyBuffer();
@@ -50,49 +83,41 @@ public class SSTableService {
 
                 int valueSize = mappedByteBuffer.getInt();
 
-                if (valueSize < 0) {
-                    resultMap.put(key, Record.tombstone(key));
-                } else {
+                if (!isInRange(key, from, to)) {
+                    if (valueSize >= 0) {
+                        mappedByteBuffer.position(mappedByteBuffer.position() + valueSize);
+                    }
+                    continue;
+                }
+
+                if (valueSize >= 0) {
                     ByteBuffer value = mappedByteBuffer.slice().limit(valueSize).asReadOnlyBuffer();
                     resultMap.put(key, Record.of(key, value));
+                } else {
+                    continue;
                 }
                 if (mappedByteBuffer.hasRemaining()) {
                     mappedByteBuffer.position(mappedByteBuffer.position() + valueSize);
                 }
             }
+
+
+        } catch (IOException e) {
+            e.printStackTrace();
+            System.err.println("Failed getting range");
         }
-        cleanMappedByteBuffer(mappedByteBuffer);
-        return Collections.emptyIterator();
+        return resultMap.values().iterator();
     }
 
-    public void writeTableAndIndexFile(SSTable ssTable) throws IOException {
-        int index = 0;
-        int currentOffset = 0;
-        try (FileChannel fileChannel = FileChannel.open(ssTable.getFilePath(),
-                StandardOpenOption.TRUNCATE_EXISTING,
-                StandardOpenOption.CREATE,
-                StandardOpenOption.WRITE);
-             FileChannel indexFileChannel = FileChannel.open(ssTable.getIndexFilePath(),
-                     StandardOpenOption.TRUNCATE_EXISTING,
-                     StandardOpenOption.CREATE,
-                     StandardOpenOption.WRITE)) {
-
-            for (final Record record : ssTable.getStorage().values()) {
-                ByteBuffer recordKey = record.getKey();
-                ByteBuffer recordValue = record.getValue();
-
-                writeValueToTableFile(fileChannel, recordKey);
-                writeValueToTableFile(fileChannel, recordValue);
-
-                IndexRecord indexRecord = new IndexRecord(index, currentOffset);
-                writeValueToIndexFile(indexFileChannel, indexRecord);
-
-                index++;
-                currentOffset += record.size();
-            }
+    private boolean isInRange(ByteBuffer key, ByteBuffer from, ByteBuffer to) {
+        if (from == null && to == null) {
+            return true;
+        } else if (to == null) {
+            return key.compareTo(from) >= 0;
+        } else if (from == null) {
+            return key.compareTo(to) < 0;
         }
-
-
+        return key.compareTo(from) >= 0 && key.compareTo(to) < 0;
     }
 
     private void writeValueToTableFile(FileChannel fileChannel, @Nullable ByteBuffer valueBuffer) throws IOException {

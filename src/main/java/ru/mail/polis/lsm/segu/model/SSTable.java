@@ -1,10 +1,6 @@
 package ru.mail.polis.lsm.segu.model;
 
-import ru.mail.polis.lsm.Record;
-
-import java.nio.ByteBuffer;
 import java.nio.file.Path;
-import java.util.SortedMap;
 
 public class SSTable {
 
@@ -14,13 +10,14 @@ public class SSTable {
     private final Path indexFilePath;
     private final Path filePath;
 
-    private final SortedMap<ByteBuffer, Record> storage;
 
-
-    public SSTable(Path filePath, Path indexFilePath, SortedMap<ByteBuffer, Record> storage) {
+    public SSTable(Path filePath, Path indexFilePath) {
         this.filePath = filePath;
         this.indexFilePath = indexFilePath;
-        this.storage = storage;
+    }
+
+    public SSTable(Path filePath) {
+        this(filePath, null);
     }
 
     public Path getIndexFilePath() {
@@ -29,10 +26,6 @@ public class SSTable {
 
     public Path getFilePath() {
         return filePath;
-    }
-
-    public SortedMap<ByteBuffer, Record> getStorage() {
-        return storage;
     }
 
 }
