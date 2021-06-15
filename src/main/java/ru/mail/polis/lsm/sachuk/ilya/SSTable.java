@@ -260,16 +260,27 @@ class SSTable {
         private int positionToStartRead;
         private ByteBuffer keyToRead;
         private String keyToReadString;
+        private boolean readToEnd = false;
 
         SSTableIterator(int positionToStartRead, ByteBuffer keyToRead) {
             this.positionToStartRead = positionToStartRead;
             this.keyToRead = keyToRead;
-            this.keyToReadString = byteBufferToString(keyToRead);
+            this.keyToReadString = keyToRead == null ? null : byteBufferToString(keyToRead);
+
+            readToEnd = keyToRead == null;
+
+            mappedByteBuffer.position(positionToStartRead);
+
+
         }
 
         @Override
         public boolean hasNext() {
             try {
+                if (readToEnd) {
+                    return mappedByteBuffer.hasRemaining();
+                }
+
                 return mappedByteBuffer.hasRemaining() && getNextKey().compareTo(keyToReadString) < 0;
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
