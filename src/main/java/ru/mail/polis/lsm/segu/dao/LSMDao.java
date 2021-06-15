@@ -33,7 +33,7 @@ public class LSMDao implements DAO {
 
     private final DAOConfig config;
 
-    private static final int DEFAULT_THRESHOLD = 1024 * 1024 * 30; // 500 MB
+    private static final int DEFAULT_THRESHOLD = 1024 * 1024 * 10; // 500 MB
     private final int threshold;
     private int ssTableNextIndex = 0;
 
@@ -49,7 +49,8 @@ public class LSMDao implements DAO {
 
     /**
      * Constructor of LSMDao.
-     * @param config - Dao config
+     *
+     * @param config    - Dao config
      * @param threshold - threshold
      * @throws IOException - it throws IO exception
      */

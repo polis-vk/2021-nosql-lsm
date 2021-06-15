@@ -3,7 +3,6 @@ package ru.mail.polis.lsm.segu.service;
 import ru.mail.polis.lsm.DAO;
 import ru.mail.polis.lsm.DAOConfig;
 import ru.mail.polis.lsm.Record;
-import ru.mail.polis.lsm.segu.model.IndexRecord;
 import ru.mail.polis.lsm.segu.model.SSTable;
 import ru.mail.polis.lsm.segu.model.SSTablePath;
 
@@ -16,7 +15,12 @@ import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
-import java.util.*;
+import java.util.Collection;
+import java.util.Deque;
+import java.util.Iterator;
+import java.util.List;
+import java.util.SortedMap;
+import java.util.TreeMap;
 import java.util.stream.Collectors;
 
 public class SSTableService {
@@ -45,8 +49,6 @@ public class SSTableService {
      * @throws IOException - it throws IO exception
      */
     public void writeTable(SSTable ssTable, Collection<Record> storage) throws IOException {
-        int index = 0;
-        int currentOffset = 0;
         try (FileChannel fileChannel = FileChannel.open(ssTable.getFilePath(),
                 StandardOpenOption.TRUNCATE_EXISTING,
                 StandardOpenOption.CREATE,
@@ -58,12 +60,6 @@ public class SSTableService {
 
                 writeValueToTableFile(fileChannel, recordKey);
                 writeValueToTableFile(fileChannel, recordValue);
-
-                //IndexRecord indexRecord = new IndexRecord(index, currentOffset);
-                //writeValueToIndexFile(indexFileChannel, indexRecord); // Currently not implemented
-
-                index++;
-                currentOffset += record.size();
             }
         }
     }
@@ -116,7 +112,6 @@ public class SSTableService {
                     mappedByteBuffer.position(mappedByteBuffer.position() + valueSize);
                 }
             }
-            cleanMappedByteBuffer(mappedByteBuffer);
         } catch (IOException e) {
             e.printStackTrace();
             System.err.println("Failed getting range");
