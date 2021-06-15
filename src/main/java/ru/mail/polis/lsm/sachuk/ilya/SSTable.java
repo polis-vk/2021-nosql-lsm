@@ -3,6 +3,7 @@ package ru.mail.polis.lsm.sachuk.ilya;
 import ru.mail.polis.lsm.Record;
 
 import javax.annotation.Nullable;
+import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.lang.reflect.Field;
@@ -13,8 +14,13 @@ import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.WritableByteChannel;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
@@ -59,7 +65,8 @@ class SSTable {
             savePaths = streamPaths.filter(path -> path.toString().endsWith(".save"))
                     .collect(Collectors.toList())
                     .stream()
-                    .sorted()
+                    .sorted(Comparator.comparing(o -> getFileNumber(o, ".save")))
+                    .collect(Collectors.toList())
                     .iterator();
         }
 
@@ -67,7 +74,8 @@ class SSTable {
             indexPaths = streamPaths.filter(path -> path.toString().endsWith(".index"))
                     .collect(Collectors.toList())
                     .stream()
-                    .sorted()
+                    .sorted(Comparator.comparing(o -> getFileNumber(o, ".index")))
+                    .collect(Collectors.toList())
                     .iterator();
         }
 
@@ -231,6 +239,31 @@ class SSTable {
 
     private String byteBufferToString(ByteBuffer buffer) {
         return StandardCharsets.UTF_8.decode(buffer).toString();
+    }
+
+    private static Integer getFileNumber(Path path, String endFile) {
+        String stringPath = path.toString();
+
+        int lastSlash = 0;
+
+        for (int i = 0; i < stringPath.length(); i++) {
+            if (stringPath.charAt(i) == File.separatorChar) {
+                lastSlash = i;
+            }
+        }
+
+        stringPath = stringPath.substring(lastSlash + 1);
+
+        int firstNumberIndex = 0;
+
+        for (int i = 0; i < stringPath.length(); i++) {
+            if (Character.isDigit(stringPath.charAt(i))) {
+                firstNumberIndex = i;
+                break;
+            }
+        }
+
+        return Integer.parseInt(stringPath.substring(firstNumberIndex, stringPath.length() - endFile.length()));
     }
 
     class SSTableIterator implements Iterator<Record> {

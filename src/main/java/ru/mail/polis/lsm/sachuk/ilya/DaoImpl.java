@@ -17,7 +17,6 @@ import java.util.NoSuchElementException;
 import java.util.SortedMap;
 import java.util.Spliterator;
 import java.util.Spliterators;
-import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.stream.StreamSupport;
 
@@ -27,7 +26,7 @@ public class DaoImpl implements DAO {
 
     private final DAOConfig config;
     private final SortedMap<ByteBuffer, Record> memoryStorage = new ConcurrentSkipListMap<>();
-    private final ConcurrentLinkedDeque<SSTable> ssTables = new ConcurrentLinkedDeque<>();
+    private final List<SSTable> ssTables = new ArrayList<>();
 
     private long memoryConsumption = 0;
     private int nextSSTableNumber;
@@ -56,7 +55,6 @@ public class DaoImpl implements DAO {
                 throw new UncheckedIOException(e);
             }
             Iterator<Record> memoryRange = map(fromKey, toKey).values().iterator();
-
             return StreamSupport
                     .stream(Spliterators.spliteratorUnknownSize(mergeTwo(ssTableRanges, memoryRange), Spliterator.ORDERED), false)
                     .filter(record -> !record.isTombstone())
@@ -82,7 +80,10 @@ public class DaoImpl implements DAO {
 
     @Override
     public void close() throws IOException {
-        flush();
+
+        if (memoryConsumption > 0) {
+            flush();
+        }
 
         for (SSTable ssTable : ssTables) {
             ssTable.close();
