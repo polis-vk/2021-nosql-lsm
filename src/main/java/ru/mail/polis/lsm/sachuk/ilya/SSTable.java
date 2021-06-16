@@ -38,6 +38,7 @@ class SSTable {
 
     private static final String TMP_FILE = "TMP";
     private static final String NULL_VALUE = "NULL_VALUE";
+    private static final ByteBuffer bb = ByteBuffer.wrap(NULL_VALUE.getBytes(StandardCharsets.UTF_8));
 
     private final Path savePath;
     private final Path indexPath;
@@ -55,7 +56,7 @@ class SSTable {
 
     Iterator<Record> range(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) throws IOException {
 
-        if (fromKey != null && toKey != null && byteBufferToString(fromKey).compareTo(byteBufferToString(toKey)) == 0) {
+        if (fromKey != null && toKey != null && fromKey.compareTo(toKey) == 0) {
             return Collections.emptyIterator();
         }
 
@@ -156,8 +157,6 @@ class SSTable {
         int start = 0;
         int end = indexList.size() - 1;
 
-        String keyStringToFind = byteBufferToString(keyToFind);
-
         int positionToRead;
 
         int middle = (start + end) / 2;
@@ -172,14 +171,12 @@ class SSTable {
 
             ByteBuffer key = readFromFile(mappedByteBuffer);
 
-            String keyString = byteBufferToString(key);
-
-            if (keyStringToFind.compareTo(keyString) == 0) {
+            if (keyToFind.compareTo(key) == 0) {
                 return positionToRead;
-            } else if (keyStringToFind.compareTo(keyString) > 0) {
+            } else if (keyToFind.compareTo(key) > 0) {
                 start = middle + 1;
 
-                if (start > end && keyStringToFind.compareTo(keyString) > 0) {
+                if (start > end && keyToFind.compareTo(key) > 0) {
 
                     if (start == indexList.size()) {
                         return -1;
@@ -250,13 +247,6 @@ class SSTable {
         }
     }
 
-    private String byteBufferToString(ByteBuffer buffer) {
-        buffer.position(0);
-        String value = StandardCharsets.UTF_8.decode(buffer).toString();
-        buffer.position(0);
-        return value;
-    }
-
     private static Iterator<Path> getPathIterator(Path dir, String pathEnd) throws IOException {
         Iterator<Path> paths;
         try (Stream<Path> streamPaths = Files.walk(Paths.get(dir.toUri()))) {
@@ -296,11 +286,11 @@ class SSTable {
     }
 
     class SSTableIterator implements Iterator<Record> {
-        private final String keyToReadString;
+        private final ByteBuffer keyToRead;
         private final boolean readToEnd;
 
         SSTableIterator(int positionToStartRead, ByteBuffer keyToRead) {
-            this.keyToReadString = keyToRead == null ? null : byteBufferToString(keyToRead);
+            this.keyToRead = keyToRead;
 
             readToEnd = keyToRead == null;
 
@@ -318,7 +308,7 @@ class SSTable {
                     return mappedByteBuffer.hasRemaining();
                 }
 
-                return mappedByteBuffer.hasRemaining() && getNextKey().compareTo(keyToReadString) < 0;
+                return mappedByteBuffer.hasRemaining() && getNextKey().compareTo(keyToRead) < 0;
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }
@@ -335,7 +325,7 @@ class SSTable {
                 ByteBuffer key = readFromFile(mappedByteBuffer);
                 ByteBuffer value = readFromFile(mappedByteBuffer);
 
-                if (byteBufferToString(value).compareTo(NULL_VALUE) == 0) {
+                if (value.compareTo(bb) == 0) {
                     record = Record.tombstone(key);
                 } else {
                     value.position(0);
@@ -347,14 +337,13 @@ class SSTable {
             return record;
         }
 
-        private String getNextKey() throws IOException {
+        private ByteBuffer getNextKey() throws IOException {
             int currentPos = mappedByteBuffer.position();
 
             ByteBuffer key = readFromFile(mappedByteBuffer);
-            String stringKey = byteBufferToString(key);
             mappedByteBuffer.position(currentPos);
 
-            return stringKey;
+            return key;
         }
     }
 }
