@@ -83,6 +83,13 @@ public class DaoImpl implements DAO {
     }
 
     @Override
+    public void compact() {
+        Iterator<Record> iterator = range(null, null);
+
+
+    }
+
+    @Override
     public void close() throws IOException {
 
         if (memoryConsumption > 0) {

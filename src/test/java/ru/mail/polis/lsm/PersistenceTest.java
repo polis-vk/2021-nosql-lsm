@@ -7,7 +7,10 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Iterator;
+import java.util.SortedMap;
+import java.util.TreeMap;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -185,8 +188,62 @@ class PersistenceTest {
 
     @Test
     void compact(@TempDir Path data) throws IOException {
-        DAO dao = TestDaoWrapper.create(new DAOConfig(data));
-        dao.compact();
+
+//        ByteBuffer key = wrap("SOME_KEY");
+//        ByteBuffer value = wrap("SOME_VALUE");
+
+//        SortedMap<ByteBuffer, Record> treeMap = new TreeMap<>();
+
+        SortedMap<ByteBuffer, Record> treeMap = new TreeMap<>();
+
+
+        try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
+            for (int i = 0; i < 5; i++) {
+                ByteBuffer key = wrap("SOME_KEY" + i);
+                ByteBuffer value = wrap("SOME_VALUE" + i);
+
+                dao.upsert(Record.of(key, value));
+            }
+        }
+
+        try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
+            for (int i = 5; i < 10; i++) {
+                ByteBuffer key = wrap("SOME_KEY" + i);
+                ByteBuffer value = wrap("SOME_VALUE" + i);
+
+                dao.upsert(Record.of(key, value));
+            }
+        }
+
+        try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
+            for (int i = 0; i < 10; i++) {
+                if (i % 2 != 0) {
+                    continue;
+                }
+
+                ByteBuffer key = wrap("SOME_KEY" + i);
+                ByteBuffer value = wrap("SOME_VALUE" + i);
+
+                Record record = Record.of(key, value);
+
+                dao.upsert(record);
+                treeMap.put(key, record);
+            }
+        }
+
+        int fileNumberBeforeCompact = (int) Files.walk(Paths.get(data.toUri())).count();
+
+        try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
+            dao.compact();
+        }
+
+        int fileNumberAfterCompact = (int) Files.walk(Paths.get(data.toUri())).count();
+
+
+        try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
+            assertTrue(fileNumberBeforeCompact > fileNumberAfterCompact);
+            assertEquals(treeMap.values().iterator(), dao.range(null, null));
+        }
     }
 
     private void verifyNext(byte[] suffix, Iterator<Record> range, int index) {
