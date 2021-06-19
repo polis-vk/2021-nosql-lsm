@@ -3,6 +3,7 @@ package ru.mail.polis.lsm.shabinsky;
 import ru.mail.polis.lsm.Record;
 
 import javax.annotation.Nullable;
+import java.io.Closeable;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -19,7 +20,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
 
-public class SSTable {
+public class SSTable implements Closeable {
 
     public static final String NAME = "sstable_";
     public static final String IDX = "_idx";
@@ -84,20 +85,37 @@ public class SSTable {
     public static SSTable write(Iterator<Record> records, Path path, String fileName) throws IOException {
         Path saveFileName = path.resolve(fileName + SAVE);
         Path tmpFileName = path.resolve(fileName + TEMP);
+        Path saveIdxFileName = path.resolve(fileName + IDX + SAVE);
+        Path tmpIdxFileName = path.resolve(fileName + IDX + TEMP);
 
-        List<Integer> offsets = new ArrayList<>();
-        try (FileChannel fileChannel = FileChannel.open(
-            tmpFileName,
-            StandardOpenOption.CREATE_NEW,
-            StandardOpenOption.WRITE,
-            StandardOpenOption.TRUNCATE_EXISTING
-        )) {
+        try (
+
+            FileChannel fileChannel = FileChannel.open(
+                tmpFileName,
+                StandardOpenOption.CREATE_NEW,
+                StandardOpenOption.WRITE,
+                StandardOpenOption.TRUNCATE_EXISTING);
+
+            FileChannel indexChannel = FileChannel.open(
+                tmpIdxFileName,
+                StandardOpenOption.CREATE_NEW,
+                StandardOpenOption.WRITE,
+                StandardOpenOption.TRUNCATE_EXISTING)
+        ) {
+
             ByteBuffer size = ByteBuffer.allocate(Integer.BYTES);
             int offset = 0;
+            int countOffset = 0;
 
             while (records.hasNext()) {
-                offsets.add(offset);
 
+                // index
+                ByteBuffer buffer = ByteBuffer.allocate(Integer.BYTES).putInt(offset);
+                buffer.position(0);
+                indexChannel.write(buffer);
+                countOffset++;
+
+                // records
                 Record record = records.next();
                 writeInt(record.getKey(), fileChannel, size);
                 writeInt(record.getValue(), fileChannel, size);
@@ -108,35 +126,18 @@ public class SSTable {
                 if (!record.isTombstone()) offset += record.getValue().remaining();
             }
 
+            // index
+            ByteBuffer buffer = ByteBuffer.allocate(Integer.BYTES).putInt(countOffset);
+            buffer.position(0);
+            indexChannel.write(buffer);
+
             fileChannel.force(false);
+            indexChannel.force(false);
         }
         Files.deleteIfExists(saveFileName);
         Files.move(tmpFileName, saveFileName, StandardCopyOption.ATOMIC_MOVE);
-
-        Path saveIdxFileName = path.resolve(fileName + IDX + SAVE);
-        Path tmpIdxFileName = path.resolve(fileName + IDX + TEMP);
-
-        try (FileChannel fileChannel = FileChannel.open(
-            tmpIdxFileName,
-            StandardOpenOption.CREATE_NEW,
-            StandardOpenOption.WRITE,
-            StandardOpenOption.TRUNCATE_EXISTING
-        )) {
-            for (Integer off : offsets) {
-                ByteBuffer buffer = ByteBuffer.allocate(Integer.BYTES).putInt(off);
-                buffer.position(0);
-                fileChannel.write(buffer);
-            }
-
-            ByteBuffer buffer = ByteBuffer.allocate(Integer.BYTES).putInt(offsets.size());
-            buffer.position(0);
-            fileChannel.write(buffer);
-
-            fileChannel.force(false);
-        }
         Files.deleteIfExists(saveIdxFileName);
         Files.move(tmpIdxFileName, saveIdxFileName, StandardCopyOption.ATOMIC_MOVE);
-
         return new SSTable(path, fileName);
     }
 
@@ -217,7 +218,7 @@ public class SSTable {
 
         @Override
         public boolean hasNext() {
-            return currentPos <= endPos;
+            return currentPos < endPos;
         }
 
         @Override
@@ -259,31 +260,27 @@ public class SSTable {
 
     private int findPos(@Nullable ByteBuffer key, boolean isStart) {
         if (key == null && isStart) return 0;
-        if (key == null) return this.count - 1;
+        if (key == null) return this.count;
 
-        int result = -10;
-        int low = 0;
-        int high = this.count - 1;
+        int left = 0;
+        int right = this.count;
 
-        while (low <= high) {
-            int mid = (low + high) / 2;
+        while (left < right) {
+            int mid = left + ((right - left) >>> 1);
 
             ByteBuffer keyMid = getRecord(mid).getKey();
             int compare = keyMid.compareTo(key);
 
             if (compare < 0) {
-                low = mid + 1;
+                left = mid + 1;
             } else if (compare > 0) {
-                high = mid - 1;
+                right = mid;
             } else {
-                result = mid;
-                break;
+                return mid;
             }
         }
 
-        if (result != -10) return result;
-        if (!isStart) return low - 1;
-        return low;
+        return left;
     }
 
     /**
@@ -291,10 +288,33 @@ public class SSTable {
      *
      * @throws IOException exception
      */
+    @Override
     public void close() throws IOException {
+        IOException exception = null;
         try {
-            if (mmapRec != null) CLEAN.invoke(null, mmapRec);
-            if (mmapOffsets != null) CLEAN.invoke(null, mmapOffsets);
+            free(mmapRec);
+        } catch (Throwable t) {
+            exception = new IOException(t);
+        }
+
+        try {
+            free(mmapOffsets);
+        } catch (Throwable t) {
+            if (exception == null) {
+                exception = new IOException(t);
+            } else {
+                exception.addSuppressed(t);
+            }
+        }
+
+        if (exception != null) {
+            throw exception;
+        }
+    }
+
+    private static void free(MappedByteBuffer buffer) throws IOException {
+        try {
+            CLEAN.invoke(null, buffer);
         } catch (IllegalAccessException | InvocationTargetException e) {
             throw new IOException(e);
         }

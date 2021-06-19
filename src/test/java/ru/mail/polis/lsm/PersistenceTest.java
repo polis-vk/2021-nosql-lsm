@@ -170,12 +170,12 @@ class PersistenceTest {
         try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
             int searchStep = 4;
 
-            for (int i = 0; i < recordsCount / searchStep - 1; i++) {
+            for (int i = 0; i < recordsCount / searchStep; i++) {
                 ByteBuffer keyFrom = keyWithSuffix(i * searchStep, suffix);
                 ByteBuffer keyTo = keyWithSuffix(i * searchStep + searchStep, suffix);
 
                 Iterator<Record> range = dao.range(keyFrom, keyTo);
-                for (int j = 0; j <= searchStep; j++) {
+                for (int j = 0; j < searchStep; j++) {
                     verifyNext(suffix, range, i * searchStep + j);
                 }
                 assertFalse(range.hasNext());
