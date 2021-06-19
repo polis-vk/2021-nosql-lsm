@@ -6,9 +6,14 @@ import ru.mail.polis.lsm.Record;
 import ru.mail.polis.lsm.sachuk.ilya.iterators.MergeIterator;
 
 import javax.annotation.Nullable;
+import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.WritableByteChannel;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
@@ -18,6 +23,8 @@ import java.util.SortedMap;
 import java.util.Spliterator;
 import java.util.Spliterators;
 import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
 public class DaoImpl implements DAO {
@@ -27,6 +34,7 @@ public class DaoImpl implements DAO {
     private final DAOConfig config;
     private final SortedMap<ByteBuffer, Record> memoryStorage = new ConcurrentSkipListMap<>();
     private final List<SSTable> ssTables = new ArrayList<>();
+    private final String TMP_FILE_TO_COMPACT = "TMP_FILE_TO_COMPACT";
 
     private long memoryConsumption;
     private int nextSSTableNumber;
@@ -83,10 +91,41 @@ public class DaoImpl implements DAO {
     }
 
     @Override
-    public void compact() {
-        Iterator<Record> iterator = range(null, null);
+    public void compact() throws IOException {
+        synchronized (this) {
+            Iterator<Record> iterator = range(null, null);
+
+            SSTable ssTable = SSTable.save(iterator, config.getDir(), nextSSTableNumber++);
+
+            Path indexPath = ssTable.getIndexPath();
+            Path savePath = ssTable.getSavePath();
+
+            String indexFile = indexPath.getFileName().toString();
+            String saveFile = savePath.getFileName().toString();
 
 
+            List<SSTable> filteredSSTables = ssTables.stream()
+                    .filter(ssTable1 -> ssTable1.getIndexPath().getFileName().toString().compareTo(indexFile) != 0
+                            && ssTable1.getSavePath().getFileName().toString().compareTo(saveFile) != 0)
+                    .collect(Collectors.toList());
+
+            for (SSTable filteredSSTable : filteredSSTables) {
+                filteredSSTable.close();
+            }
+
+            try (Stream<Path> paths = Files.walk(config.getDir())) {
+                paths.filter(Files::isRegularFile)
+                        .map(Path::toFile)
+                        .filter(file -> file.getName().compareTo(indexFile) != 0 && file.getName().compareTo(saveFile) != 0)
+                        .forEach(File::delete);
+            }
+
+            ssTables.clear();
+            ssTables.add(ssTable);
+
+            Files.move(ssTable.getIndexPath(), config.getDir().resolve(SSTable.FIRST_INDEX_FILE), StandardCopyOption.ATOMIC_MOVE);
+            Files.move(ssTable.getSavePath(), config.getDir().resolve(SSTable.FIRST_SAVE_FILE), StandardCopyOption.ATOMIC_MOVE);
+        }
     }
 
     @Override
@@ -96,6 +135,18 @@ public class DaoImpl implements DAO {
             flush();
         }
 
+        closeSSTables();
+    }
+
+    private static void writeSizeAndValue(ByteBuffer value, WritableByteChannel channel, ByteBuffer tmp) throws IOException {
+        tmp.position(0);
+        tmp.putInt(value.remaining());
+        tmp.position(0);
+        channel.write(tmp);
+        channel.write(value);
+    }
+
+    private void closeSSTables() throws IOException {
         for (SSTable ssTable : ssTables) {
             ssTable.close();
         }
@@ -140,6 +191,14 @@ public class DaoImpl implements DAO {
         return 8 + record.getKey().capacity() + (record.isTombstone() ? 0 : record.getKey().capacity());
     }
 
+    private void clearDir() throws IOException {
+        try (Stream<Path> paths = Files.walk(config.getDir())) {
+            paths.filter(Files::isRegularFile)
+                    .map(Path::toFile)
+                    .forEach(File::delete);
+        }
+    }
+
     /**
      * Method that merge iterators and return iterator.
      *
@@ -166,3 +225,16 @@ public class DaoImpl implements DAO {
         return new MergeIterator(leftIterator, rightIterator);
     }
 }
+
+//            Path pathToCompact = Path.of(TMP_FILE_TO_COMPACT);
+//
+//            Iterator<Record> iterator = range(null, null);
+//
+//
+//
+//            Path pathToNewFirstFile = Path.of();
+//
+//            Files.move(pathToCompact, , StandardCopyOption.ATOMIC_MOVE);
+//
+//            ssTables.addAll(SSTable.loadFromDir(config.getDir()));
+//            nextSSTableNumber = ssTables.size();

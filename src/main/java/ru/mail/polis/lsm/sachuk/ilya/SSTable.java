@@ -30,6 +30,9 @@ import java.util.stream.Stream;
 
 class SSTable {
 
+    static final String FIRST_SAVE_FILE = "SSTABLE0.save";
+    static final String FIRST_INDEX_FILE = "INDEX0.index";
+
     private static final String SAVE_FILE = "SSTABLE";
     private static final String SAVE_FILE_END = ".save";
 
@@ -146,6 +149,14 @@ class SSTable {
             indexList.clear();
         }
 
+    }
+
+    public Path getSavePath() {
+        return savePath;
+    }
+
+    public Path getIndexPath() {
+        return indexPath;
     }
 
     private int binarySearchKey(List<Long> indexList, ByteBuffer keyToFind) throws IOException {

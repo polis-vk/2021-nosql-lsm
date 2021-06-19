@@ -189,12 +189,7 @@ class PersistenceTest {
     @Test
     void compact(@TempDir Path data) throws IOException {
 
-//        ByteBuffer key = wrap("SOME_KEY");
-//        ByteBuffer value = wrap("SOME_VALUE");
-
-//        SortedMap<ByteBuffer, Record> treeMap = new TreeMap<>();
-
-        SortedMap<ByteBuffer, Record> treeMap = new TreeMap<>();
+        SortedMap<ByteBuffer, ByteBuffer> treeMap = new TreeMap<>();
 
 
         try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
@@ -217,17 +212,16 @@ class PersistenceTest {
 
         try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
             for (int i = 0; i < 10; i++) {
-                if (i % 2 != 0) {
-                    continue;
-                }
-
                 ByteBuffer key = wrap("SOME_KEY" + i);
                 ByteBuffer value = wrap("SOME_VALUE" + i);
 
-                Record record = Record.of(key, value);
+                if (i % 2 != 0) {
+                    treeMap.put(key, value);
+                    continue;
+                }
 
+                Record record = Record.tombstone(key);
                 dao.upsert(record);
-                treeMap.put(key, record);
             }
         }
 
@@ -242,7 +236,8 @@ class PersistenceTest {
 
         try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
             assertTrue(fileNumberBeforeCompact > fileNumberAfterCompact);
-            assertEquals(treeMap.values().iterator(), dao.range(null, null));
+            Utils.assertEquals(dao.range(null, null), treeMap.entrySet());
+//            assertEquals(treeMap.values().iterator(), dao.range(null, null));
         }
     }
 
