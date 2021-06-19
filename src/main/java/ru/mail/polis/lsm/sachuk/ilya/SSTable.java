@@ -117,8 +117,8 @@ class SSTable {
                             ? ByteBuffer.wrap(NULL_VALUE.getBytes(StandardCharsets.UTF_8))
                             : record.getValue();
 
-                    writeInt(record.getKey(), saveFileChannel, size);
-                    writeInt(value, saveFileChannel, size);
+                    writeSizeAndValue(record.getKey(), saveFileChannel, size);
+                    writeSizeAndValue(value, saveFileChannel, size);
                 }
 
                 saveFileChannel.force(false);
@@ -225,7 +225,7 @@ class SSTable {
         return byteBuffer;
     }
 
-    private static void writeInt(ByteBuffer value, WritableByteChannel channel, ByteBuffer tmp) throws IOException {
+    private static void writeSizeAndValue(ByteBuffer value, WritableByteChannel channel, ByteBuffer tmp) throws IOException {
         tmp.position(0);
         tmp.putInt(value.remaining());
         tmp.position(0);
