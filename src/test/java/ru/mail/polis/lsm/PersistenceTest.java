@@ -252,7 +252,7 @@ class PersistenceTest {
         return fileNumberBeforeCompact;
     }
 
-    private long getFilesSize(@TempDir Path data) throws IOException {
+    private long getFilesSize(@TempDir Path data) {
         File[] files = data.toFile().listFiles();
 
         long size = 0;
