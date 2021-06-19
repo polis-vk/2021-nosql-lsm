@@ -11,6 +11,7 @@ import java.nio.file.Paths;
 import java.util.Iterator;
 import java.util.SortedMap;
 import java.util.TreeMap;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -191,7 +192,6 @@ class PersistenceTest {
 
         SortedMap<ByteBuffer, ByteBuffer> treeMap = new TreeMap<>();
 
-
         try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
             for (int i = 0; i < 5; i++) {
                 ByteBuffer key = wrap("SOME_KEY" + i);
@@ -225,20 +225,30 @@ class PersistenceTest {
             }
         }
 
-        int fileNumberBeforeCompact = (int) Files.walk(Paths.get(data.toUri())).count();
+        long fileNumberBeforeCompact = getFilesNumber(data);
+        long filesSizeBeforeCompact = Files.size(data);
 
         try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
             dao.compact();
         }
 
-        int fileNumberAfterCompact = (int) Files.walk(Paths.get(data.toUri())).count();
-
+        long fileNumberAfterCompact = getFilesNumber(data);
+        long filesSizeAfterCompact = Files.size(data);
 
         try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
             assertTrue(fileNumberBeforeCompact > fileNumberAfterCompact);
+            assertTrue(filesSizeAfterCompact <= filesSizeBeforeCompact);
             Utils.assertEquals(dao.range(null, null), treeMap.entrySet());
-//            assertEquals(treeMap.values().iterator(), dao.range(null, null));
         }
+    }
+
+    private long getFilesNumber(@TempDir Path data) throws IOException {
+        long fileNumberBeforeCompact;
+        try (Stream<Path> paths = Files.walk(Paths.get(data.toUri()))) {
+            fileNumberBeforeCompact = paths.count();
+        }
+
+        return fileNumberBeforeCompact;
     }
 
     private void verifyNext(byte[] suffix, Iterator<Record> range, int index) {

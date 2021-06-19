@@ -10,7 +10,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
-import java.nio.channels.WritableByteChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -34,7 +33,6 @@ public class DaoImpl implements DAO {
     private final DAOConfig config;
     private final SortedMap<ByteBuffer, Record> memoryStorage = new ConcurrentSkipListMap<>();
     private final List<SSTable> ssTables = new ArrayList<>();
-    private final String TMP_FILE_TO_COMPACT = "TMP_FILE_TO_COMPACT";
 
     private long memoryConsumption;
     private int nextSSTableNumber;
@@ -138,14 +136,6 @@ public class DaoImpl implements DAO {
         closeSSTables();
     }
 
-    private static void writeSizeAndValue(ByteBuffer value, WritableByteChannel channel, ByteBuffer tmp) throws IOException {
-        tmp.position(0);
-        tmp.putInt(value.remaining());
-        tmp.position(0);
-        channel.write(tmp);
-        channel.write(value);
-    }
-
     private void closeSSTables() throws IOException {
         for (SSTable ssTable : ssTables) {
             ssTable.close();
@@ -189,14 +179,6 @@ public class DaoImpl implements DAO {
 
     private int sizeOf(Record record) {
         return 8 + record.getKey().capacity() + (record.isTombstone() ? 0 : record.getKey().capacity());
-    }
-
-    private void clearDir() throws IOException {
-        try (Stream<Path> paths = Files.walk(config.getDir())) {
-            paths.filter(Files::isRegularFile)
-                    .map(Path::toFile)
-                    .forEach(File::delete);
-        }
     }
 
     /**
