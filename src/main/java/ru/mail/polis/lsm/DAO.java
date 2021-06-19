@@ -1,7 +1,5 @@
 package ru.mail.polis.lsm;
 
-import ru.mail.polis.lsm.shabinsky.MergeRecordIterator;
-
 import javax.annotation.Nullable;
 import java.io.Closeable;
 import java.nio.ByteBuffer;
@@ -15,6 +13,8 @@ public interface DAO extends Closeable {
     Iterator<Record> range(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey);
 
     void upsert(Record record);
+
+    void compact();
 
     /**
      * Appends {@code Byte.MIN_VALUE} to {@code buffer}.
@@ -34,15 +34,5 @@ public interface DAO extends Closeable {
         result.rewind();
 
         return result;
-    }
-
-    /**
-     * Merge Iterators.
-     *
-     * @param iterators List
-     * @return Iterator
-     */
-    static Iterator<Record> merge(List<Iterator<Record>> iterators) {
-        return new MergeRecordIterator(iterators);
     }
 }
