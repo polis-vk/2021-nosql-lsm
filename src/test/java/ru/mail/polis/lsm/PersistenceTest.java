@@ -3,6 +3,7 @@ package ru.mail.polis.lsm;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
@@ -226,14 +227,14 @@ class PersistenceTest {
         }
 
         long fileNumberBeforeCompact = getFilesNumber(data);
-        long filesSizeBeforeCompact = Files.size(data);
+        long filesSizeBeforeCompact = getFilesSize(data);
 
         try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
             dao.compact();
         }
 
         long fileNumberAfterCompact = getFilesNumber(data);
-        long filesSizeAfterCompact = Files.size(data);
+        long filesSizeAfterCompact = getFilesSize(data);
 
         try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
             assertTrue(fileNumberBeforeCompact > fileNumberAfterCompact);
@@ -249,6 +250,24 @@ class PersistenceTest {
         }
 
         return fileNumberBeforeCompact;
+    }
+
+    private long getFilesSize(@TempDir Path data) throws IOException {
+        File[] files = data.toFile().listFiles();
+
+        long size = 0;
+
+        if (files == null) {
+            return size;
+        }
+
+        for (File file : files) {
+            if (file.isFile()) {
+                size += file.length();
+            }
+        }
+
+        return size;
     }
 
     private void verifyNext(byte[] suffix, Iterator<Record> range, int index) {
