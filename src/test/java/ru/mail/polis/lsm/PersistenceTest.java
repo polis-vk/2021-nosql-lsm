@@ -183,6 +183,12 @@ class PersistenceTest {
         }
     }
 
+    @Test
+    void compact(@TempDir Path data) throws IOException {
+        DAO dao = TestDaoWrapper.create(new DAOConfig(data));
+        dao.compact();
+    }
+
     private void verifyNext(byte[] suffix, Iterator<Record> range, int index) {
         ByteBuffer key = keyWithSuffix(index, suffix);
         ByteBuffer value = valueWithSuffix(index, suffix);
