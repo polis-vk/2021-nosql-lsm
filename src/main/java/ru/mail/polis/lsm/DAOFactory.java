@@ -1,6 +1,6 @@
 package ru.mail.polis.lsm;
 
-import ru.mail.polis.lsm.alyonazakharova.NotJustInMemoryDAO;
+import ru.mail.polis.lsm.alyonazakharova.LmsDAO;
 
 import java.io.IOException;
 
@@ -14,8 +14,8 @@ public final class DAOFactory {
      * Create an instance of {@link DAO} with supplied {@link DAOConfig}.
      */
     public static DAO create(DAOConfig config) throws IOException {
-        assert config.getDir().toFile().exists();
+        assert config.dir.toFile().exists();
 
-        return new NotJustInMemoryDAO(config);
+        return new LmsDAO(config);
     }
 }

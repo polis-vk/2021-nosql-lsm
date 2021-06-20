@@ -164,7 +164,7 @@ class PersistenceTest {
         byte[] suffix = sizeBasedRandomData(size);
         int recordsCount = (int) (TestDaoWrapper.MAX_HEAP * 15 / size);
 
-        prepareHugeDao(data, size, suffix);
+        prepareHugeDao(data, recordsCount, suffix);
 
         // Check
         try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
