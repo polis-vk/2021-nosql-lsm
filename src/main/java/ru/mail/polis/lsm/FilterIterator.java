@@ -8,6 +8,9 @@ public class FilterIterator implements Iterator<Record> {
     private Record current;
     private final ByteBuffer toKey;
 
+    /**
+     * Iterator filtering tombstones and toKey.
+     */
     public FilterIterator(Iterator<Record> iterator, ByteBuffer toKey) {
         this.iter = iterator;
         this.toKey = toKey;
