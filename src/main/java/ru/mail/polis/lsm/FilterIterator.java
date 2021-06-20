@@ -6,8 +6,14 @@ import java.util.Iterator;
 public class FilterIterator implements Iterator<Record> {
     private final Iterator<Record> iter;
     private Record current;
-    private ByteBuffer toKey;
+    private final ByteBuffer toKey;
 
+    /**
+     * Filter iterator.
+     *
+     * @param iterator and toKey
+     * @return iterator without tombstones and toKey
+     */
     public FilterIterator(Iterator<Record> iterator, ByteBuffer toKey) {
         this.iter = iterator;
         this.toKey = toKey;
