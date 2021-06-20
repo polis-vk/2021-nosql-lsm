@@ -6,15 +6,18 @@ import java.util.Iterator;
 public class FilterIterator implements Iterator<Record> {
     private final Iterator<Record> iter;
     private Record current;
+    private ByteBuffer toKey;
 
-    public FilterIterator(Iterator<Record> iterator) {
+    public FilterIterator(Iterator<Record> iterator, ByteBuffer toKey) {
         this.iter = iterator;
+        this.toKey = toKey;
         getCurrent();
     }
 
     @Override
     public boolean hasNext() {
-        return current != null;
+        return current != null
+                && (toKey == null || current.getKey().compareTo(toKey) < 0);
     }
 
     @Override

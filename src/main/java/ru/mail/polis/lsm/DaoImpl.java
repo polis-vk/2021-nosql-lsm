@@ -48,7 +48,7 @@ public class DaoImpl implements DAO {
 
             iterators.add(memoryRange);
             Iterator<Record> merged = DAO.merge(iterators);
-            return new FilterIterator(merged);
+            return new FilterIterator(merged, toKey);
         }
     }
 

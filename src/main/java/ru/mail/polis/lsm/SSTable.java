@@ -35,13 +35,13 @@ public class SSTable implements Closeable {
     private MappedByteBuffer mmap;
 
     static List<SSTable> loadFromDir(Path dir) throws IOException {
-            try (Stream<Path> files = Files.list(dir)) {
-                return files.filter(path -> path.getFileName().toString().startsWith("file_"))
-                        .sorted(Comparator.comparingInt(path -> Integer.parseInt(path
-                                .getFileName().toString().substring(5))))
-                        .map(path -> new SSTable(dir.resolve(path)))
-                        .collect(Collectors.toList());
-            }
+        try (Stream<Path> files = Files.list(dir)) {
+            return files.filter(path -> path.getFileName().toString().startsWith("file_"))
+                    .sorted(Comparator.comparingInt(path -> Integer.parseInt(path
+                            .getFileName().toString().substring(5))))
+                    .map(path -> new SSTable(dir.resolve(path)))
+                    .collect(Collectors.toList());
+        }
     }
 
     static SSTable write(Iterator<Record> records, Path file) throws IOException {

@@ -22,7 +22,7 @@ public class DiskIterator implements Iterator<Record> {
     }
 
     private void getCurrent() {
-        if (!buffer.hasRemaining() || (toKey != null && current.getKey().compareTo(toKey) > 0)) {
+        if (!buffer.hasRemaining() || (toKey != null && current.getKey().compareTo(toKey) >= 0)) {
             current = null;
             return;
         }
