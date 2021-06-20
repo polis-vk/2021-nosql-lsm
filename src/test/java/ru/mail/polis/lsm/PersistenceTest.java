@@ -185,8 +185,52 @@ class PersistenceTest {
 
     @Test
     void compact(@TempDir Path data) throws IOException {
-        DAO dao = TestDaoWrapper.create(new DAOConfig(data));
-        dao.compact();
+        ByteBuffer key = wrap("FIXED_KEY");
+
+        int overwrites = 100;
+        for (int i = 0; i < overwrites; i++) {
+            ByteBuffer value = value(i);
+            try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
+                dao.upsert(Record.of(key, value));
+                assertEquals(value, dao.range(key, null).next().getValue());
+            }
+
+            // Check
+            try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
+                assertEquals(value, dao.range(key, null).next().getValue());
+            }
+        }
+
+        try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
+            dao.compact();
+        }
+    }
+
+    @Test
+    void compactHard(@TempDir Path data) throws IOException {
+        // Reference value
+        int size = 1024 * 1024;
+        byte[] suffix = sizeBasedRandomData(size);
+        int recordsCount = (int) (TestDaoWrapper.MAX_HEAP * 15 / size);
+
+        prepareHugeDao(data, recordsCount, suffix);
+
+        // Check
+        try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
+            Iterator<Record> range = dao.range(null, null);
+
+            for (int i = 0; i < recordsCount; i++) {
+                verifyNext(suffix, range, i);
+            }
+
+            assertFalse(range.hasNext());
+
+            dao.compact();
+            range = dao.range(null, null);
+            for (int i = 0; i < recordsCount; i++) {
+                verifyNext(suffix, range, i);
+            }
+        }
     }
 
     private void verifyNext(byte[] suffix, Iterator<Record> range, int index) {

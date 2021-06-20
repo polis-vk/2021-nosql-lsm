@@ -12,7 +12,6 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ConcurrentSkipListMap;
-import java.util.stream.Collectors;
 
 public class LmsDAO implements DAO {
 
@@ -21,8 +20,8 @@ public class LmsDAO implements DAO {
 
     private final DAOConfig config;
 
-    private static final long MEM_LIM = 20 * 1024 * 1024;
-    private long memorySize;
+    private static final int MEM_LIM = 20 * 1024 * 1024;
+    private int memorySize;
 
     @GuardedBy("this")
     private Integer genIndex;
@@ -53,29 +52,37 @@ public class LmsDAO implements DAO {
     @Override
     public void upsert(Record record) {
         synchronized (this) {
-            updateMemorySize(record);
+            memorySize += record.sizeOf();
             if (memorySize >= MEM_LIM) {
                 try {
                     flush();
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
-                updateMemorySize(record);
+                memorySize += record.sizeOf();
             }
 
             memoryStorage.put(record.getKey(), record);
         }
     }
 
+    // TODO Restore log (create log)
     @Override
-    public void compact() {
+    public void compact() throws IOException {
+        synchronized (this) {
+            if (!memoryStorage.isEmpty()) flush();
 
-    }
+            Iterator<Record> records = range(null, null);
+            List<SSTable> newTables = SSTable.compact(config.getDir(), records, MEM_LIM);
 
-    private void updateMemorySize(Record record) {
-        int keySize = Integer.BYTES + record.getKey().remaining();
-        int valueSize = Integer.BYTES + (record.isTombstone() ? 0 : record.getValue().remaining());
-        memorySize += keySize + valueSize;
+            for (SSTable ssTable : tables) ssTable.close();
+
+            SSTable.cleanForComp(config.getDir());
+
+            tables.clear();
+            tables.addAll(newTables);
+            this.genIndex = tables.size();
+        }
     }
 
     /**

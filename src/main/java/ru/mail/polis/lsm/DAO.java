@@ -4,6 +4,7 @@ import ru.mail.polis.lsm.shabinsky.LmsDAO;
 
 import javax.annotation.Nullable;
 import java.io.Closeable;
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.*;
 
@@ -15,7 +16,7 @@ public interface DAO extends Closeable {
 
     void upsert(Record record);
 
-    void compact();
+    void compact() throws IOException;
 
     /**
      * Appends {@code Byte.MIN_VALUE} to {@code buffer}.

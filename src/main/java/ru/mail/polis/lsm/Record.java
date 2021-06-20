@@ -34,4 +34,9 @@ public class Record {
         return value == null;
     }
 
+    public int sizeOf() {
+        int keySize = Integer.BYTES + key.remaining();
+        int valueSize = Integer.BYTES + (isTombstone() ? 0 : value.remaining());
+        return keySize + valueSize;
+    }
 }

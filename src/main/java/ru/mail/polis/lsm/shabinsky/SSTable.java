@@ -23,6 +23,7 @@ import java.util.NoSuchElementException;
 public class SSTable implements Closeable {
 
     public static final String NAME = "sstable_";
+    public static final String COMP = "comp_";
     public static final String IDX = "_idx";
     public static final String SAVE = ".save";
     public static final String TEMP = ".temp";
@@ -54,9 +55,8 @@ public class SSTable implements Closeable {
         List<SSTable> tables = new ArrayList<>();
 
         for (int i = 0; ; i++) {
-            String fileName = NAME + i;
-            Path saveFileName = dir.resolve(fileName + SAVE);
-            Path tmpFileName = dir.resolve(fileName + TEMP);
+            Path saveFileName = dir.resolve(sstableName(i) + SAVE);
+            Path tmpFileName = dir.resolve(sstableName(i) + TEMP);
 
             if (!Files.exists(saveFileName)) {
                 if (Files.exists(tmpFileName)) {
@@ -66,7 +66,7 @@ public class SSTable implements Closeable {
                 }
             }
 
-            SSTable ssTable = new SSTable(dir, fileName);
+            SSTable ssTable = new SSTable(dir, sstableName(i));
             tables.add(ssTable);
         }
 
@@ -89,7 +89,6 @@ public class SSTable implements Closeable {
         Path tmpIdxFileName = path.resolve(fileName + IDX + TEMP);
 
         try (
-
             FileChannel fileChannel = FileChannel.open(
                 tmpFileName,
                 StandardOpenOption.CREATE_NEW,
@@ -157,6 +156,166 @@ public class SSTable implements Closeable {
         }
     }
 
+    public static void cleanForComp(Path dir) throws IOException {
+        for (int i = 0; ; i++) {
+            Path saveFileName = dir.resolve(sstableName(i) + SAVE);
+            Path tmpFileName = dir.resolve(sstableName(i) + TEMP);
+
+            Path saveSS = dir.resolve(sstableCompName(i) + SAVE);
+            Path tmpSS = dir.resolve(sstableCompName(i) + TEMP);
+            Path normalFileName = dir.resolve(sstableName(i) + SAVE);
+
+            if (!Files.exists(saveFileName)) {
+                if (Files.exists(tmpFileName)) {
+                    Files.move(tmpFileName, saveFileName, StandardCopyOption.ATOMIC_MOVE);
+                } else {
+                    break;
+                }
+            }
+            Files.delete(saveFileName);
+
+            if (!Files.exists(saveSS)) {
+                if (Files.exists(tmpSS)) {
+                    Files.move(tmpSS, saveSS, StandardCopyOption.ATOMIC_MOVE);
+                    Files.move(saveSS, normalFileName, StandardCopyOption.ATOMIC_MOVE);
+                }
+            } else {
+                Files.move(saveSS, normalFileName, StandardCopyOption.ATOMIC_MOVE);
+            }
+
+            Path saveIdxFileName = dir.resolve(sstableName(i) + IDX + SAVE);
+            Path tmpIdxFileName = dir.resolve(sstableName(i) + IDX + TEMP);
+
+            Path saveIdxSS = dir.resolve(sstableCompName(i) + IDX + SAVE);
+            Path tmpIdxSS = dir.resolve(sstableCompName(i) + IDX + TEMP);
+            Path normalIdxFileName = dir.resolve(sstableName(i) + IDX + SAVE);
+
+            if (!Files.exists(saveIdxFileName)) {
+                if (Files.exists(tmpIdxFileName)) {
+                    Files.move(tmpIdxFileName, saveIdxFileName, StandardCopyOption.ATOMIC_MOVE);
+                } else {
+                    break;
+                }
+            }
+            Files.delete(saveIdxFileName);
+
+            if (!Files.exists(saveIdxSS)) {
+                if (Files.exists(tmpIdxSS)) {
+                    Files.move(tmpIdxSS, saveIdxSS, StandardCopyOption.ATOMIC_MOVE);
+                }
+            } else {
+                Files.move(saveIdxSS, normalIdxFileName, StandardCopyOption.ATOMIC_MOVE);
+            }
+        }
+    }
+
+    public static List<SSTable> compact(Path path, Iterator<Record> records, final int limit) throws IOException {
+        int count = 0;
+        int mem = 0;
+        Record record = null;
+
+        ArrayList<SSTable> tables = new ArrayList<>();
+
+        while (record != null || records.hasNext()) {
+
+            Path saveFileName = path.resolve(sstableCompName(count) + SAVE);
+            Path tmpFileName = path.resolve(sstableCompName(count) + TEMP);
+            Path saveIdxFileName = path.resolve(sstableCompName(count) + IDX + SAVE);
+            Path tmpIdxFileName = path.resolve(sstableCompName(count) + IDX + TEMP);
+
+            try (
+                FileChannel fileChannel = FileChannel.open(
+                    tmpFileName,
+                    StandardOpenOption.CREATE_NEW,
+                    StandardOpenOption.WRITE,
+                    StandardOpenOption.TRUNCATE_EXISTING);
+
+                FileChannel indexChannel = FileChannel.open(
+                    tmpIdxFileName,
+                    StandardOpenOption.CREATE_NEW,
+                    StandardOpenOption.WRITE,
+                    StandardOpenOption.TRUNCATE_EXISTING)
+            ) {
+
+                ByteBuffer size = ByteBuffer.allocate(Integer.BYTES);
+                int offset = 0;
+                int countOffset = 0;
+
+                if (record != null) {
+                    mem += record.sizeOf();
+
+                    // index
+                    ByteBuffer buffer = ByteBuffer.allocate(Integer.BYTES).putInt(offset);
+                    buffer.position(0);
+                    indexChannel.write(buffer);
+                    countOffset++;
+
+                    // records
+                    writeInt(record.getKey(), fileChannel, size);
+                    writeInt(record.getValue(), fileChannel, size);
+
+                    offset +=
+                        Integer.BYTES + record.getKey().remaining() + Integer.BYTES;
+
+                    if (!record.isTombstone()) offset += record.getValue().remaining();
+                    record = null;
+                }
+
+                while (records.hasNext()) {
+                    record = records.next();
+                    mem += record.sizeOf();
+
+                    if (mem >= limit) {
+                        mem = 0;
+                        break;
+                    }
+
+                    // index
+                    ByteBuffer buffer = ByteBuffer.allocate(Integer.BYTES).putInt(offset);
+                    buffer.position(0);
+                    indexChannel.write(buffer);
+                    countOffset++;
+
+                    // records
+                    writeInt(record.getKey(), fileChannel, size);
+                    writeInt(record.getValue(), fileChannel, size);
+
+                    offset +=
+                        Integer.BYTES + record.getKey().remaining() + Integer.BYTES;
+
+                    if (!record.isTombstone()) offset += record.getValue().remaining();
+                    record = null;
+                }
+
+                // index
+                ByteBuffer buffer = ByteBuffer.allocate(Integer.BYTES).putInt(countOffset);
+                buffer.position(0);
+                indexChannel.write(buffer);
+
+                fileChannel.force(false);
+                indexChannel.force(false);
+            }
+            Files.deleteIfExists(saveFileName);
+            Files.move(tmpFileName, saveFileName, StandardCopyOption.ATOMIC_MOVE);
+            Files.deleteIfExists(saveIdxFileName);
+            Files.move(tmpIdxFileName, saveIdxFileName, StandardCopyOption.ATOMIC_MOVE);
+
+            SSTable ssTable = new SSTable(path, sstableCompName(count));
+            tables.add(ssTable);
+
+            count++;
+        }
+        return tables;
+    }
+
+    private static String sstableName(int number) {
+        return NAME + number;
+    }
+
+    private static String sstableCompName(int number) {
+        return NAME + COMP + number;
+    }
+
     /**
      * SSTable.
      *
@@ -204,32 +363,25 @@ public class SSTable implements Closeable {
     }
 
     public Iterator<Record> range(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
-        return new SSTableIterator(fromKey, toKey);
-    }
+        return new Iterator<>() {
+            private int currentPos = findPos(fromKey, true);
+            private final int endPos = findPos(toKey, false);
 
-    private class SSTableIterator implements Iterator<Record> {
-        private int currentPos;
-        private final int endPos;
-
-        public SSTableIterator(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
-            this.currentPos = findPos(fromKey, true);
-            this.endPos = findPos(toKey, false);
-        }
-
-        @Override
-        public boolean hasNext() {
-            return currentPos < endPos;
-        }
-
-        @Override
-        public Record next() {
-            if (!hasNext()) {
-                throw new NoSuchElementException("No elements");
+            @Override
+            public boolean hasNext() {
+                return currentPos < endPos;
             }
-            Record record = getRecord(currentPos);
-            currentPos++;
-            return record;
-        }
+
+            @Override
+            public Record next() {
+                if (!hasNext()) {
+                    throw new NoSuchElementException("No elements");
+                }
+                Record record = getRecord(currentPos);
+                currentPos++;
+                return record;
+            }
+        };
     }
 
     private Record getRecord(int pos) {
