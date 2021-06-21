@@ -16,6 +16,8 @@ public interface DAO extends Closeable {
 
     void upsert(Record record) throws UncheckedIOException;
 
+    void compact();
+
     /**
      * Appends {@code Byte.MIN_VALUE} to {@code buffer}.
      *
