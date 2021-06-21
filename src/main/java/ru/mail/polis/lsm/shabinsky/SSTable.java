@@ -3,7 +3,6 @@ package ru.mail.polis.lsm.shabinsky;
 import ru.mail.polis.lsm.Record;
 
 import javax.annotation.Nullable;
-import java.io.Closeable;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -20,7 +19,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
 
-public class SSTable implements Closeable {
+public class SSTable {
 
     public static final String NAME = "sstable_";
     public static final String COMP = "comp_";
@@ -156,6 +155,12 @@ public class SSTable implements Closeable {
         }
     }
 
+    /**
+     * CleanForComp.
+     *
+     * @param dir Path
+     * @throws IOException exception
+     */
     public static void cleanForComp(Path dir) throws IOException {
         for (int i = 0; ; i++) {
             Path saveFileName = dir.resolve(sstableName(i) + SAVE);
@@ -174,13 +179,13 @@ public class SSTable implements Closeable {
             }
             Files.delete(saveFileName);
 
-            if (!Files.exists(saveSS)) {
+            if (Files.exists(saveSS)) {
+                Files.move(saveSS, normalFileName, StandardCopyOption.ATOMIC_MOVE);
+            } else {
                 if (Files.exists(tmpSS)) {
                     Files.move(tmpSS, saveSS, StandardCopyOption.ATOMIC_MOVE);
                     Files.move(saveSS, normalFileName, StandardCopyOption.ATOMIC_MOVE);
                 }
-            } else {
-                Files.move(saveSS, normalFileName, StandardCopyOption.ATOMIC_MOVE);
             }
 
             Path saveIdxFileName = dir.resolve(sstableName(i) + IDX + SAVE);
@@ -199,16 +204,25 @@ public class SSTable implements Closeable {
             }
             Files.delete(saveIdxFileName);
 
-            if (!Files.exists(saveIdxSS)) {
+            if (Files.exists(saveIdxSS)) {
+                Files.move(saveIdxSS, normalIdxFileName, StandardCopyOption.ATOMIC_MOVE);
+            } else {
                 if (Files.exists(tmpIdxSS)) {
                     Files.move(tmpIdxSS, saveIdxSS, StandardCopyOption.ATOMIC_MOVE);
                 }
-            } else {
-                Files.move(saveIdxSS, normalIdxFileName, StandardCopyOption.ATOMIC_MOVE);
             }
         }
     }
 
+    /**
+     * Compact.
+     *
+     * @param path    Path
+     * @param records Iterator
+     * @param limit   limit
+     * @return list
+     * @throws IOException exception
+     */
     public static List<SSTable> compact(Path path, Iterator<Record> records, final int limit) throws IOException {
         int count = 0;
         int mem = 0;
@@ -241,28 +255,9 @@ public class SSTable implements Closeable {
                 int offset = 0;
                 int countOffset = 0;
 
-                if (record != null) {
-                    mem += record.sizeOf();
+                while (record != null || records.hasNext()) {
+                    if (record == null) record = records.next();
 
-                    // index
-                    ByteBuffer buffer = ByteBuffer.allocate(Integer.BYTES).putInt(offset);
-                    buffer.position(0);
-                    indexChannel.write(buffer);
-                    countOffset++;
-
-                    // records
-                    writeInt(record.getKey(), fileChannel, size);
-                    writeInt(record.getValue(), fileChannel, size);
-
-                    offset +=
-                        Integer.BYTES + record.getKey().remaining() + Integer.BYTES;
-
-                    if (!record.isTombstone()) offset += record.getValue().remaining();
-                    record = null;
-                }
-
-                while (records.hasNext()) {
-                    record = records.next();
                     mem += record.sizeOf();
 
                     if (mem >= limit) {
@@ -308,7 +303,7 @@ public class SSTable implements Closeable {
         return tables;
     }
 
-    private static String sstableName(int number) {
+    public static String sstableName(int number) {
         return NAME + number;
     }
 
@@ -440,7 +435,6 @@ public class SSTable implements Closeable {
      *
      * @throws IOException exception
      */
-    @Override
     public void close() throws IOException {
         IOException exception = null;
         try {

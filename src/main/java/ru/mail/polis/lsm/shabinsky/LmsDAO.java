@@ -66,7 +66,6 @@ public class LmsDAO implements DAO {
         }
     }
 
-    // TODO Restore log (create log)
     @Override
     public void compact() throws IOException {
         synchronized (this) {
@@ -132,7 +131,7 @@ public class LmsDAO implements DAO {
     }
 
     private static Iterator<Record> merge(List<Iterator<Record>> iterators) {
-        if (iterators.size() == 0) {
+        if (iterators.isEmpty()) {
             return Collections.emptyIterator();
         }
         if (iterators.size() == 1) {

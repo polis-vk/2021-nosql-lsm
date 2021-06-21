@@ -2,6 +2,7 @@ package ru.mail.polis.lsm;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import ru.mail.polis.lsm.shabinsky.SSTable;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -10,15 +11,8 @@ import java.nio.file.Path;
 import java.util.Iterator;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static ru.mail.polis.lsm.Utils.key;
-import static ru.mail.polis.lsm.Utils.keyWithSuffix;
-import static ru.mail.polis.lsm.Utils.recursiveDelete;
-import static ru.mail.polis.lsm.Utils.sizeBasedRandomData;
-import static ru.mail.polis.lsm.Utils.value;
-import static ru.mail.polis.lsm.Utils.valueWithSuffix;
-import static ru.mail.polis.lsm.Utils.wrap;
+import static org.junit.jupiter.api.Assertions.*;
+import static ru.mail.polis.lsm.Utils.*;
 
 class PersistenceTest {
     @Test
@@ -184,7 +178,7 @@ class PersistenceTest {
     }
 
     @Test
-    void compact(@TempDir Path data) throws IOException {
+    void compactSimple(@TempDir Path data) throws IOException {
         ByteBuffer key = wrap("FIXED_KEY");
 
         int overwrites = 100;
@@ -201,13 +195,25 @@ class PersistenceTest {
             }
         }
 
+        int countOld = getCountFiles(data);
+        long sizeOld = getSizeKBFiles(data);
         try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
             dao.compact();
         }
+        int countNew = getCountFiles(data);
+        long sizeNew = getSizeKBFiles(data);
+
+        assertTrue(
+            (countOld / countNew) >= overwrites - 1
+                && (countOld / countNew) <= overwrites + 1);
+
+        assertTrue(
+            (sizeOld / sizeNew) >= overwrites - 1
+                && (sizeOld / sizeNew) <= overwrites + 1);
     }
 
     @Test
-    void compactHard(@TempDir Path data) throws IOException {
+    void compactNoChanges(@TempDir Path data) throws IOException {
         // Reference value
         int size = 1024 * 1024;
         byte[] suffix = sizeBasedRandomData(size);
@@ -225,12 +231,38 @@ class PersistenceTest {
 
             assertFalse(range.hasNext());
 
+            int countOld = getCountFiles(data);
+            long sizeOld = getSizeKBFiles(data);
             dao.compact();
+            int countNew = getCountFiles(data);
+            long sizeNew = getSizeKBFiles(data);
+            assertEquals(countOld, countNew);
+            assertEquals(sizeOld, sizeNew);
+
             range = dao.range(null, null);
             for (int i = 0; i < recordsCount; i++) {
                 verifyNext(suffix, range, i);
             }
         }
+    }
+
+    private int getCountFiles(@TempDir Path dir) {
+        int i = 0;
+        for (; ; i++) {
+            Path saveFileName = dir.resolve(SSTable.sstableName(i) + SSTable.SAVE);
+            if (!Files.exists(saveFileName)) break;
+        }
+        return i;
+    }
+
+    private long getSizeKBFiles(@TempDir Path dir) throws IOException {
+        long size = 0;
+        for (int i = 0; ; i++) {
+            Path saveFileName = dir.resolve(SSTable.sstableName(i) + SSTable.SAVE);
+            if (!Files.exists(saveFileName)) break;
+            size += Files.size(saveFileName);
+        }
+        return size;
     }
 
     private void verifyNext(byte[] suffix, Iterator<Record> range, int index) {
