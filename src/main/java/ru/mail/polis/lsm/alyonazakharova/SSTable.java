@@ -153,7 +153,7 @@ public class SSTable implements Closeable {
         int right = rightLimit;
 
         while (left < right) {
-            int mid = left + (right - left) >>> 1;
+            int mid = left + ((right - left) >>> 1);
             int offset = idx.getInt(mid * Integer.BYTES);
             buffer.position(offset);
             int keySize = buffer.getInt();
@@ -219,7 +219,7 @@ public class SSTable implements Closeable {
         };
     }
 
-    private static Path getIndexFile(Path file) {
+    protected static Path getIndexFile(Path file) {
         return resolveWithExt(file, ".idx");
     }
 

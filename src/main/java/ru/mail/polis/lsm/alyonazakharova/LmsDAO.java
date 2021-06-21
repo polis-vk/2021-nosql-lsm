@@ -9,15 +9,18 @@ import javax.annotation.concurrent.GuardedBy;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class LmsDAO implements DAO {
 
     private final SortedMap<ByteBuffer, Record> memoryStorage = new ConcurrentSkipListMap<>();
-    private final ConcurrentLinkedDeque<SSTable> tables = new ConcurrentLinkedDeque<>();
+    private final ConcurrentLinkedDeque<SSTable> ssTables = new ConcurrentLinkedDeque<>();
 
     @SuppressWarnings("unused")
     private final DAOConfig config;
@@ -38,7 +41,7 @@ public class LmsDAO implements DAO {
         this.config = config;
         List<SSTable> ssTables = SSTable.loadFromDir(config.dir);
         nextSSTableIndex = ssTables.size();
-        tables.addAll(ssTables);
+        this.ssTables.addAll(ssTables);
     }
 
     @Override
@@ -71,12 +74,45 @@ public class LmsDAO implements DAO {
         memoryStorage.put(record.getKey(), record);
     }
 
+    @GuardedBy("this")
+    @Override
+    public void compact() throws IOException {
+        Iterator<Record> iterator = range(null, null);
+
+        Path dir = config.dir;
+        Path fileName = dir.resolve("file_" + nextSSTableIndex);
+        nextSSTableIndex++;
+
+        Path indexFileName = SSTable.getIndexFile(fileName);
+
+        SSTable ssTable = SSTable.write(fileName, iterator);
+
+        try (Stream<Path> stream = Files.list(dir)) {
+            List<Path> files = stream
+                    .filter(file -> !file.startsWith(fileName) && !file.startsWith(indexFileName))
+                    .collect(Collectors.toList());
+
+            closeTables();
+
+            for (Path file : files) {
+                Files.delete(file);
+            }
+        }
+
+        ssTables.clear();
+        ssTables.add(ssTable);
+    }
+
     @Override
     public void close() throws IOException {
         synchronized (this) {
             flush();
         }
-        for (SSTable sstable : tables) {
+        closeTables();
+    }
+
+    private void closeTables() throws IOException {
+        for (SSTable sstable : ssTables) {
             sstable.close();
         }
     }
@@ -88,7 +124,7 @@ public class LmsDAO implements DAO {
         nextSSTableIndex++;
 
         SSTable ssTable = SSTable.write(file, memoryStorage.values().iterator());
-        tables.add(ssTable);
+        ssTables.add(ssTable);
         memoryStorage.clear();
     }
 
@@ -98,8 +134,8 @@ public class LmsDAO implements DAO {
     }
 
     private Iterator<Record> ssTableRanges(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) throws IOException {
-        List<Iterator<Record>> iterators = new ArrayList<>(tables.size());
-        for (SSTable ssTable : tables) {
+        List<Iterator<Record>> iterators = new ArrayList<>(ssTables.size());
+        for (SSTable ssTable : ssTables) {
             iterators.add(ssTable.range(fromKey, toKey));
         }
         return merge(iterators);
@@ -177,7 +213,7 @@ public class LmsDAO implements DAO {
     /**
      * Merges two sorted iterators.
      *
-     * @param left has lower priority
+     * @param left  has lower priority
      * @param right has higher priority
      * @return iterator over merged sorted records
      */
@@ -225,7 +261,7 @@ public class LmsDAO implements DAO {
         return new Iterator<>() {
             @Override
             public boolean hasNext() {
-                for (;;) {
+                for (; ; ) {
                     Record peek = delegate.peek();
                     if (peek == null) {
                         return false;

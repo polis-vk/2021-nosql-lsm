@@ -10,15 +10,8 @@ import java.nio.file.Path;
 import java.util.Iterator;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static ru.mail.polis.lsm.Utils.key;
-import static ru.mail.polis.lsm.Utils.keyWithSuffix;
-import static ru.mail.polis.lsm.Utils.recursiveDelete;
-import static ru.mail.polis.lsm.Utils.sizeBasedRandomData;
-import static ru.mail.polis.lsm.Utils.value;
-import static ru.mail.polis.lsm.Utils.valueWithSuffix;
-import static ru.mail.polis.lsm.Utils.wrap;
+import static org.junit.jupiter.api.Assertions.*;
+import static ru.mail.polis.lsm.Utils.*;
 
 class PersistenceTest {
     @Test
@@ -185,8 +178,18 @@ class PersistenceTest {
 
     @Test
     void compact(@TempDir Path data) throws IOException {
-        DAO dao = TestDaoWrapper.create(new DAOConfig(data));
-        dao.compact();
+        try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
+            for (int i = 0; i < 500000; i++) {
+                ByteBuffer key = key(i);
+                ByteBuffer value = value(i);
+                dao.upsert(Record.of(key, value));
+            }
+            long numberOfFilesBefore = Files.list(data).count();
+            dao.compact();
+            long numberOfFilesAfter = Files.list(data).count();
+            assertTrue(numberOfFilesBefore > numberOfFilesAfter);
+            assertEquals(numberOfFilesAfter, 2);
+        }
     }
 
     private void verifyNext(byte[] suffix, Iterator<Record> range, int index) {
