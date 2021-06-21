@@ -30,6 +30,16 @@ public class Record {
         return value == null ? null : value.asReadOnlyBuffer();
     }
 
+    /**
+     * Key-value record.
+     */
+    public int getSize() {
+        int result = 0;
+        result += key == null ? 0 : key.capacity();
+        result += value == null ? 0 : value.capacity();
+        return result;
+    }
+
     public boolean isTombstone() {
         return value == null;
     }

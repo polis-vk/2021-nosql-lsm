@@ -8,6 +8,8 @@ import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Iterator;
+import java.util.TreeMap;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -164,16 +166,14 @@ class PersistenceTest {
         byte[] suffix = sizeBasedRandomData(size);
         int recordsCount = (int) (TestDaoWrapper.MAX_HEAP * 15 / size);
 
-        prepareHugeDao(data, size, suffix);
+        prepareHugeDao(data, recordsCount, suffix);
 
         // Check
         try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
             int searchStep = 4;
-
             for (int i = 0; i < recordsCount / searchStep; i++) {
                 ByteBuffer keyFrom = keyWithSuffix(i * searchStep, suffix);
                 ByteBuffer keyTo = keyWithSuffix(i * searchStep + searchStep, suffix);
-
                 Iterator<Record> range = dao.range(keyFrom, keyTo);
                 for (int j = 0; j < searchStep; j++) {
                     verifyNext(suffix, range, i * searchStep + j);
@@ -184,9 +184,158 @@ class PersistenceTest {
     }
 
     @Test
-    void compact(@TempDir Path data) throws IOException {
-        DAO dao = TestDaoWrapper.create(new DAOConfig(data));
-        dao.compact();
+    void compactEmpty(@TempDir Path data) throws IOException {
+        try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
+            dao.compact();
+            Iterator<Record> range = dao.range(null, null);
+            assertFalse(range.hasNext());
+            assertEquals(0, getFilesCount(data));
+        }
+        assertEquals(0, getFilesCount(data));
+    }
+
+    @Test
+    void compactTombstones(@TempDir Path data) throws IOException {
+        TreeMap<ByteBuffer, ByteBuffer> expectedData = new TreeMap<>();
+        try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
+            for (int i = 0; i < 20; i++) {
+                ByteBuffer key = wrap("key_" + i);
+                ByteBuffer value = wrap("value" + i);
+                dao.upsert(Record.of(key, value));
+                expectedData.put(key, value);
+            }
+            for (int i = 5; i < 15; i += 2) {
+                ByteBuffer key = wrap("key_" + i);
+                dao.upsert(Record.tombstone(key));
+                expectedData.remove(key);
+            }
+            Iterator<Record> range = dao.range(null, null);
+        }
+
+        try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
+            for (int i = 20; i < 50; i += 4) {
+                ByteBuffer key = wrap("key_" + i);
+                ByteBuffer value = wrap("value" + i);
+                dao.upsert(Record.of(key, value));
+                expectedData.put(key, value);
+            }
+            for (int i = 20; i < 50; i += 8) {
+                ByteBuffer key = wrap("key_" + i);
+                dao.upsert(Record.tombstone(key));
+                expectedData.remove(key);
+            }
+        }
+
+        long filesSizeBefore = getFilesSize(data);
+        long filesSizeAfter;
+
+        try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
+            dao.compact();
+            Utils.assertEquals(dao.range(null, null), expectedData.entrySet());
+
+            filesSizeAfter = getFilesSize(data);
+            assertEquals(1, getFilesCount(data));
+            assertTrue( filesSizeAfter < filesSizeBefore);
+        }
+
+        filesSizeAfter = getFilesSize(data);
+        assertEquals(1, getFilesCount(data));
+        assertTrue( filesSizeAfter < filesSizeBefore);
+    }
+
+    @Test
+    void compactDuplicates(@TempDir Path data) throws IOException {
+        TreeMap<ByteBuffer, ByteBuffer> expectedData = new TreeMap<>();
+        long filesSizeBefore;
+        long filesSizeAfter;
+        long filesCountBefore;
+        long filesCountAfter;
+        for (int i = 0; i < 20; i++) {
+            try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
+                for (int j = 0; j < 20; j++) {
+                    ByteBuffer key = wrap("key_" + j);
+                    ByteBuffer value = wrap("value" + j);
+                    dao.upsert(Record.of(key, value));
+                    expectedData.put(key, value);
+                }
+            }
+        }
+        try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
+            filesSizeBefore = getFilesSize(data);
+            dao.compact();
+            Iterator<Record> range = dao.range(null, null);
+            Utils.assertEquals(dao.range(null, null), expectedData.entrySet());
+
+            filesSizeAfter = getFilesSize(data);
+            assertEquals(1, getFilesCount(data));
+            assertTrue( filesSizeAfter < filesSizeBefore);
+        }
+
+        filesSizeAfter = getFilesSize(data);
+        assertEquals(1, getFilesCount(data));
+        assertTrue( filesSizeAfter < filesSizeBefore);
+    }
+
+
+    @Test
+    void compactRepeatable(@TempDir Path data) throws IOException {
+        TreeMap<ByteBuffer, ByteBuffer> expectedData = new TreeMap<>();
+        long filesSizeBefore;
+        long filesSizeAfter;
+        long filesCountBefore;
+        long filesCountAfter;
+        try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
+            for (int j = 0; j < 20; j++) {
+                ByteBuffer key = wrap("key_" + j);
+                ByteBuffer value = wrap("value" + j);
+                dao.upsert(Record.of(key, value));
+                expectedData.put(key, value);
+            }
+
+            dao.compact();
+
+            assertEquals(0, getFilesCount(data));
+            Utils.assertEquals(dao.range(null, null), expectedData.entrySet());
+
+            dao.compact();
+
+            assertEquals(0, getFilesCount(data));
+            Utils.assertEquals(dao.range(null, null), expectedData.entrySet());
+        }
+
+        try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
+            filesSizeBefore = getFilesSize(data);
+            Utils.assertEquals(dao.range(null, null), expectedData.entrySet());
+
+            dao.compact();
+
+            filesSizeAfter = getFilesSize(data);
+            assertEquals(1, getFilesCount(data));
+            assertTrue( filesSizeAfter <= filesSizeBefore);
+            Utils.assertEquals(dao.range(null, null), expectedData.entrySet());
+        }
+
+    }
+
+    private long getFilesCount(@TempDir Path dir) throws IOException {
+        try (Stream<Path> files = Files.list(dir)) {
+            return files.count();
+        }
+    }
+
+    private long getFilesSize(@TempDir Path dir) throws IOException {
+        try (Stream<Path> files = Files.list(dir)) {
+            return files
+                    .map(file -> {
+                        try {
+                            return Files.size(file);
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                        return 0L;
+                    })
+                    .reduce(0L, Long::sum);
+        }
     }
 
     private void verifyNext(byte[] suffix, Iterator<Record> range, int index) {
