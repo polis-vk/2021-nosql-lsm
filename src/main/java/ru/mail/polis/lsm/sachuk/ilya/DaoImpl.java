@@ -31,6 +31,7 @@ public class DaoImpl implements DAO {
     private static final long LIMIT = 16L * 1024 * 1024;
 
     private final DAOConfig config;
+    private final Path dirPath;
     private final SortedMap<ByteBuffer, Record> memoryStorage = new ConcurrentSkipListMap<>();
     private final List<SSTable> ssTables = new ArrayList<>();
 
@@ -45,8 +46,9 @@ public class DaoImpl implements DAO {
      */
     public DaoImpl(DAOConfig config) throws IOException {
         this.config = config;
+        this.dirPath = config.getDir();
 
-        ssTables.addAll(SSTable.loadFromDir(config.getDir()));
+        ssTables.addAll(SSTable.loadFromDir(dirPath));
         nextSSTableNumber = ssTables.size();
     }
 
@@ -88,6 +90,7 @@ public class DaoImpl implements DAO {
                 }
             }
         }
+
         memoryConsumption += sizeOf(record);
         memoryStorage.put(record.getKey(), record);
     }
@@ -97,7 +100,7 @@ public class DaoImpl implements DAO {
         synchronized (this) {
             Iterator<Record> iterator = range(null, null);
 
-            SSTable compactedTable = SSTable.save(iterator, config.getDir(), nextSSTableNumber++);
+            SSTable compactedTable = SSTable.save(iterator, dirPath, nextSSTableNumber++);
 
             String indexFile = compactedTable.getIndexPath().getFileName().toString();
             String saveFile = compactedTable.getSavePath().getFileName().toString();
@@ -107,8 +110,8 @@ public class DaoImpl implements DAO {
 
             ssTables.add(compactedTable);
 
-            Files.move(compactedTable.getIndexPath(), config.getDir().resolve(SSTable.FIRST_INDEX_FILE), StandardCopyOption.ATOMIC_MOVE);
-            Files.move(compactedTable.getSavePath(), config.getDir().resolve(SSTable.FIRST_SAVE_FILE), StandardCopyOption.ATOMIC_MOVE);
+            Files.move(compactedTable.getIndexPath(), dirPath.resolve(SSTable.FIRST_INDEX_FILE), StandardCopyOption.ATOMIC_MOVE);
+            Files.move(compactedTable.getSavePath(), dirPath.resolve(SSTable.FIRST_SAVE_FILE), StandardCopyOption.ATOMIC_MOVE);
         }
     }
 
@@ -144,7 +147,7 @@ public class DaoImpl implements DAO {
     private void flush() throws IOException {
         SSTable ssTable = SSTable.save(
                 memoryStorage.values().iterator(),
-                config.getDir(),
+                dirPath,
                 nextSSTableNumber++
         );
 
@@ -180,7 +183,7 @@ public class DaoImpl implements DAO {
     }
 
     private void deleteOldTables(String indexFile, String saveFile) throws IOException {
-        try (Stream<Path> paths = Files.walk(config.getDir())) {
+        try (Stream<Path> paths = Files.walk(dirPath)) {
             paths.filter(Files::isRegularFile)
                     .map(Path::toFile)
                     .filter(file -> file.getName().compareTo(indexFile) != 0 && file.getName().compareTo(saveFile) != 0)
