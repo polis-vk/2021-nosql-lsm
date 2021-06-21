@@ -439,13 +439,13 @@ public class SSTable {
         IOException exception = null;
         try {
             free(mmapRec);
-        } catch (Throwable t) {
+        } catch (Exception t) {
             exception = new IOException(t);
         }
 
         try {
             free(mmapOffsets);
-        } catch (Throwable t) {
+        } catch (Exception t) {
             if (exception == null) {
                 exception = new IOException(t);
             } else {
