@@ -160,6 +160,33 @@ public class SSTable {
         }
     }
 
+    private static boolean cleanComp(Path dir, String nameSSTable, String nameComp) throws IOException {
+        Path saveFileName = dir.resolve(nameSSTable + SAVE);
+        Path tmpFileName = dir.resolve(nameSSTable + TEMP);
+
+        if (!Files.exists(saveFileName)) {
+            if (Files.exists(tmpFileName)) {
+                Files.move(tmpFileName, saveFileName, StandardCopyOption.ATOMIC_MOVE);
+            } else {
+                return false;
+            }
+        }
+        Files.delete(saveFileName);
+
+        Path saveSS = dir.resolve(nameComp + SAVE);
+        Path tmpSS = dir.resolve(nameComp + TEMP);
+
+        if (Files.exists(saveSS)) {
+            Files.move(saveSS, saveFileName, StandardCopyOption.ATOMIC_MOVE);
+        } else {
+            if (Files.exists(tmpSS)) {
+                Files.move(tmpSS, saveSS, StandardCopyOption.ATOMIC_MOVE);
+                Files.move(saveSS, saveFileName, StandardCopyOption.ATOMIC_MOVE);
+            }
+        }
+        return true;
+    }
+
     /**
      * CleanForComp.
      *
@@ -168,54 +195,8 @@ public class SSTable {
      */
     public static void cleanForComp(Path dir) throws IOException {
         for (int i = 0; ; i++) {
-            Path saveFileName = dir.resolve(sstableName(i) + SAVE);
-            Path tmpFileName = dir.resolve(sstableName(i) + TEMP);
-
-            Path saveSS = dir.resolve(sstableCompName(i) + SAVE);
-            Path tmpSS = dir.resolve(sstableCompName(i) + TEMP);
-            Path normalFileName = dir.resolve(sstableName(i) + SAVE);
-
-            if (!Files.exists(saveFileName)) {
-                if (Files.exists(tmpFileName)) {
-                    Files.move(tmpFileName, saveFileName, StandardCopyOption.ATOMIC_MOVE);
-                } else {
-                    break;
-                }
-            }
-            Files.delete(saveFileName);
-
-            if (Files.exists(saveSS)) {
-                Files.move(saveSS, normalFileName, StandardCopyOption.ATOMIC_MOVE);
-            } else {
-                if (Files.exists(tmpSS)) {
-                    Files.move(tmpSS, saveSS, StandardCopyOption.ATOMIC_MOVE);
-                    Files.move(saveSS, normalFileName, StandardCopyOption.ATOMIC_MOVE);
-                }
-            }
-
-            Path saveIdxFileName = dir.resolve(sstableName(i) + IDX + SAVE);
-            Path tmpIdxFileName = dir.resolve(sstableName(i) + IDX + TEMP);
-
-            Path saveIdxSS = dir.resolve(sstableCompName(i) + IDX + SAVE);
-            Path tmpIdxSS = dir.resolve(sstableCompName(i) + IDX + TEMP);
-            Path normalIdxFileName = dir.resolve(sstableName(i) + IDX + SAVE);
-
-            if (!Files.exists(saveIdxFileName)) {
-                if (Files.exists(tmpIdxFileName)) {
-                    Files.move(tmpIdxFileName, saveIdxFileName, StandardCopyOption.ATOMIC_MOVE);
-                } else {
-                    break;
-                }
-            }
-            Files.delete(saveIdxFileName);
-
-            if (Files.exists(saveIdxSS)) {
-                Files.move(saveIdxSS, normalIdxFileName, StandardCopyOption.ATOMIC_MOVE);
-            } else {
-                if (Files.exists(tmpIdxSS)) {
-                    Files.move(tmpIdxSS, saveIdxSS, StandardCopyOption.ATOMIC_MOVE);
-                }
-            }
+            if (!cleanComp(dir, sstableName(i), sstableCompName(i))) break;
+            if (!cleanComp(dir, sstableName(i) + IDX, sstableCompName(i) + IDX)) break;
         }
     }
 
