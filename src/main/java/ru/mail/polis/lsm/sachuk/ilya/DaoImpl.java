@@ -63,11 +63,11 @@ public class DaoImpl implements DAO {
             }
 
             Iterator<Record> memoryRange = map(fromKey, toKey).values().iterator();
+            Iterator<Record> mergedIterators = mergeTwo(ssTableRanges, memoryRange);
 
             return StreamSupport
-                    .stream(Spliterators.spliteratorUnknownSize(
-                            mergeTwo(ssTableRanges, memoryRange),
-                            Spliterator.ORDERED),
+                    .stream(
+                            Spliterators.spliteratorUnknownSize(mergedIterators, Spliterator.ORDERED),
                             false
                     )
                     .filter(record -> !record.isTombstone())
@@ -97,36 +97,18 @@ public class DaoImpl implements DAO {
         synchronized (this) {
             Iterator<Record> iterator = range(null, null);
 
-            SSTable ssTable = SSTable.save(iterator, config.getDir(), nextSSTableNumber++);
+            SSTable compactedTable = SSTable.save(iterator, config.getDir(), nextSSTableNumber++);
 
-            Path indexPath = ssTable.getIndexPath();
-            Path savePath = ssTable.getSavePath();
+            String indexFile = compactedTable.getIndexPath().getFileName().toString();
+            String saveFile = compactedTable.getSavePath().getFileName().toString();
 
-            String indexFile = indexPath.getFileName().toString();
-            String saveFile = savePath.getFileName().toString();
+            closeOldTables(indexFile, saveFile);
+            deleteOldTables(indexFile, saveFile);
 
+            ssTables.add(compactedTable);
 
-            List<SSTable> filteredSSTables = ssTables.stream()
-                    .filter(ssTable1 -> ssTable1.getIndexPath().getFileName().toString().compareTo(indexFile) != 0
-                            && ssTable1.getSavePath().getFileName().toString().compareTo(saveFile) != 0)
-                    .collect(Collectors.toList());
-
-            for (SSTable filteredSSTable : filteredSSTables) {
-                filteredSSTable.close();
-            }
-
-            try (Stream<Path> paths = Files.walk(config.getDir())) {
-                paths.filter(Files::isRegularFile)
-                        .map(Path::toFile)
-                        .filter(file -> file.getName().compareTo(indexFile) != 0 && file.getName().compareTo(saveFile) != 0)
-                        .forEach(File::delete);
-            }
-
-            ssTables.clear();
-            ssTables.add(ssTable);
-
-            Files.move(ssTable.getIndexPath(), config.getDir().resolve(SSTable.FIRST_INDEX_FILE), StandardCopyOption.ATOMIC_MOVE);
-            Files.move(ssTable.getSavePath(), config.getDir().resolve(SSTable.FIRST_SAVE_FILE), StandardCopyOption.ATOMIC_MOVE);
+            Files.move(compactedTable.getIndexPath(), config.getDir().resolve(SSTable.FIRST_INDEX_FILE), StandardCopyOption.ATOMIC_MOVE);
+            Files.move(compactedTable.getSavePath(), config.getDir().resolve(SSTable.FIRST_SAVE_FILE), StandardCopyOption.ATOMIC_MOVE);
         }
     }
 
@@ -184,6 +166,32 @@ public class DaoImpl implements DAO {
     private int sizeOf(Record record) {
         return record.getKey().remaining()
                 + (record.isTombstone() ? 0 : record.getKey().remaining()) + Integer.BYTES * 2;
+    }
+
+    private void closeOldTables(String indexFile, String saveFile) throws IOException {
+        List<SSTable> filteredSSTables = ssTables.stream()
+                .filter(ssTable1 -> checkFilesNameEquals(ssTable1.getIndexPath(), indexFile) &&
+                        checkFilesNameEquals(ssTable1.getSavePath(), saveFile))
+                .collect(Collectors.toList());
+
+        for (SSTable filteredSSTable : filteredSSTables) {
+            filteredSSTable.close();
+        }
+    }
+
+    private void deleteOldTables(String indexFile, String saveFile) throws IOException {
+        try (Stream<Path> paths = Files.walk(config.getDir())) {
+            paths.filter(Files::isRegularFile)
+                    .map(Path::toFile)
+                    .filter(file -> file.getName().compareTo(indexFile) != 0 && file.getName().compareTo(saveFile) != 0)
+                    .forEach(File::delete);
+        }
+
+        ssTables.clear();
+    }
+
+    private boolean checkFilesNameEquals(Path filePath, String fileToCompare) {
+        return filePath.toString().compareTo(fileToCompare) != 0;
     }
 
     /**
