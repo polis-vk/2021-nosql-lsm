@@ -232,47 +232,20 @@ class PersistenceTest {
         }
 
         long fileNumberBeforeCompact = getFilesNumber(data);
-        long filesSizeBeforeCompact = getFilesSize(data);
+        long filesSizeBeforeCompact = getDirSize(data);
 
         try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
             dao.compact();
         }
 
         long fileNumberAfterCompact = getFilesNumber(data);
-        long filesSizeAfterCompact = getFilesSize(data);
+        long filesSizeAfterCompact = getDirSize(data);
 
         try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
             assertTrue(fileNumberBeforeCompact > fileNumberAfterCompact);
             assertTrue(filesSizeAfterCompact <= filesSizeBeforeCompact);
             Utils.assertEquals(dao.range(null, null), treeMap.entrySet());
         }
-    }
-
-    private long getFilesNumber(@TempDir Path data) throws IOException {
-        long fileNumberBeforeCompact;
-        try (Stream<Path> paths = Files.walk(Paths.get(data.toUri()))) {
-            fileNumberBeforeCompact = paths.count();
-        }
-
-        return fileNumberBeforeCompact;
-    }
-
-    private long getFilesSize(@TempDir Path data) {
-        File[] files = data.toFile().listFiles();
-
-        long size = 0;
-
-        if (files == null) {
-            return size;
-        }
-
-        for (File file : files) {
-            if (file.isFile()) {
-                size += file.length();
-            }
-        }
-
-        return size;
     }
 
     @Test
@@ -319,6 +292,15 @@ class PersistenceTest {
         });
 
         return size[0];
+    }
+
+    private long getFilesNumber(@TempDir Path data) throws IOException {
+        long fileNumberBeforeCompact;
+        try (Stream<Path> paths = Files.walk(Paths.get(data.toUri()))) {
+            fileNumberBeforeCompact = paths.count();
+        }
+
+        return fileNumberBeforeCompact;
     }
 
     private void verifyNext(byte[] suffix, Iterator<Record> range, int index) {
