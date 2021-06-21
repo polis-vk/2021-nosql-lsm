@@ -71,8 +71,18 @@ public class LmsDAO implements DAO {
         synchronized (this) {
             if (!memoryStorage.isEmpty()) flush();
 
-            Iterator<Record> records = range(null, null);
-            List<SSTable> newTables = SSTable.compact(config.getDir(), records, MEM_LIM);
+            PeekingIterator records = new PeekingIterator(range(null, null));
+            List<SSTable> newTables = new LinkedList<>();
+
+            while (records.hasNext()) {
+                SSTable ssTable = SSTable.write(
+                    records,
+                    config.getDir(),
+                    SSTable.sstableCompName(newTables.size()),
+                    MEM_LIM
+                );
+                newTables.add(ssTable);
+            }
 
             for (SSTable ssTable : tables) ssTable.close();
 
@@ -94,7 +104,11 @@ public class LmsDAO implements DAO {
         Path dir = config.getDir();
         String fileName = SSTable.NAME + genIndex++;
 
-        SSTable ssTable = SSTable.write(memoryStorage.values().iterator(), dir, fileName);
+        SSTable ssTable = SSTable.write(
+            new PeekingIterator(memoryStorage.values().iterator()),
+            dir, fileName,
+            MEM_LIM
+        );
         tables.add(ssTable);
 
         memorySize = 0;
@@ -212,45 +226,5 @@ public class LmsDAO implements DAO {
                 return delegate.next();
             }
         };
-    }
-
-    private static class PeekingIterator implements Iterator<Record> {
-
-        private Record current;
-
-        private final Iterator<Record> delegate;
-
-        public PeekingIterator(Iterator<Record> delegate) {
-            this.delegate = delegate;
-        }
-
-        @Override
-        public boolean hasNext() {
-            return current != null || delegate.hasNext();
-        }
-
-        @Override
-        public Record next() {
-            if (!hasNext()) {
-                throw new NoSuchElementException();
-            }
-            Record now = peek();
-            current = null;
-            return now;
-        }
-
-        public Record peek() {
-            if (current != null) {
-                return current;
-            }
-
-            if (!delegate.hasNext()) {
-                return null;
-            }
-
-            current = delegate.next();
-            return current;
-        }
-
     }
 }

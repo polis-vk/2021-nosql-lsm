@@ -81,7 +81,7 @@ public class SSTable {
      * @return SSTable
      * @throws IOException exception
      */
-    public static SSTable write(Iterator<Record> records, Path path, String fileName) throws IOException {
+    public static SSTable write(PeekingIterator records, Path path, String fileName, final int MEM_LIM) throws IOException {
         Path saveFileName = path.resolve(fileName + SAVE);
         Path tmpFileName = path.resolve(fileName + TEMP);
         Path saveIdxFileName = path.resolve(fileName + IDX + SAVE);
@@ -104,19 +104,24 @@ public class SSTable {
             ByteBuffer size = ByteBuffer.allocate(Integer.BYTES);
             int offset = 0;
             int countOffset = 0;
+            int mem = 0;
 
             while (records.hasNext()) {
+                // records
+                Record record = records.peek();
+
+                mem += record.sizeOf();
+                if (mem >= MEM_LIM) break;
+                records.next();
+
+                writeInt(record.getKey(), fileChannel, size);
+                writeInt(record.getValue(), fileChannel, size);
 
                 // index
                 ByteBuffer buffer = ByteBuffer.allocate(Integer.BYTES).putInt(offset);
                 buffer.position(0);
                 indexChannel.write(buffer);
                 countOffset++;
-
-                // records
-                Record record = records.next();
-                writeInt(record.getKey(), fileChannel, size);
-                writeInt(record.getValue(), fileChannel, size);
 
                 offset +=
                     Integer.BYTES + record.getKey().remaining() + Integer.BYTES;
@@ -214,100 +219,11 @@ public class SSTable {
         }
     }
 
-    /**
-     * Compact.
-     *
-     * @param path    Path
-     * @param records Iterator
-     * @param limit   limit
-     * @return list
-     * @throws IOException exception
-     */
-    public static List<SSTable> compact(Path path, Iterator<Record> records, final int limit) throws IOException {
-        int count = 0;
-        int mem = 0;
-        Record record = null;
-
-        ArrayList<SSTable> tables = new ArrayList<>();
-
-        while (record != null || records.hasNext()) {
-
-            Path saveFileName = path.resolve(sstableCompName(count) + SAVE);
-            Path tmpFileName = path.resolve(sstableCompName(count) + TEMP);
-            Path saveIdxFileName = path.resolve(sstableCompName(count) + IDX + SAVE);
-            Path tmpIdxFileName = path.resolve(sstableCompName(count) + IDX + TEMP);
-
-            try (
-                FileChannel fileChannel = FileChannel.open(
-                    tmpFileName,
-                    StandardOpenOption.CREATE_NEW,
-                    StandardOpenOption.WRITE,
-                    StandardOpenOption.TRUNCATE_EXISTING);
-
-                FileChannel indexChannel = FileChannel.open(
-                    tmpIdxFileName,
-                    StandardOpenOption.CREATE_NEW,
-                    StandardOpenOption.WRITE,
-                    StandardOpenOption.TRUNCATE_EXISTING)
-            ) {
-
-                ByteBuffer size = ByteBuffer.allocate(Integer.BYTES);
-                int offset = 0;
-                int countOffset = 0;
-
-                while (record != null || records.hasNext()) {
-                    if (record == null) record = records.next();
-
-                    mem += record.sizeOf();
-
-                    if (mem >= limit) {
-                        mem = 0;
-                        break;
-                    }
-
-                    // index
-                    ByteBuffer buffer = ByteBuffer.allocate(Integer.BYTES).putInt(offset);
-                    buffer.position(0);
-                    indexChannel.write(buffer);
-                    countOffset++;
-
-                    // records
-                    writeInt(record.getKey(), fileChannel, size);
-                    writeInt(record.getValue(), fileChannel, size);
-
-                    offset +=
-                        Integer.BYTES + record.getKey().remaining() + Integer.BYTES;
-
-                    if (!record.isTombstone()) offset += record.getValue().remaining();
-                    record = null;
-                }
-
-                // index
-                ByteBuffer buffer = ByteBuffer.allocate(Integer.BYTES).putInt(countOffset);
-                buffer.position(0);
-                indexChannel.write(buffer);
-
-                fileChannel.force(false);
-                indexChannel.force(false);
-            }
-            Files.deleteIfExists(saveFileName);
-            Files.move(tmpFileName, saveFileName, StandardCopyOption.ATOMIC_MOVE);
-            Files.deleteIfExists(saveIdxFileName);
-            Files.move(tmpIdxFileName, saveIdxFileName, StandardCopyOption.ATOMIC_MOVE);
-
-            SSTable ssTable = new SSTable(path, sstableCompName(count));
-            tables.add(ssTable);
-
-            count++;
-        }
-        return tables;
-    }
-
     public static String sstableName(int number) {
         return NAME + number;
     }
 
-    private static String sstableCompName(int number) {
+    public static String sstableCompName(int number) {
         return NAME + COMP + number;
     }
 
@@ -439,17 +355,17 @@ public class SSTable {
         IOException exception = null;
         try {
             free(mmapRec);
-        } catch (Exception t) {
-            exception = new IOException(t);
+        } catch (IOException e) {
+            exception = e;
         }
 
         try {
             free(mmapOffsets);
-        } catch (Exception t) {
+        } catch (IOException e) {
             if (exception == null) {
-                exception = new IOException(t);
+                exception = e;
             } else {
-                exception.addSuppressed(t);
+                exception.addSuppressed(e);
             }
         }
 
