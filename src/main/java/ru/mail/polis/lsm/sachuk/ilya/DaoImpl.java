@@ -51,15 +51,19 @@ public class DaoImpl implements DAO {
     }
 
     @Override
-    public Iterator<Record> range(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
+    public Iterator<Record> range(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey)
+            throws UncheckedIOException {
         synchronized (this) {
+
             Iterator<Record> ssTableRanges;
             try {
                 ssTableRanges = ssTableRanges(fromKey, toKey);
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }
+
             Iterator<Record> memoryRange = map(fromKey, toKey).values().iterator();
+
             return StreamSupport
                     .stream(Spliterators.spliteratorUnknownSize(
                             mergeTwo(ssTableRanges, memoryRange),
@@ -72,7 +76,7 @@ public class DaoImpl implements DAO {
     }
 
     @Override
-    public void upsert(Record record) {
+    public void upsert(Record record) throws UncheckedIOException {
         synchronized (this) {
             memoryConsumption += sizeOf(record);
             if (memoryConsumption > LIMIT) {
@@ -178,7 +182,8 @@ public class DaoImpl implements DAO {
     }
 
     private int sizeOf(Record record) {
-        return 8 + record.getKey().capacity() + (record.isTombstone() ? 0 : record.getKey().capacity());
+        return record.getKey().remaining()
+                + (record.isTombstone() ? 0 : record.getKey().remaining()) + Integer.BYTES * 2;
     }
 
     /**
@@ -208,15 +213,3 @@ public class DaoImpl implements DAO {
     }
 }
 
-//            Path pathToCompact = Path.of(TMP_FILE_TO_COMPACT);
-//
-//            Iterator<Record> iterator = range(null, null);
-//
-//
-//
-//            Path pathToNewFirstFile = Path.of();
-//
-//            Files.move(pathToCompact, , StandardCopyOption.ATOMIC_MOVE);
-//
-//            ssTables.addAll(SSTable.loadFromDir(config.getDir()));
-//            nextSSTableNumber = ssTables.size();

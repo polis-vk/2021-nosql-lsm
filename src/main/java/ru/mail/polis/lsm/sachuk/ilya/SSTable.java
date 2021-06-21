@@ -41,7 +41,7 @@ class SSTable {
 
     private static final String TMP_FILE = "TMP";
     private static final String NULL_VALUE = "NULL_VALUE";
-    private static final ByteBuffer bb = ByteBuffer.wrap(NULL_VALUE.getBytes(StandardCharsets.UTF_8));
+    private static final ByteBuffer BYTE_BUFFER_TOMBSTONE = ByteBuffer.wrap(NULL_VALUE.getBytes(StandardCharsets.UTF_8));
 
     private final Path savePath;
     private final Path indexPath;
@@ -303,7 +303,7 @@ class SSTable {
         SSTableIterator(int positionToStartRead, ByteBuffer keyToRead) {
             this.keyToRead = keyToRead;
 
-            readToEnd = keyToRead == null;
+            this.readToEnd = keyToRead == null;
 
             if (positionToStartRead == -1) {
                 mappedByteBuffer.position(mappedByteBuffer.limit());
@@ -336,7 +336,7 @@ class SSTable {
                 ByteBuffer key = readFromFile(mappedByteBuffer);
                 ByteBuffer value = readFromFile(mappedByteBuffer);
 
-                if (value.compareTo(bb) == 0) {
+                if (value.compareTo(BYTE_BUFFER_TOMBSTONE) == 0) {
                     record = Record.tombstone(key);
                 } else {
                     value.position(0);
