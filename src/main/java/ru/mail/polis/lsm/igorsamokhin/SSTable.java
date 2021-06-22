@@ -26,6 +26,7 @@ import java.util.concurrent.ConcurrentSkipListMap;
 class SSTable {
     private static final Method CLEAN;
     private static final String TMP_FILE_SUFFIX = "_temp";
+    private static final String COMPACT_FILE_NAME = "COMPACT_";
 
     private final SortedMap<ByteBuffer, Record> memoryStorage = new ConcurrentSkipListMap<>();
     private final MappedByteBuffer mmap;
@@ -93,6 +94,7 @@ class SSTable {
     }
 
     static List<SSTable> loadFromDir(Path dir) throws IOException {
+        prepareDirectory(dir);
         File[] files = dir.toFile().listFiles();
         ArrayList<SSTable> ssTables = new ArrayList<>();
         if (files.length == 0) {
@@ -107,7 +109,11 @@ class SSTable {
         return ssTables;
     }
 
-    static SSTable write(Iterator<Record> records, Path file) throws IOException {
+    static SSTable loadFromFile(Path file) throws IOException {
+        return new SSTable(file);
+    }
+
+    static void write(Iterator<Record> records, Path file) throws IOException {
         String first = file.toString() + TMP_FILE_SUFFIX;
         Path tmpFilePath = Path.of(first);
         Files.deleteIfExists(tmpFilePath);
@@ -128,7 +134,6 @@ class SSTable {
 
         Files.deleteIfExists(file);
         Files.move(tmpFilePath, file, StandardCopyOption.ATOMIC_MOVE);
-        return new SSTable(file);
     }
 
     private static void writeInt(@Nullable ByteBuffer value, WritableByteChannel channel, ByteBuffer tmp)
@@ -149,7 +154,6 @@ class SSTable {
 
     /**
      * Create sub map.
-     *
      */
     static SortedMap<ByteBuffer, Record> getSubMap(SortedMap<ByteBuffer, Record> memoryStorage,
                                                    @Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
@@ -161,5 +165,44 @@ class SSTable {
             return memoryStorage.tailMap(fromKey);
         }
         return memoryStorage.subMap(fromKey, toKey);
+    }
+
+    /**
+     * Compact several sstables in dir into one.
+     */
+    public static Path compact(Path dir, Iterator<Record> range) throws IOException {
+        File[] files = dir.toFile().listFiles();
+        if (files.length == 0) {
+            return null;
+        }
+
+        Path fileName = dir.resolve(COMPACT_FILE_NAME + files[0].getName());
+        write(range, fileName);
+        return fileName;
+    }
+
+    /**
+     * Delete all files if there is compact file inside dir
+     *
+     * @param dir directory
+     * @return true if files deleted
+     */
+    public static boolean prepareDirectory(Path dir) throws IOException {
+        File[] files = dir.toFile().listFiles();
+
+        if ((files.length == 0) || !files[0].getName().startsWith(COMPACT_FILE_NAME)) {
+            return false;
+        }
+
+        for (int i = 1; i < files.length; i++) {
+            files[i].delete();
+        }
+
+        Path compactFile = files[0].toPath();
+        String fileName = files[0].getName().substring(COMPACT_FILE_NAME.length());
+        Path file = dir.resolve(fileName);
+
+        Files.move(compactFile, file, StandardCopyOption.ATOMIC_MOVE);
+        return true;
     }
 }

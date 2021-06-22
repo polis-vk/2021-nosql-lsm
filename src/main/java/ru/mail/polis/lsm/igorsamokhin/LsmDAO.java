@@ -94,7 +94,8 @@ public class LsmDAO implements DAO {
         if (memoryConsumption == 0) {
             return;
         }
-        SSTable ssTable = SSTable.write(memoryStorage.values().iterator(), filePath);
+        SSTable.write(memoryStorage.values().iterator(), filePath);
+        SSTable ssTable = SSTable.loadFromFile(filePath);
         ssTables.add(ssTable);
         memoryStorage.clear();
         memoryConsumption = 0;
@@ -120,6 +121,28 @@ public class LsmDAO implements DAO {
             for (SSTable ssTable : ssTables) {
                 ssTable.close();
             }
+        }
+    }
+
+    @Override
+    public void compact() throws IOException {
+        synchronized (this) {
+            Path compactFile = SSTable.compact(config.getDir(), this.range(null, null));
+
+            if (compactFile == null) {
+                return;
+            }
+
+            for (SSTable ssTable : ssTables) {
+                ssTable.close();
+            }
+            ssTables.clear();
+            SSTable.prepareDirectory(config.getDir());
+
+            ssTables.addAll(SSTable.loadFromDir(config.getDir()));
+
+            currentTableN = ssTables.size();
+            filePath = getNewFileName();
         }
     }
 
