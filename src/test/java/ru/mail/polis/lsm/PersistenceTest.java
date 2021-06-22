@@ -5,25 +5,15 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.file.FileVisitResult;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.SimpleFileVisitor;
+import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static ru.mail.polis.lsm.Utils.assertDaoEquals;
-import static ru.mail.polis.lsm.Utils.key;
-import static ru.mail.polis.lsm.Utils.keyWithSuffix;
-import static ru.mail.polis.lsm.Utils.recursiveDelete;
-import static ru.mail.polis.lsm.Utils.sizeBasedRandomData;
-import static ru.mail.polis.lsm.Utils.value;
-import static ru.mail.polis.lsm.Utils.valueWithSuffix;
-import static ru.mail.polis.lsm.Utils.wrap;
+import static org.junit.jupiter.api.Assertions.*;
+import static ru.mail.polis.lsm.Utils.*;
 
 class PersistenceTest {
     @Test
@@ -234,6 +224,47 @@ class PersistenceTest {
         return size[0];
     }
 
+    @Test
+    void compact(@TempDir Path data) throws IOException {
+        try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
+            for (int i = 0; i < 10; i++) {
+                createFile(dao, wrap("KEY" + i), wrap("VALUE" + i));
+            }
+        }
+
+        try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
+            for (int i = 5; i < 15; i++) {
+                createFile(dao, wrap("KEY" + i), wrap("VALUE" + i));
+            }
+        }
+
+        try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
+            for (int i = 10; i < 20; i++) {
+                createFile(dao, wrap("KEY" + i), wrap("VALUE" + i));
+            }
+        }
+
+        try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
+            for (int i = 0; i < 25; i++) {
+                createFile(dao, wrap("KEY" + i), wrap("VALUE" + i));
+            }
+        }
+
+        long beforeCompact = getDirSize(data);
+
+        try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
+            dao.compact();
+        }
+
+        long afterCompact = getDirSize(data);
+
+        assertTrue(beforeCompact > afterCompact);
+    }
+
+    private void createFile(DAO dao, ByteBuffer wrap, ByteBuffer wrap2) {
+        dao.upsert(Record.of(wrap, wrap2));
+    }
+
     private void verifyNext(byte[] suffix, Iterator<Record> range, int index) {
         ByteBuffer key = keyWithSuffix(index, suffix);
         ByteBuffer value = valueWithSuffix(index, suffix);
@@ -247,10 +278,7 @@ class PersistenceTest {
     private void prepareHugeDao(@TempDir Path data, int recordsCount, byte[] suffix) throws IOException {
         try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
             for (int i = 0; i < recordsCount; i++) {
-                ByteBuffer key = keyWithSuffix(i, suffix);
-                ByteBuffer value = valueWithSuffix(i, suffix);
-
-                dao.upsert(Record.of(key, value));
+                createFile(dao, keyWithSuffix(i, suffix), valueWithSuffix(i, suffix));
             }
         }
     }

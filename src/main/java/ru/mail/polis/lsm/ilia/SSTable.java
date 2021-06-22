@@ -20,31 +20,44 @@ import java.util.*;
 class SSTable implements Closeable {
 
     private static final Method CLEAN;
+    static final String SSTABLE_FILE_PREFIX = "file_";
 
     private final MappedByteBuffer mmap;
     private final MappedByteBuffer idx;
+    private Path file;
 
     static {
         try {
             Class<?> filename = Class.forName("sun.nio.ch.FileChannelImpl");
             CLEAN = filename.getDeclaredMethod("unmap", MappedByteBuffer.class);
             CLEAN.setAccessible(true);
-        } catch (ClassNotFoundException | NoSuchMethodException e) {
+        } catch (Exception e) {
             throw new IllegalStateException(e);
         }
     }
 
     private SSTable(Path file) throws IOException {
-        Path indexFile = getIndexFile(file);
+        Path indexPath = getIndexFile(file);
+        this.file = file;
 
         mmap = open(file);
-        idx = open(indexFile);
+        idx = open(indexPath);
+    }
+
+    public Path getPath() {
+        return file;
+    }
+
+    static int sizeOf(Record record) {
+        int keySize = Integer.BYTES + record.getKeySize();
+        int valueSize = Integer.BYTES + record.getValueSize();
+        return keySize + valueSize;
     }
 
     static List<SSTable> loadFromDir(Path dir) throws IOException {
         List<SSTable> result = new ArrayList<>();
         for (int i = 0; ; i++) {
-            Path file = dir.resolve("file_" + i);
+            Path file = dir.resolve(SSTABLE_FILE_PREFIX + i);
             if (!Files.exists(file)) {
                 return result;
             }
@@ -59,15 +72,17 @@ class SSTable implements Closeable {
 
         try (FileChannel fileChannel = FileChannel.open(
                 tmpFileName,
+                StandardOpenOption.CREATE_NEW,
                 StandardOpenOption.WRITE,
-                StandardOpenOption.CREATE_NEW
+                StandardOpenOption.TRUNCATE_EXISTING
         );
              FileChannel indexChannel = FileChannel.open(
                      tmpIndexName,
+                     StandardOpenOption.CREATE_NEW,
                      StandardOpenOption.WRITE,
-                     StandardOpenOption.CREATE_NEW
+                     StandardOpenOption.TRUNCATE_EXISTING
              )) {
-            final ByteBuffer size = ByteBuffer.allocate(Integer.BYTES);
+            ByteBuffer size = ByteBuffer.allocate(Integer.BYTES);
             while (records.hasNext()) {
                 long position = fileChannel.position();
                 if (position > Integer.MAX_VALUE) {
@@ -88,11 +103,9 @@ class SSTable implements Closeable {
             fileChannel.force(false);
         }
 
-        Files.deleteIfExists(file);
-        Files.move(tmpFileName, file, StandardCopyOption.ATOMIC_MOVE);
+        rename(indexFile, tmpIndexName);
+        rename(file, tmpFileName);
 
-        Files.deleteIfExists(indexFile);
-        Files.move(tmpIndexName, indexFile, StandardCopyOption.ATOMIC_MOVE);
         return new SSTable(file);
     }
 
@@ -135,11 +148,16 @@ class SSTable implements Closeable {
         );
     }
 
+    private static void rename(Path indexFile, Path tmpIndexName) throws IOException {
+        Files.deleteIfExists(indexFile);
+        Files.move(tmpIndexName, indexFile, StandardCopyOption.ATOMIC_MOVE);
+    }
+
     private static Path getTmpFile(Path file) {
         return resolveWithExt(file, ".tmp");
     }
 
-    private static Path getIndexFile(Path file) {
+    public static Path getIndexFile(Path file) {
         return resolveWithExt(file, ".idx");
     }
 

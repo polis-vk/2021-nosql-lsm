@@ -9,20 +9,23 @@ import javax.annotation.Nullable;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
+import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.SortedMap;
+import java.util.*;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ConcurrentSkipListMap;
 
 public class DAOImpl implements DAO {
 
-    private static final int MEMORY_LIM = 1024 * 1024 * 20;
+    private static final String COMPACT = "COMPACT";
+    private static final String FILE_NAME_COMPACT = SSTable.SSTABLE_FILE_PREFIX + COMPACT;
+    private static final String FILE_NAME_COMPACT_RESULT = SSTable.SSTABLE_FILE_PREFIX + "0";
+
     private final SortedMap<ByteBuffer, Record> memoryStorage = new ConcurrentSkipListMap<>();
-    private final DAOConfig config;
     private final ConcurrentLinkedDeque<SSTable> tables = new ConcurrentLinkedDeque<>();
+
+    private final DAOConfig config;
+
     private int nextSStableIndex;
     private int memorySize;
 
@@ -33,9 +36,34 @@ public class DAOImpl implements DAO {
      */
     public DAOImpl(DAOConfig config) throws IOException {
         this.config = config;
-        List<SSTable> ssTables = SSTable.loadFromDir(config.getDir());
+        List<SSTable> ssTables = SSTable.loadFromDir(config.dir);
         nextSStableIndex = ssTables.size();
         tables.addAll(ssTables);
+    }
+
+    @Override
+    public void compact() throws IOException {
+        synchronized (this) {
+            Iterator<Record> result = new PeekingIterator(range(null, null));
+            Path dir = config.dir;
+            Path file = dir.resolve(DAOImpl.FILE_NAME_COMPACT);
+
+            if (result.hasNext()) {
+                SSTable ssTable = SSTable.write(result,  file);
+                tables.add(ssTable);
+
+                for (SSTable table : tables) {
+                    if (!table.getPath().getFileName().toString().contains(COMPACT)) {
+                        table.close();
+                        tables.remove(table);
+                        Files.deleteIfExists(table.getPath());
+                    }
+                }
+
+                memoryStorage.clear();
+                Files.move(dir.resolve(FILE_NAME_COMPACT), dir.resolve(FILE_NAME_COMPACT_RESULT));
+            }
+        }
     }
 
     @Override
@@ -51,26 +79,16 @@ public class DAOImpl implements DAO {
     @Override
     public void upsert(@Nonnull Record record) {
         synchronized (this) {
-            memorySize += sizeOf(record);
-            if (memorySize >= MEMORY_LIM) {
+            memorySize += SSTable.sizeOf(record);
+            if (memorySize > config.memoryLimit) {
                 try {
                     flush();
                 } catch (IOException e) {
                     throw new UncheckedIOException(e);
                 }
             }
+            memoryStorage.put(record.getKey(), record);
         }
-
-        memoryStorage.put(record.getKey(), record);
-    }
-
-    private Integer sizeOf(Record record) {
-        int keySize = record.getKey().remaining();
-        int valueSize = 0;
-        if (!record.isTombstone()) {
-            valueSize = record.getValue().remaining();
-        }
-        return keySize + valueSize;
     }
 
     @Override
@@ -79,16 +97,19 @@ public class DAOImpl implements DAO {
             if (!memoryStorage.isEmpty()) {
                 flush();
             }
-            for (SSTable ssTable : tables) {
-                ssTable.close();
-            }
+            sstableClose();
+        }
+    }
+
+    private void sstableClose() throws IOException {
+        for (SSTable sstable : tables) {
+            sstable.close();
         }
     }
 
     private void flush() throws IOException {
-        Path dir = config.getDir();
-        Path file = dir.resolve("file_" + nextSStableIndex);
-        nextSStableIndex++;
+        Path dir = config.dir;
+        Path file = dirResolve(dir);
 
         SSTable ssTable = SSTable.write(memoryStorage.values().iterator(), file);
         tables.add(ssTable);
@@ -96,12 +117,18 @@ public class DAOImpl implements DAO {
         memorySize = 0;
     }
 
+    private Path dirResolve(Path dir) {
+        Path file = dir.resolve(SSTable.SSTABLE_FILE_PREFIX + nextSStableIndex);
+        nextSStableIndex++;
+        return file;
+    }
+
     private Iterator<Record> sstableRanges(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
         List<Iterator<Record>> iterators = new ArrayList<>(tables.size());
         for (SSTable ssTable : tables) {
             iterators.add(ssTable.range(fromKey, toKey));
         }
-        return DAO.merge(iterators);
+        return merge(iterators);
     }
 
     private SortedMap<ByteBuffer, Record> map(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
@@ -115,5 +142,27 @@ public class DAOImpl implements DAO {
             return memoryStorage.tailMap(fromKey);
         }
         return memoryStorage.subMap(fromKey, toKey);
+    }
+
+    /**
+     * Merges iterators.
+     *
+     * @param iterators iterators List
+     * @return result Iterator
+     */
+    private static Iterator<Record> merge(List<Iterator<Record>> iterators) {
+        switch (iterators.size()) {
+            case (0):
+                return Collections.emptyIterator();
+            case (1):
+                return iterators.get(0);
+            case (2):
+                return new MergeTwo(new PeekingIterator(iterators.get(0)), new PeekingIterator(iterators.get(1)));
+            default:
+                Iterator<Record> left = merge(iterators.subList(0, iterators.size() / 2));
+                Iterator<Record> right = merge(iterators.subList(iterators.size() / 2, iterators.size()));
+
+                return new MergeTwo(new PeekingIterator(left), new PeekingIterator(right));
+        }
     }
 }
