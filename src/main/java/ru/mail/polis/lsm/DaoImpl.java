@@ -102,7 +102,7 @@ public class DaoImpl implements DAO {
                 Files.move(config.getDir().resolve("file_-1"), config.getDir().resolve("file_0"));
                 Objects.requireNonNull(compactSSTable).setPath(config.getDir().resolve("file_0"));
             }
-        ]
+        }
     }
 
     private void removeOldSSTables() throws IOException {
