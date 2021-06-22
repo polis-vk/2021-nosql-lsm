@@ -53,7 +53,7 @@ public class DAOImpl implements DAO {
                 tables.add(ssTable);
 
                 for (SSTable table : tables) {
-                    if (!table.getPath().getFileName().toString().contains(COMPACT)) {
+                    if (!fileNameEquals(table.getPath())) {
                         table.close();
                         tables.remove(table);
                         Files.deleteIfExists(table.getPath());
@@ -64,6 +64,10 @@ public class DAOImpl implements DAO {
                 Files.move(dir.resolve(FILE_NAME_COMPACT), dir.resolve(FILE_NAME_COMPACT_RESULT));
             }
         }
+    }
+
+    private boolean fileNameEquals(Path table) {
+        return SSTable.fileNameEquals(table, COMPACT);
     }
 
     @Override

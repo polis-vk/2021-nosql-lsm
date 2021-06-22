@@ -24,7 +24,7 @@ class SSTable implements Closeable {
 
     private final MappedByteBuffer mmap;
     private final MappedByteBuffer idx;
-    private Path file;
+    private Path fileName;
 
     static {
         try {
@@ -38,14 +38,14 @@ class SSTable implements Closeable {
 
     private SSTable(Path file) throws IOException {
         Path indexPath = getIndexFile(file);
-        this.file = file;
+        fileName = file;
 
         mmap = open(file);
         idx = open(indexPath);
     }
 
-    public Path getPath() {
-        return file;
+    Path getPath() {
+        return fileName;
     }
 
     static int sizeOf(Record record) {
@@ -157,7 +157,7 @@ class SSTable implements Closeable {
         return resolveWithExt(file, ".tmp");
     }
 
-    public static Path getIndexFile(Path file) {
+    private static Path getIndexFile(Path file) {
         return resolveWithExt(file, ".idx");
     }
 
@@ -169,6 +169,10 @@ class SSTable implements Closeable {
         writeInt(value.remaining(), channel, tmp);
         channel.write(tmp);
         channel.write(value);
+    }
+
+     static boolean fileNameEquals(Path path, String name) {
+        return path.getFileName().toString().contains(name);
     }
 
     private static void writeInt(int value, WritableByteChannel channel, ByteBuffer tmp) throws IOException {
