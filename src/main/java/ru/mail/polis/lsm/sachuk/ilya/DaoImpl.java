@@ -51,16 +51,9 @@ public class DaoImpl implements DAO {
     }
 
     @Override
-    public Iterator<Record> range(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey)
-            throws UncheckedIOException {
+    public Iterator<Record> range(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
         synchronized (this) {
-
-            Iterator<Record> ssTableRanges;
-            try {
-                ssTableRanges = ssTableRanges(fromKey, toKey);
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
+            Iterator<Record> ssTableRanges = ssTableRanges(fromKey, toKey);
 
             Iterator<Record> memoryRange = map(fromKey, toKey).values().iterator();
             Iterator<Record> mergedIterators = mergeTwo(ssTableRanges, memoryRange);
@@ -154,8 +147,7 @@ public class DaoImpl implements DAO {
 
     }
 
-    private Iterator<Record> ssTableRanges(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey)
-            throws IOException {
+    private Iterator<Record> ssTableRanges(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
         List<Iterator<Record>> iterators = new ArrayList<>(ssTables.size());
 
         for (SSTable ssTable : ssTables) {

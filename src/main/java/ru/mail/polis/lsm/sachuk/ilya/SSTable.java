@@ -5,7 +5,6 @@ import ru.mail.polis.lsm.Record;
 import javax.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -58,7 +57,7 @@ class SSTable {
         restoreStorage();
     }
 
-    Iterator<Record> range(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) throws IOException {
+    Iterator<Record> range(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
 
         if (fromKey != null && toKey != null && fromKey.compareTo(toKey) == 0) {
             return Collections.emptyIterator();
@@ -169,7 +168,6 @@ class SSTable {
             Arrays.fill(indexes, 0);
             indexes = null;
         }
-
     }
 
     public Path getSavePath() {
@@ -180,11 +178,7 @@ class SSTable {
         return indexPath;
     }
 
-    public int getValuesNumber() {
-        return indexes.length;
-    }
-
-    private int binarySearchKey(int[] indexArray, ByteBuffer keyToFind) throws IOException {
+    private int binarySearchKey(int[] indexArray, ByteBuffer keyToFind) {
 
         if (keyToFind == null) {
             return 0;
@@ -260,7 +254,7 @@ class SSTable {
         }
     }
 
-    private ByteBuffer readFromFile(MappedByteBuffer mappedByteBuffer) throws IOException {
+    private ByteBuffer readFromFile(MappedByteBuffer mappedByteBuffer) {
         int length = mappedByteBuffer.getInt();
 
         ByteBuffer byteBuffer = mappedByteBuffer.slice().limit(length).asReadOnlyBuffer();
@@ -347,41 +341,35 @@ class SSTable {
 
         @Override
         public boolean hasNext() {
-            try {
-                if (readToEnd) {
-                    return mappedByteBuffer.hasRemaining();
-                }
-
-                return mappedByteBuffer.hasRemaining() && getNextKey().compareTo(keyToRead) < 0;
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
+            if (readToEnd) {
+                return mappedByteBuffer.hasRemaining();
             }
+
+            return mappedByteBuffer.hasRemaining() && getNextKey().compareTo(keyToRead) < 0;
         }
 
         @Override
         public Record next() {
             Record record;
-            try {
-                if (!hasNext()) {
-                    throw new NoSuchElementException();
-                }
 
-                ByteBuffer key = readFromFile(mappedByteBuffer);
-                ByteBuffer value = readFromFile(mappedByteBuffer);
-
-                if (value.compareTo(BYTE_BUFFER_TOMBSTONE) == 0) {
-                    record = Record.tombstone(key);
-                } else {
-                    value.position(0);
-                    record = Record.of(key, value);
-                }
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
+            if (!hasNext()) {
+                throw new NoSuchElementException();
             }
+
+            ByteBuffer key = readFromFile(mappedByteBuffer);
+            ByteBuffer value = readFromFile(mappedByteBuffer);
+
+            if (value.compareTo(BYTE_BUFFER_TOMBSTONE) == 0) {
+                record = Record.tombstone(key);
+            } else {
+                value.position(0);
+                record = Record.of(key, value);
+            }
+
             return record;
         }
 
-        private ByteBuffer getNextKey() throws IOException {
+        private ByteBuffer getNextKey() {
             int currentPos = mappedByteBuffer.position();
 
             ByteBuffer key = readFromFile(mappedByteBuffer);
