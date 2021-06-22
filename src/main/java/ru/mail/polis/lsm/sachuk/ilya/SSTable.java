@@ -20,6 +20,7 @@ import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Iterator;
@@ -45,7 +46,7 @@ class SSTable {
 
     private final Path savePath;
     private final Path indexPath;
-    private final List<Long> indexList = new ArrayList<>();
+    private int[] indexes;
 
     private MappedByteBuffer mappedByteBuffer;
     private MappedByteBuffer indexByteBuffer;
@@ -63,7 +64,7 @@ class SSTable {
             return Collections.emptyIterator();
         }
 
-        return new SSTableIterator(binarySearchKey(indexList, fromKey), toKey);
+        return new SSTableIterator(binarySearchKey(indexes, fromKey), toKey);
     }
 
     static List<SSTable> loadFromDir(Path dir) throws IOException {
@@ -83,7 +84,7 @@ class SSTable {
         return listSSTables;
     }
 
-    static SSTable save(Iterator<Record> iterators, Path dir, int fileNumber) throws IOException {
+    static SSTable save(Iterator<Record> iterators, int indexSize, Path dir, int fileNumber) throws IOException {
 
         final Path savePath = dir.resolve(SAVE_FILE + fileNumber + SAVE_FILE_END);
         final Path indexPath = dir.resolve(INDEX_FILE + fileNumber + INDEX_FILE_END);
@@ -105,6 +106,12 @@ class SSTable {
                     StandardOpenOption.TRUNCATE_EXISTING)) {
 
                 ByteBuffer size = ByteBuffer.allocate(Integer.BYTES);
+
+
+                ByteBuffer indexSizeByteBuffer = ByteBuffer.wrap(
+                        ByteBuffer.allocate(Integer.BYTES).putInt(indexSize).array()
+                );
+                indexFileChanel.write(indexSizeByteBuffer);
 
                 while (iterators.hasNext()) {
                     long indexPositionToRead = saveFileChannel.position();
@@ -146,7 +153,8 @@ class SSTable {
         if (indexByteBuffer != null) {
             clean(indexByteBuffer);
             indexByteBuffer.clear();
-            indexList.clear();
+            Arrays.fill(indexes, 0);
+            indexes = null;
         }
 
     }
@@ -159,14 +167,18 @@ class SSTable {
         return indexPath;
     }
 
-    private int binarySearchKey(List<Long> indexList, ByteBuffer keyToFind) throws IOException {
+    public int getValuesNumber() {
+        return indexes.length;
+    }
+
+    private int binarySearchKey(int[] indexArray, ByteBuffer keyToFind) throws IOException {
 
         if (keyToFind == null) {
             return 0;
         }
 
         int start = 0;
-        int end = indexList.size() - 1;
+        int end = indexArray.length - 1;
 
         int positionToRead;
 
@@ -176,7 +188,7 @@ class SSTable {
 
             middle = (start + end) / 2;
 
-            positionToRead = indexList.get(middle).intValue();
+            positionToRead = indexArray[middle];
 
             mappedByteBuffer.position(positionToRead);
 
@@ -189,11 +201,11 @@ class SSTable {
 
                 if (start > end && keyToFind.compareTo(key) > 0) {
 
-                    if (start == indexList.size()) {
+                    if (start == indexArray.length) {
                         return -1;
                     }
 
-                    if (start < indexList.size()) {
+                    if (start < indexArray.length) {
                         return start;
                     }
                 }
@@ -202,7 +214,7 @@ class SSTable {
             }
 
         }
-        return indexList.get(middle).intValue();
+        return indexArray[middle];
     }
 
     private void restoreStorage() throws IOException {
@@ -220,8 +232,16 @@ class SSTable {
                         indexFileChannel.size()
                 );
 
+                int size = indexByteBuffer.getInt();
+                indexes = new int[size];
+
+                int counter = 0;
                 while (indexByteBuffer.hasRemaining()) {
-                    indexList.add(indexByteBuffer.getLong());
+
+                    int value = (int) indexByteBuffer.getLong();
+
+                    indexes[counter] = value;
+                    counter++;
                 }
             }
         }
