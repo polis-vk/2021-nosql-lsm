@@ -98,9 +98,7 @@ public class DaoImpl implements DAO {
         synchronized (this) {
             Iterator<Record> iterator = range(null, null);
 
-            int size = ssTables.stream().mapToInt(SSTable::getValuesNumber).sum() + memoryStorage.size();
-
-            SSTable compactedTable = SSTable.save(iterator, size, dirPath, nextSSTableNumber++);
+            SSTable compactedTable = SSTable.save(iterator, dirPath, nextSSTableNumber++);
 
             String indexFile = compactedTable.getIndexPath().getFileName().toString();
             String saveFile = compactedTable.getSavePath().getFileName().toString();
@@ -147,7 +145,6 @@ public class DaoImpl implements DAO {
     private void flush() throws IOException {
         SSTable ssTable = SSTable.save(
                 memoryStorage.values().iterator(),
-                memoryStorage.size(),
                 dirPath,
                 nextSSTableNumber++
         );

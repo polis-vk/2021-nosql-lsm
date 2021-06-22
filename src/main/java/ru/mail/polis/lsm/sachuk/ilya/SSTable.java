@@ -84,7 +84,7 @@ class SSTable {
         return listSSTables;
     }
 
-    static SSTable save(Iterator<Record> iterators, int indexSize, Path dir, int fileNumber) throws IOException {
+    static SSTable save(Iterator<Record> iterators, Path dir, int fileNumber) throws IOException {
 
         final Path savePath = dir.resolve(SAVE_FILE + fileNumber + SAVE_FILE_END);
         final Path indexPath = dir.resolve(INDEX_FILE + fileNumber + INDEX_FILE_END);
@@ -107,11 +107,12 @@ class SSTable {
 
                 ByteBuffer size = ByteBuffer.allocate(Integer.BYTES);
 
-
-                ByteBuffer indexSizeByteBuffer = ByteBuffer.wrap(
-                        ByteBuffer.allocate(Integer.BYTES).putInt(indexSize).array()
+                int counter = 0;
+                ByteBuffer firstSize = ByteBuffer.wrap(
+                        ByteBuffer.allocate(Integer.BYTES).putInt(counter).array()
                 );
-                indexFileChanel.write(indexSizeByteBuffer);
+
+                indexFileChanel.write(firstSize);
 
                 while (iterators.hasNext()) {
                     long indexPositionToRead = saveFileChannel.position();
@@ -120,6 +121,7 @@ class SSTable {
                             ByteBuffer.allocate(Long.BYTES).putLong(indexPositionToRead).array()
                     );
                     indexFileChanel.write(offset);
+                    counter++;
 
                     Record record = iterators.next();
 
@@ -130,6 +132,17 @@ class SSTable {
                     writeSizeAndValue(record.getKey(), saveFileChannel, size);
                     writeSizeAndValue(value, saveFileChannel, size);
                 }
+
+                int curPos = (int) indexFileChanel.position();
+
+                indexFileChanel.position(0);
+
+                ByteBuffer realNumberRecords = ByteBuffer.wrap(
+                        ByteBuffer.allocate(Integer.BYTES).putInt(counter).array()
+                );
+                indexFileChanel.write(realNumberRecords);
+
+                indexFileChanel.position(curPos);
 
                 saveFileChannel.force(false);
                 indexFileChanel.force(false);
