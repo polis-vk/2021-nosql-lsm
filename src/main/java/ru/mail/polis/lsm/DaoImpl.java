@@ -88,20 +88,21 @@ public class DaoImpl implements DAO {
 
     @Override
     public void compact() throws IOException {
-        Iterator<Record> result = range(null, null);
-        boolean dataExists = result.hasNext() && !tables.isEmpty();
-        SSTable compactSSTable = null;
-        if (dataExists) {
-            compactSSTable = makeSSTable("file_-1", result);
-            tables.add(compactSSTable);
-        }
-            removeOldSSTables();
-        if (dataExists) {
-            map.clear();
-            Files.move(config.getDir().resolve("file_-1"), config.getDir().resolve("file_0"));
-            Objects.requireNonNull(compactSSTable).setPath(config.getDir().resolve("file_0"));
-        }
-
+        synchronized (this) {
+            Iterator<Record> result = range(null, null);
+            boolean dataExists = result.hasNext() && !tables.isEmpty();
+            SSTable compactSSTable = null;
+            if (dataExists) {
+                compactSSTable = makeSSTable("file_-1", result);
+                tables.add(compactSSTable);
+            }
+                removeOldSSTables();
+            if (dataExists) {
+                map.clear();
+                Files.move(config.getDir().resolve("file_-1"), config.getDir().resolve("file_0"));
+                Objects.requireNonNull(compactSSTable).setPath(config.getDir().resolve("file_0"));
+            }
+        ]
     }
 
     private void removeOldSSTables() throws IOException {
