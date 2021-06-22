@@ -182,7 +182,7 @@ class SSTable {
     }
 
     /**
-     * Delete all files if there is compact file inside dir
+     * Delete all files if there is compact file inside dir.
      *
      * @param dir directory
      * @return true if files deleted
