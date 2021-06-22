@@ -350,7 +350,6 @@ class SSTable {
 
         @Override
         public Record next() {
-            Record record;
 
             if (!hasNext()) {
                 throw new NoSuchElementException();
@@ -359,6 +358,8 @@ class SSTable {
             ByteBuffer key = readFromFile(mappedByteBuffer);
             ByteBuffer value = readFromFile(mappedByteBuffer);
 
+            Record record;
+            
             if (value.compareTo(BYTE_BUFFER_TOMBSTONE) == 0) {
                 record = Record.tombstone(key);
             } else {
