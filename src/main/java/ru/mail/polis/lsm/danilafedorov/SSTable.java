@@ -27,7 +27,7 @@ public class SSTable implements Closeable {
     private static final Method CLEAN;
     private static final Integer NULL_SIZE = -1;
     private static final String TEMP_FILE_ENDING = "_temp";
-    private static final String INDEX_FILE_ENDING = "_index";
+    static final String INDEX_FILE_ENDING = "_index";
 
     private final MappedByteBuffer mmap;
     private final Path indexPath;
@@ -60,10 +60,9 @@ public class SSTable implements Closeable {
         return ssTables;
     }
 
-    static SSTable write(final Path path, final Iterator<Record> iterator) throws IOException {
-        String name = path.getFileName().toString();
-        Path pathTemp = path.resolveSibling(name + TEMP_FILE_ENDING);
-        Path pathIndex = path.resolveSibling(name + INDEX_FILE_ENDING);
+    static SSTable write(final Path file, final Iterator<Record> iterator) throws IOException {
+        Path pathTemp = resolveTempFilePath(file);
+        Path pathIndex = resolveIndexFilePath(file);
         try (FileChannel mainChannel =
                      FileChannel.open(
                              pathTemp,
@@ -93,9 +92,19 @@ public class SSTable implements Closeable {
             indexChannel.force(false);
         }
 
-        Files.move(pathTemp, path, StandardCopyOption.ATOMIC_MOVE);
+        Files.move(pathTemp, file, StandardCopyOption.ATOMIC_MOVE);
 
-        return new SSTable(path);
+        return new SSTable(file);
+    }
+
+    static Path resolveIndexFilePath(Path file) {
+        String name = file.getFileName().toString();
+        return file.resolveSibling(name + INDEX_FILE_ENDING);
+    }
+
+    private static Path resolveTempFilePath(Path file) {
+        String name = file.getFileName().toString();
+        return file.resolveSibling(name + TEMP_FILE_ENDING);
     }
 
     /**
@@ -106,12 +115,10 @@ public class SSTable implements Closeable {
      */
     public SSTable(final Path path) throws IOException {
         String name = path.getFileName().toString();
-        indexPath = path.resolveSibling(name + INDEX_FILE_ENDING);
+        indexPath = resolveIndexFilePath(path);
 
         indexes = getIndexes();
-        try (FileChannel channel = FileChannel.open(path, StandardOpenOption.READ)) {
-            mmap = channel.map(FileChannel.MapMode.READ_ONLY, 0, channel.size());
-        }
+        mmap = getMappedByteBuffer(path);
     }
 
     /**
@@ -129,7 +136,7 @@ public class SSTable implements Closeable {
 
         int toIndex = toKey == null ? indexes.length : findKeyIndex(toKey);
 
-        ByteBuffer buffer = mmap.position(indexes[fromIndex]).slice();
+        ByteBuffer buffer = mmap.duplicate().position(indexes[fromIndex]).slice();
         if (toIndex < indexes.length) {
             buffer = buffer.limit(indexes[toIndex] - indexes[fromIndex]);
         }
@@ -145,6 +152,12 @@ public class SSTable implements Closeable {
             } catch (IllegalAccessException | InvocationTargetException e) {
                 throw new IOException(e);
             }
+        }
+    }
+
+    private static MappedByteBuffer getMappedByteBuffer(Path path) throws IOException {
+        try (FileChannel channel = FileChannel.open(path, StandardOpenOption.READ)) {
+            return channel.map(FileChannel.MapMode.READ_ONLY, 0, channel.size());
         }
     }
 

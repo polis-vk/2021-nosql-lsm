@@ -8,22 +8,30 @@ import javax.annotation.Nullable;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
+import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.*;
+import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.List;
+import java.util.SortedMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.stream.Stream;
 
 public class LsmDAO implements DAO {
 
     private final SortedMap<ByteBuffer, Record> memoryStorage = new ConcurrentSkipListMap<>();
-    private ConcurrentLinkedDeque<SSTable> ssTables;
+    private ConcurrentLinkedDeque<SSTable> ssTables  = new ConcurrentLinkedDeque<>();
 
     private final DAOConfig config;
 
     private Integer memoryConsumption = 0;
     private static final Integer MEMORY_LIMIT = 1024 * 1024 * 32;
-
     static final String FILE_NAME = "SSTable_";
+    private static final String COMPACTED_FILE_ENDING = "compacted";
+    private static final String COMPACTED_FILE_NAME = FILE_NAME + COMPACTED_FILE_ENDING;
 
     /**
      * Class constructor identifying directory of DB location.
@@ -67,15 +75,71 @@ public class LsmDAO implements DAO {
     }
 
     @Override
+    public void compact() {
+        synchronized (this) {
+            final Path pathTemp = getCompactedSSTablePath();
+            try {
+                flush();
+                final Iterator<Record> it = new TombstoneSkippingIterator(sstableRanges(null, null));
+                final SSTable ssTable = SSTable.write(pathTemp, it);
+                ssTables.add(ssTable);
+                close();
+
+                restore();
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
+    }
+
+    @Override
     public void close() throws IOException {
         flush();
 
         for (SSTable ssTable : ssTables) {
             ssTable.close();
         }
+
+        ssTables.clear();
+    }
+
+    private static boolean isCompacted(Path path) {
+        String name = path.getFileName().toString();
+        return name.contains(COMPACTED_FILE_ENDING);
+    }
+
+    private Path getCompactedSSTablePath() {
+        return config.getDir().resolve(COMPACTED_FILE_NAME);
+    }
+
+    private void replaceCompactedSSTable() throws IOException {
+        try (Stream<Path> paths = Files.list(config.getDir())) {
+            Iterator<Path> it = paths
+                    .filter(e -> !isCompacted(e))
+                    .iterator();
+
+            while (it.hasNext()) {
+                Path path = it.next();
+                Files.delete(path);
+            }
+        }
+
+        final Path pathTemp = getCompactedSSTablePath();
+        final Path indexPathTemp = SSTable.resolveIndexFilePath(pathTemp);
+
+        final Path path = getNewSSTablePath();
+        final Path indexPath = SSTable.resolveIndexFilePath(path);
+
+        Files.copy(indexPathTemp, indexPath, StandardCopyOption.REPLACE_EXISTING);
+        Files.move(pathTemp, path, StandardCopyOption.ATOMIC_MOVE);
+        Files.delete(indexPathTemp);
     }
 
     private void restore() throws IOException {
+        if (Files.exists(getCompactedSSTablePath())) {
+            replaceCompactedSSTable();
+        }
+
         ssTables = SSTable.loadFromDir(config.getDir());
     }
 
@@ -118,14 +182,18 @@ public class LsmDAO implements DAO {
             return;
         }
 
-        final String name = FILE_NAME + ssTables.size();
-        final Path path = config.getDir().resolve(name);
+        final Path path = getNewSSTablePath();
         final Iterator<Record> iterator = memoryStorage.values().iterator();
 
         final SSTable ssTable = SSTable.write(path, iterator);
         memoryStorage.clear();
         memoryConsumption = 0;
         ssTables.add(ssTable);
+    }
+
+    private Path getNewSSTablePath() {
+        final String name = FILE_NAME + ssTables.size();
+        return config.getDir().resolve(name);
     }
 
     /**
