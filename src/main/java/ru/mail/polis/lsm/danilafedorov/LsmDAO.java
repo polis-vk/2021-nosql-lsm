@@ -9,10 +9,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.SortedMap;
+import java.util.*;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ConcurrentSkipListMap;
 
@@ -47,7 +44,7 @@ public class LsmDAO implements DAO {
         }
         final Iterator<Record> memoryStorageRange = memoryStorageRange(fromKey, toKey);
 
-        final Iterator<Record> mergedRanges = DAO.mergeTwo(sstableRanges, memoryStorageRange);
+        final Iterator<Record> mergedRanges = mergeTwo(sstableRanges, memoryStorageRange);
         return new TombstoneSkippingIterator(mergedRanges);
     }
 
@@ -87,7 +84,7 @@ public class LsmDAO implements DAO {
         for (SSTable ssTable : ssTables) {
             iterators.add(ssTable.range(fromKey, toKey));
         }
-        return DAO.merge(iterators);
+        return merge(iterators);
     }
 
     private Iterator<Record> memoryStorageRange(ByteBuffer fromKey, ByteBuffer toKey) {
@@ -129,6 +126,91 @@ public class LsmDAO implements DAO {
         memoryStorage.clear();
         memoryConsumption = 0;
         ssTables.add(ssTable);
+    }
+
+    /**
+     * Merges iterators.
+     *
+     * @param iterators List
+     * @return Iterator
+     */
+    private static Iterator<Record> merge(List<Iterator<Record>> iterators) {
+        if (iterators.isEmpty()) {
+            return Collections.emptyIterator();
+        }
+        if (iterators.size() == 1) {
+            return iterators.get(0);
+        }
+        if (iterators.size() == 2) {
+            return mergeTwo(iterators.get(0), iterators.get(1));
+        }
+
+        Iterator<Record> left = merge(iterators.subList(0, iterators.size() / 2));
+        Iterator<Record> right = merge(iterators.subList(iterators.size() / 2, iterators.size()));
+        return mergeTwo(left, right);
+    }
+
+    private static Iterator<Record> mergeTwo(Iterator<Record> left, Iterator<Record> right) {
+        return new MergedRecordsIterator(left, right);
+    }
+
+    static class MergedRecordsIterator implements Iterator<Record> {
+
+        private final Iterator<Record> it1;
+        private final Iterator<Record> it2;
+        private Record next1;
+        private Record next2;
+
+        public MergedRecordsIterator(final Iterator<Record> left, final Iterator<Record> right) {
+            it1 = right;
+            it2 = left;
+            getNext1();
+            getNext2();
+        }
+
+        @Override
+        public boolean hasNext() {
+            return next1 != null || next2 != null;
+        }
+
+        @Override
+        public Record next() {
+            Record returnRecord = null;
+
+            if (hasNext()) {
+                if (next2 == null) {
+                    returnRecord = next1;
+                    getNext1();
+                } else if (next1 == null) {
+                    returnRecord = next2;
+                    getNext2();
+                } else {
+                    int compareResult = next1.getKey().compareTo(next2.getKey());
+
+                    if (compareResult <= 0) {
+                        returnRecord = next1;
+                        getNext1();
+
+                        if (compareResult == 0) {
+                            getNext2();
+                        }
+                    } else {
+                        returnRecord = next2;
+                        getNext2();
+                    }
+                }
+            }
+
+            return returnRecord;
+        }
+
+        private void getNext1() {
+            next1 = it1.hasNext() ? it1.next() : null;
+        }
+
+        private void getNext2() {
+            next2 = it2.hasNext() ? it2.next() : null;
+        }
     }
 
     static class TombstoneSkippingIterator implements Iterator<Record> {
