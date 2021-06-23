@@ -3,6 +3,8 @@ package ru.mail.polis.lsm.saveliyschur;
 import ru.mail.polis.lsm.DAO;
 import ru.mail.polis.lsm.DAOConfig;
 import ru.mail.polis.lsm.Record;
+import ru.mail.polis.lsm.saveliyschur.sstservice.SSTable;
+import ru.mail.polis.lsm.saveliyschur.sstservice.SSTableService;
 
 import javax.annotation.Nullable;
 import java.io.File;
@@ -14,26 +16,47 @@ import java.nio.channels.WritableByteChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.util.Deque;
 import java.util.Iterator;
+import java.util.List;
+import java.util.NoSuchElementException;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ConcurrentNavigableMap;
 import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.logging.Logger;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class MyDAO implements DAO {
 
+    private static final Logger log = Logger.getLogger(MyDAO.class.getName());
+
     private volatile ConcurrentSkipListMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
     private final DAOConfig config;
-    private static final String FILE_SAVE = "save.dat";
     private static final String LOG_FILE = "log_db.log";
     private static Path fileLog;
 
+    private static long numberSSTables;
+
+    private final Deque<SSTable> ssTables = new ConcurrentLinkedDeque<>();
+
+    private final SSTableService ssTableService;
+
     public MyDAO(DAOConfig config) throws IOException {
+        log.info("Create DAO from path: " + config.getDir().toString());
         this.config = config;
         fileLog = config.getDir().resolve(LOG_FILE);
+        ssTableService = new SSTableService(config);
 
-        Path file = config.getDir().resolve(FILE_SAVE);
+        try (Stream<Path> streamPath = Files.walk(config.getDir())) {
+            log.info("Read SSTables");
+            streamPath.filter(file -> file.toString().endsWith(SSTable.EXTENSION))
+                    .sorted()
+                    .map(SSTable::new)
+                    .forEach(ssTables::add);
 
-        if (Files.exists(file)) {
-            readFileAndAddCollection(file);
+            numberSSTables = ssTables.size();
+            log.info("SSTables number = " + numberSSTables);
         }
 
         //Create a log file if it does not exist
@@ -50,39 +73,38 @@ public class MyDAO implements DAO {
     @Override
     public Iterator<Record> range(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
         ConcurrentNavigableMap<ByteBuffer, Record> storageHash = storage.clone();
-        return getSubMap(fromKey, toKey, storageHash).values().stream().filter(x -> x.getValue() != null).iterator();
+        Iterator<Record> memoryIterator = getSubMap(fromKey, toKey, storageHash).values().stream()
+                .filter(x -> x.getValue() != null)
+                .iterator();
+        Iterator<Record> sstableIterators = ssTableService.getRange(ssTables, fromKey, toKey);
+        Iterator<Record> anser =  DAO.mergeTwo(new PeekingIterator(memoryIterator), new PeekingIterator(sstableIterators));
+        return filterTombstones(anser);
     }
 
     @Override
     public void upsert(Record record) {
-        storage.put(record.getKey(), record);
+        synchronized (this) {
+            storage.put(record.getKey(), record);
 
-        //We write the entry to the log so that in case of a failure we can recover
-        try (FileChannel fileChannel = FileChannel.open(fileLog, StandardOpenOption.WRITE)) {
-            ByteBuffer size = ByteBuffer.allocate(Integer.BYTES);
-            writeInt(record.getKey(), fileChannel, size);
-            writeInt(record.getValue(), fileChannel, size);
-        } catch (IOException e) {
-            e.printStackTrace();
+            //We write the entry to the log so that in case of a failure we can recover
+            try (FileChannel fileChannel = FileChannel.open(fileLog, StandardOpenOption.WRITE)) {
+                ByteBuffer size = ByteBuffer.allocate(Integer.BYTES);
+                writeInt(record.getKey(), fileChannel, size);
+                writeInt(record.getValue(), fileChannel, size);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
     }
 
     @Override
     public void close() throws IOException {
-        Files.deleteIfExists(config.getDir().resolve(FILE_SAVE));
-
-        Path file = config.getDir().resolve(FILE_SAVE);
-
-        try (FileChannel fileChannel = FileChannel.open(file, StandardOpenOption.CREATE_NEW,
-                StandardOpenOption.WRITE)) {
-            ByteBuffer size = ByteBuffer.allocate(Integer.BYTES);
-            for (Record record : storage.values()) {
-                writeInt(record.getKey(), fileChannel, size);
-                writeInt(record.getValue(), fileChannel, size);
-            }
+        synchronized (this) {
+            ssTableService.flush(storage, create());
+            ssTableService.close();
+            storage.clear();
+            Files.deleteIfExists(fileLog);
         }
-
-        Files.deleteIfExists(fileLog);
     }
 
     public DAOConfig getConfig() {
@@ -152,5 +174,42 @@ public class MyDAO implements DAO {
             channel.write(tmp);
             channel.write(value);
         }
+    }
+
+    private SSTable create(){
+        SSTable ssTable = new SSTable(config.getDir().resolve(SSTable.NAME
+                + numberSSTables
+                + SSTable.EXTENSION));
+        numberSSTables ++;
+        ssTables.add(ssTable);
+        return ssTable;
+    }
+
+    private static Iterator<Record> filterTombstones(Iterator<Record> iterator) {
+        PeekingIterator delegate = new PeekingIterator(iterator);
+        return new Iterator<>() {
+            @Override
+            public boolean hasNext() {
+                for (;;) {
+                    Record peek = delegate.peek();
+                    if (peek == null) {
+                        return false;
+                    }
+                    if (!peek.isTombstone()) {
+                        return true;
+                    }
+
+                    delegate.next();
+                }
+            }
+
+            @Override
+            public Record next() {
+                if (!hasNext()) {
+                    throw new NoSuchElementException("No elements");
+                }
+                return delegate.next();
+            }
+        };
     }
 }

@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.TreeMap;
@@ -157,5 +158,4 @@ class BasicTest {
 
         assertFalse(dao.range(null, null).hasNext());
     }
-
 }
