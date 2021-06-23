@@ -4,7 +4,7 @@ import javax.annotation.Nullable;
 import java.nio.ByteBuffer;
 
 @SuppressWarnings("JavaLangClash")
-public class Record {
+final public class Record {
 
     private final ByteBuffer key;
     private final ByteBuffer value;
