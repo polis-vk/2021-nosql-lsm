@@ -111,26 +111,8 @@ final class SSTable implements Closeable {
 
     @Override
     public void close() throws IOException {
-        IOException exception = null;
-        try {
-            free(mmap);
-        } catch (Exception e) {
-            exception = new IOException(e);
-        }
-
-        try {
-            free(idx);
-        } catch (Exception e) {
-            if (exception == null) {
-                exception = new IOException(e);
-            } else {
-                exception.addSuppressed(e);
-            }
-        }
-
-        if (exception != null) {
-            throw exception;
-        }
+        free(mmap);
+        free(idx);
     }
 
     private static void rename(Path indexFile, Path tmpIndexName) throws IOException {
@@ -142,7 +124,7 @@ final class SSTable implements Closeable {
         return resolveWithExt(file, ".tmp");
     }
 
-    static Path getIndexFile(Path file) {
+    private static Path getIndexFile(Path file) {
         return resolveWithExt(file, ".idx");
     }
 
@@ -158,10 +140,6 @@ final class SSTable implements Closeable {
         writeInt(value.remaining(), channel, tmp);
         channel.write(tmp);
         channel.write(value);
-    }
-
-    static boolean fileNameEquals(Path path, String name) {
-        return path.getFileName().toString().contains(name);
     }
 
     private static void writeInt(int value, WritableByteChannel channel, ByteBuffer tmp) throws IOException {

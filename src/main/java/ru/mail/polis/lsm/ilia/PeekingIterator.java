@@ -9,7 +9,7 @@ public class PeekingIterator implements Iterator<Record> {
     private final Iterator<Record> delegate;
     private Record current;
 
-    public PeekingIterator(Iterator<Record> delegate) {
+    PeekingIterator(Iterator<Record> delegate) {
         this.delegate = delegate;
     }
 
@@ -28,8 +28,7 @@ public class PeekingIterator implements Iterator<Record> {
         return now;
     }
 
-
-    public Record peek() {
+    Record peek() {
         if (current != null) {
             return current;
         }

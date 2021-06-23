@@ -61,13 +61,13 @@ public class DAOImpl implements DAO {
                 }
 
                 memoryStorage.clear();
-                Files.move(dir.resolve(FILE_NAME_COMPACT), dir.resolve(FILE_NAME_COMPACT_RESULT), StandardCopyOption.ATOMIC_MOVE);
+                Files.move(
+                        dir.resolve(FILE_NAME_COMPACT),
+                        dir.resolve(FILE_NAME_COMPACT_RESULT),
+                        StandardCopyOption.ATOMIC_MOVE
+                );
             }
         }
-    }
-
-    private boolean fileNameEquals(Path table) {
-        return SSTable.fileNameEquals(table, COMPACT);
     }
 
     @Override
