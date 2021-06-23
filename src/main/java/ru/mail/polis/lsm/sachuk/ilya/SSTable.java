@@ -94,32 +94,18 @@ class SSTable {
         Files.deleteIfExists(tmpSavePath);
         Files.deleteIfExists(tmpIndexPath);
 
-        try (FileChannel saveFileChannel = FileChannel.open(
-                tmpSavePath,
-                StandardOpenOption.CREATE_NEW,
-                StandardOpenOption.WRITE,
-                StandardOpenOption.TRUNCATE_EXISTING)) {
-            try (FileChannel indexFileChanel = FileChannel.open(
-                    tmpIndexPath, StandardOpenOption.CREATE_NEW,
-                    StandardOpenOption.WRITE,
-                    StandardOpenOption.TRUNCATE_EXISTING)) {
+        try (FileChannel saveFileChannel = openFileChannel(tmpSavePath)) {
+            try (FileChannel indexFileChanel = openFileChannel(tmpIndexPath)) {
 
                 ByteBuffer size = ByteBuffer.allocate(Integer.BYTES);
 
                 int counter = 0;
-                ByteBuffer firstSize = ByteBuffer.wrap(
-                        ByteBuffer.allocate(Integer.BYTES).putInt(counter).array()
-                );
-
-                indexFileChanel.write(firstSize);
+                writeValue(indexFileChanel, counter);
 
                 while (iterators.hasNext()) {
-                    long indexPositionToRead = saveFileChannel.position();
+                    int indexPositionToRead = (int) saveFileChannel.position();
 
-                    ByteBuffer offset = ByteBuffer.wrap(
-                            ByteBuffer.allocate(Long.BYTES).putLong(indexPositionToRead).array()
-                    );
-                    indexFileChanel.write(offset);
+                    writeValue(indexFileChanel, indexPositionToRead);
                     counter++;
 
                     Record record = iterators.next();
@@ -136,10 +122,7 @@ class SSTable {
 
                 indexFileChanel.position(0);
 
-                ByteBuffer realNumberRecords = ByteBuffer.wrap(
-                        ByteBuffer.allocate(Integer.BYTES).putInt(counter).array()
-                );
-                indexFileChanel.write(realNumberRecords);
+                writeValue(indexFileChanel, counter);
 
                 indexFileChanel.position(curPos);
 
@@ -245,7 +228,7 @@ class SSTable {
                 int counter = 0;
                 while (indexByteBuffer.hasRemaining()) {
 
-                    int value = (int) indexByteBuffer.getLong();
+                    int value = indexByteBuffer.getInt();
 
                     indexes[counter] = value;
                     counter++;
@@ -269,6 +252,14 @@ class SSTable {
         tmp.position(0);
         channel.write(tmp);
         channel.write(value);
+    }
+
+    private static void writeValue(FileChannel fileChannel, int value) throws IOException {
+        ByteBuffer byteBuffer = ByteBuffer.wrap(
+                ByteBuffer.allocate(Integer.BYTES).putInt(value).array()
+        );
+
+        fileChannel.write(byteBuffer);
     }
 
     private void clean(MappedByteBuffer mappedByteBuffer) throws IOException {
@@ -323,6 +314,14 @@ class SSTable {
         return Integer.parseInt(stringPath.substring(firstNumberIndex, stringPath.length() - endFile.length()));
     }
 
+    private static FileChannel openFileChannel(Path path) throws IOException {
+        return FileChannel.open(
+                path,
+                StandardOpenOption.CREATE_NEW,
+                StandardOpenOption.WRITE,
+                StandardOpenOption.TRUNCATE_EXISTING);
+    }
+
     class SSTableIterator implements Iterator<Record> {
         private final ByteBuffer keyToRead;
         private final boolean readToEnd;
@@ -359,7 +358,7 @@ class SSTable {
             ByteBuffer value = readFromFile(mappedByteBuffer);
 
             Record record;
-            
+
             if (value.compareTo(BYTE_BUFFER_TOMBSTONE) == 0) {
                 record = Record.tombstone(key);
             } else {
