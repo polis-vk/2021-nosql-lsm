@@ -11,6 +11,7 @@ import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.*;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ConcurrentSkipListMap;
@@ -46,14 +47,13 @@ public class DAOImpl implements DAO {
         synchronized (this) {
             Iterator<Record> result = new PeekingIterator(range(null, null));
             Path dir = config.dir;
-            Path file = dir.resolve(DAOImpl.FILE_NAME_COMPACT);
 
             if (result.hasNext()) {
-                SSTable ssTable = SSTable.write(result,  file);
+                SSTable ssTable = SSTable.write(result, dir.resolve(DAOImpl.FILE_NAME_COMPACT));
                 tables.add(ssTable);
 
                 for (SSTable table : tables) {
-                    if (!fileNameEquals(table.getPath())) {
+                    if (!table.getPath().toString().endsWith(COMPACT)) {
                         table.close();
                         tables.remove(table);
                         Files.deleteIfExists(table.getPath());
@@ -61,7 +61,7 @@ public class DAOImpl implements DAO {
                 }
 
                 memoryStorage.clear();
-                Files.move(dir.resolve(FILE_NAME_COMPACT), dir.resolve(FILE_NAME_COMPACT_RESULT));
+                Files.move(dir.resolve(FILE_NAME_COMPACT), dir.resolve(FILE_NAME_COMPACT_RESULT), StandardCopyOption.ATOMIC_MOVE);
             }
         }
     }
@@ -75,7 +75,10 @@ public class DAOImpl implements DAO {
         synchronized (this) {
             Iterator<Record> ssTableRanges = sstableRanges(fromKey, toKey);
             Iterator<Record> memoryRange = map(fromKey, toKey).values().iterator();
-            Iterator<Record> mergeTwo = new MergeTwo(new PeekingIterator(ssTableRanges), new PeekingIterator(memoryRange));
+            Iterator<Record> mergeTwo = new MergeTwo(
+                    new PeekingIterator(ssTableRanges),
+                    new PeekingIterator(memoryRange)
+            );
             return new FilterIterator(mergeTwo);
         }
     }

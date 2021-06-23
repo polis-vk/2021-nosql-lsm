@@ -28,6 +28,7 @@ public class PeekingIterator implements Iterator<Record> {
         return now;
     }
 
+
     public Record peek() {
         if (current != null) {
             return current;

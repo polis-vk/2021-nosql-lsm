@@ -17,21 +17,21 @@ import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.util.*;
 
-class SSTable implements Closeable {
+final class SSTable implements Closeable {
 
     private static final Method CLEAN;
     static final String SSTABLE_FILE_PREFIX = "file_";
 
     private final MappedByteBuffer mmap;
     private final MappedByteBuffer idx;
-    private Path fileName;
+    private final Path fileName;
 
     static {
         try {
             Class<?> filename = Class.forName("sun.nio.ch.FileChannelImpl");
             CLEAN = filename.getDeclaredMethod("unmap", MappedByteBuffer.class);
             CLEAN.setAccessible(true);
-        } catch (Exception e) {
+        } catch (ClassNotFoundException | NoSuchMethodException e) {
             throw new IllegalStateException(e);
         }
     }
@@ -114,38 +114,23 @@ class SSTable implements Closeable {
         IOException exception = null;
         try {
             free(mmap);
-        } catch (Throwable t) {
-            exception = new IOException(t);
+        } catch (Exception e) {
+            exception = new IOException(e);
         }
 
         try {
             free(idx);
-        } catch (Throwable t) {
+        } catch (Exception e) {
             if (exception == null) {
-                exception = new IOException(t);
+                exception = new IOException(e);
             } else {
-                exception.addSuppressed(t);
+                exception.addSuppressed(e);
             }
         }
 
         if (exception != null) {
             throw exception;
         }
-    }
-
-    Iterator<Record> range(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
-        ByteBuffer buffer = mmap.asReadOnlyBuffer();
-
-        int maxSize = mmap.remaining();
-
-        int fromOffset = fromKey == null ? 0 : offset(buffer, fromKey);
-        int toOffset = toKey == null ? maxSize : offset(buffer, toKey);
-
-        return range(
-                buffer,
-                fromOffset == -1 ? maxSize : fromOffset,
-                toOffset == -1 ? maxSize : toOffset
-        );
     }
 
     private static void rename(Path indexFile, Path tmpIndexName) throws IOException {
@@ -157,7 +142,7 @@ class SSTable implements Closeable {
         return resolveWithExt(file, ".tmp");
     }
 
-    private static Path getIndexFile(Path file) {
+    static Path getIndexFile(Path file) {
         return resolveWithExt(file, ".idx");
     }
 
@@ -165,13 +150,17 @@ class SSTable implements Closeable {
         return file.resolveSibling(file.getFileName() + ext);
     }
 
-    private static void writeValueWithSize(ByteBuffer value, WritableByteChannel channel, ByteBuffer tmp) throws IOException {
+    private static void writeValueWithSize(
+            ByteBuffer value,
+            WritableByteChannel channel,
+            ByteBuffer tmp
+    ) throws IOException {
         writeInt(value.remaining(), channel, tmp);
         channel.write(tmp);
         channel.write(value);
     }
 
-     static boolean fileNameEquals(Path path, String name) {
+    static boolean fileNameEquals(Path path, String name) {
         return path.getFileName().toString().contains(name);
     }
 
@@ -211,12 +200,12 @@ class SSTable implements Closeable {
             buffer.position(offset);
             int keySize = buffer.getInt();
 
-            int result;
             int mismatch = buffer.mismatch(key);
             if (mismatch == -1 || (keySize == key.remaining() && mismatch == keySize)) {
                 return offset;
             }
 
+            int result;
             if (mismatch < keySize && mismatch < key.remaining()) {
                 result = Byte.compare(
                         key.get(key.position() + mismatch),
@@ -240,6 +229,21 @@ class SSTable implements Closeable {
         }
 
         return idx.getInt(left * Integer.BYTES);
+    }
+
+    Iterator<Record> range(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
+        ByteBuffer buffer = mmap.asReadOnlyBuffer();
+
+        int maxSize = mmap.remaining();
+
+        int fromOffset = fromKey == null ? 0 : offset(buffer, fromKey);
+        int toOffset = toKey == null ? maxSize : offset(buffer, toKey);
+
+        return range(
+                buffer,
+                fromOffset == -1 ? maxSize : fromOffset,
+                toOffset == -1 ? maxSize : toOffset
+        );
     }
 
     private static Iterator<Record> range(ByteBuffer buffer, int fromOffset, int toOffset) {
