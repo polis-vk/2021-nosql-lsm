@@ -213,13 +213,17 @@ class SSTable implements Closeable {
 
             int result;
             int mismatch = buffer.mismatch(key);
-            if (mismatch == -1) {
+            if (mismatch == -1 || (keySize == key.remaining() && mismatch == keySize)) {
                 return offset;
-            } else if (mismatch < keySize) {
+            }
+
+            if (mismatch < keySize && mismatch < key.remaining()) {
                 result = Byte.compare(
                         key.get(key.position() + mismatch),
                         buffer.get(buffer.position() + mismatch)
                 );
+            } else if (mismatch >= keySize) {
+                result = 1;
             } else {
                 result = -1;
             }

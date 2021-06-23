@@ -227,6 +227,14 @@ class PersistenceTest {
     @Test
     void compact(@TempDir Path data) throws IOException {
         try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
+            dao.compact();
+
+            try (Stream<Path> files = Files.list(data)) {
+                assertEquals(0, files.count());
+            }
+        }
+
+        try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
             for (int i = 0; i < 10; i++) {
                 createFile(dao, wrap("KEY" + i), wrap("VALUE" + i));
             }
