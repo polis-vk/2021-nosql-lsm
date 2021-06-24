@@ -11,6 +11,7 @@ import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -25,6 +26,7 @@ public class DAOImpl implements DAO {
     private static final String COMPACT = "COMPACT";
     private static final String FILE_NAME_COMPACT = SSTable.SSTABLE_FILE_PREFIX + COMPACT;
     private static final String FILE_NAME_COMPACT_RESULT = SSTable.SSTABLE_FILE_PREFIX + "0";
+    private static final String IDX = ".idx";
 
     private final SortedMap<ByteBuffer, Record> memoryStorage = new ConcurrentSkipListMap<>();
     private final ConcurrentLinkedDeque<SSTable> tables = new ConcurrentLinkedDeque<>();
@@ -59,8 +61,10 @@ public class DAOImpl implements DAO {
                 for (SSTable table : tables) {
                     if (!table.getPath().toString().endsWith(COMPACT)) {
                         table.close();
+                        Path path = table.getPath();
+                        Files.deleteIfExists(path);
+                        Files.deleteIfExists(Paths.get(path + IDX));
                         tables.remove(table);
-                        Files.deleteIfExists(table.getPath());
                     }
                 }
 
@@ -68,6 +72,11 @@ public class DAOImpl implements DAO {
                 Files.move(
                         dir.resolve(FILE_NAME_COMPACT),
                         dir.resolve(FILE_NAME_COMPACT_RESULT),
+                        StandardCopyOption.ATOMIC_MOVE
+                );
+                Files.move(
+                        dir.resolve(FILE_NAME_COMPACT + IDX),
+                        dir.resolve(FILE_NAME_COMPACT_RESULT + IDX),
                         StandardCopyOption.ATOMIC_MOVE
                 );
             }
