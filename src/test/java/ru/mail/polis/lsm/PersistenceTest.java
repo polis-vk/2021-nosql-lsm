@@ -21,6 +21,47 @@ import static ru.mail.polis.lsm.Utils.valueWithSuffix;
 import static ru.mail.polis.lsm.Utils.wrap;
 
 class PersistenceTest {
+
+    /*
+        Create value, save on a disk, read value from disk
+     */
+    @Test
+    void basicSave(@TempDir Path data) throws IOException {
+        try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
+            dao.upsert(Record.of(key(1), value(1)));
+        }
+
+        try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
+            Iterator<Record> range = dao.range(null, null);
+            assertTrue(range.hasNext());
+
+            Record record = range.next();
+            assertEquals(key(1), record.getKey());
+            assertEquals(value(1), record.getValue());
+        }
+    }
+
+    /*
+        Create value in memory, chech in memory
+        Check normal close without Range
+     */
+    @Test
+    void basicSaveCheckInMemory(@TempDir Path data) throws IOException {
+        try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
+            dao.upsert(Record.of(key(1), value(1)));
+
+            Iterator<Record> range = dao.range(null, null);
+            assertTrue(range.hasNext());
+
+            Record record = range.next();
+            assertEquals(key(1), record.getKey());
+            assertEquals(value(1), record.getValue());
+        }
+        try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
+            dao.upsert(Record.of(key(1), value(1)));
+        }
+    }
+
     @Test
     void fs(@TempDir Path data) throws IOException {
         try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
@@ -137,6 +178,7 @@ class PersistenceTest {
     }
 
     @Test
+<<<<<<< HEAD
     void hugeRecords(@TempDir Path data) throws IOException {
         // Reference value
         int size = 1024 * 1024;
@@ -201,6 +243,41 @@ class PersistenceTest {
 
                 dao.upsert(Record.of(key, value));
             }
+=======
+    void test(@TempDir Path data) throws IOException {
+        ByteBuffer key = wrap("KEY_1");
+        ByteBuffer key2 = wrap("KEY_2");
+        ByteBuffer value = wrap("VALUE_1");
+        ByteBuffer value2 = wrap("VALUE_2");
+
+        // Initial insert
+        try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
+            dao.upsert(Record.of(key, value));
+
+            Iterator<Record> range = dao.range(null, null);
+            assertTrue(range.hasNext());
+            assertEquals(value, range.next().getValue());
+        }
+
+        try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
+            dao.upsert(Record.of(key, value2));
+
+            Iterator<Record> range = dao.range(null, null);
+            assertTrue(range.hasNext());
+            assertEquals(value2, range.next().getValue());
+        }
+
+        try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
+            dao.upsert(Record.of(key2, value));
+
+            Iterator<Record> range = dao.range(null, null);
+            assertTrue(range.hasNext());
+            assertEquals(value2, range.next().getValue());
+            assertTrue(range.hasNext());
+            assertEquals(value, range.next().getValue());
+            assertFalse(range.hasNext());
+            assertFalse(false);
+>>>>>>> stage3_origin
         }
     }
 

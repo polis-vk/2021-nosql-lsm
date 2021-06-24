@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
+<<<<<<< HEAD
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
@@ -22,8 +23,71 @@ import static ru.mail.polis.lsm.Utils.key;
 import static ru.mail.polis.lsm.Utils.sizeBasedRandomData;
 import static ru.mail.polis.lsm.Utils.value;
 import static ru.mail.polis.lsm.Utils.valueWithSuffix;
+=======
+import java.util.*;
+import java.util.stream.Collectors;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static ru.mail.polis.lsm.Utils.*;
+import static ru.mail.polis.lsm.Utils.wrap;
+>>>>>>> stage3_origin
 
 class MergeTest {
+
+    @Test
+    void mergeSimple() throws IOException {
+        List<Record> one = new ArrayList<>(1);
+        List<Record> two = new ArrayList<>(1);
+
+        ByteBuffer key = wrap("KEY");
+        ByteBuffer value = wrap("VALUE_1");
+
+        one.add(Record.of(key, value));
+        two.add(Record.tombstone(key));
+
+        DAO.PeekingIterator oneIterator = new DAO.PeekingIterator(one.iterator());
+        DAO.PeekingIterator twoIterator = new DAO.PeekingIterator(two.iterator());
+
+        Iterator<Record> answer = DAO.mergeTwo(oneIterator, twoIterator);
+        assertTrue(answer.hasNext());
+        assertNull(answer.next().getValue());
+    }
+
+    @Test
+    void mergeSimpleTwo() throws IOException {
+        List<Record> one = new ArrayList<>(1);
+        List<Record> two = new ArrayList<>(1);
+
+        ByteBuffer key = wrap("KEY");
+        ByteBuffer value = wrap("VALUE_1");
+
+        one.add(Record.of(key, value));
+        two.add(Record.tombstone(key));
+
+        DAO.PeekingIterator oneIterator = new DAO.PeekingIterator(one.iterator());
+        DAO.PeekingIterator twoIterator = new DAO.PeekingIterator(two.iterator());
+
+        Iterator<Record> answer = DAO.mergeTwo(twoIterator, oneIterator);
+        assertTrue(answer.hasNext());
+        assertEquals(value, answer.next().getValue());
+    }
+
+    @Test
+    void mergeFunction() {
+        List<Record> one = new ArrayList<>(1);
+        List<Record> two = new ArrayList<>(1);
+
+        ByteBuffer key = wrap("KEY");
+        ByteBuffer value = wrap("VALUE_1");
+
+        one.add(Record.of(key, value));
+        two.add(Record.tombstone(key));
+
+        List<Iterator<Record>> iterators = List.of(one.iterator(), two.iterator());
+        Iterator<Record> answer = DAO.merge(iterators);
+        assertTrue(answer.hasNext());
+        assertNull(answer.next().getValue());
+    }
 
     @Test
     void hugeValues(@TempDir Path data) throws IOException {
