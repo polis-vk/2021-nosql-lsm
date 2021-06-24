@@ -88,9 +88,6 @@ public class SSTable implements Closeable, Comparable {
         String thisNumber = nameSSTableThis.replace(SSTable.NAME, "").replace(SSTable.EXTENSION, "");
         String oNumber = nameSSTableO.replace(SSTable.NAME, "").replace(SSTable.EXTENSION, "");
 
-        log.info("This SSTable number = " + thisNumber);
-        log.info("O SSTabel number = " + oNumber);
-
         int thisInt = Integer.parseInt(thisNumber);
         int oInt = Integer.parseInt(oNumber);
 

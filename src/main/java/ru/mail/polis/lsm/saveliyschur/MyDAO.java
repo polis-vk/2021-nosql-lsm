@@ -102,7 +102,7 @@ public class MyDAO implements DAO {
                 ssTableService.flush(storage, create());
             }
             storage.clear();
-            ssTables.stream().forEach(s -> {
+            ssTables.forEach(s -> {
                 try {
                     s.close();
                 } catch (IOException e) {
@@ -214,7 +214,6 @@ public class MyDAO implements DAO {
             @Override
             public Record next() {
                 if (!hasNext()) {
-                    log.severe("No elements in iterator");
                     throw new NoSuchElementException("No elements");
                 }
                 return delegate.next();

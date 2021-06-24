@@ -29,7 +29,6 @@ public class SSTableService {
 
     public Iterator<Record> getRange(Deque<SSTable> ssTables, ByteBuffer from, ByteBuffer to) {
         log.info("Get range.");
-        ssTables.forEach(s -> log.info(s.getPath().toString()));
         return DAO.merge(ssTables.stream()
                 .map(ssTable -> readSSTable(ssTable, from, to))
                 .collect(Collectors.toList()));
@@ -38,6 +37,7 @@ public class SSTableService {
     private Iterator<Record> readSSTable(SSTable ssTable, ByteBuffer from, ByteBuffer to) {
         Path file = ssTable.getPath();
         log.info("Read SSTable from path: " + file.toString());
+
         SortedMap<ByteBuffer, Record> resultMap = new TreeMap<>();
         try (FileChannel fileChannel = FileChannel.open(file, StandardOpenOption.READ)) {
             MappedByteBuffer mappedByteBuffer;
