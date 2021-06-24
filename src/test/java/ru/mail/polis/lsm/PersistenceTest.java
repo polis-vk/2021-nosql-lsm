@@ -178,7 +178,6 @@ class PersistenceTest {
     }
 
     @Test
-<<<<<<< HEAD
     void hugeRecords(@TempDir Path data) throws IOException {
         // Reference value
         int size = 1024 * 1024;
@@ -234,7 +233,7 @@ class PersistenceTest {
         assertEquals(key, next.getKey());
         assertEquals(value, next.getValue());
     }
-
+    
     private void prepareHugeDao(@TempDir Path data, int recordsCount, byte[] suffix) throws IOException {
         try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
             for (int i = 0; i < recordsCount; i++) {
@@ -243,7 +242,10 @@ class PersistenceTest {
 
                 dao.upsert(Record.of(key, value));
             }
-=======
+        }
+    }
+
+    @Test
     void test(@TempDir Path data) throws IOException {
         ByteBuffer key = wrap("KEY_1");
         ByteBuffer key2 = wrap("KEY_2");
@@ -277,7 +279,6 @@ class PersistenceTest {
             assertEquals(value, range.next().getValue());
             assertFalse(range.hasNext());
             assertFalse(false);
->>>>>>> stage3_origin
         }
     }
 
