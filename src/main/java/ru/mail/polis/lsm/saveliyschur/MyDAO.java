@@ -16,10 +16,7 @@ import java.nio.channels.WritableByteChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
-import java.util.Deque;
-import java.util.Iterator;
-import java.util.List;
-import java.util.NoSuchElementException;
+import java.util.*;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ConcurrentNavigableMap;
 import java.util.concurrent.ConcurrentSkipListMap;
@@ -31,14 +28,14 @@ public class MyDAO implements DAO {
 
     private static final Logger log = Logger.getLogger(MyDAO.class.getName());
 
-    private volatile ConcurrentSkipListMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
+    private final ConcurrentSkipListMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
     private final DAOConfig config;
     private static final String LOG_FILE = "log_db.log";
     private static Path fileLog;
 
     private static long numberSSTables;
 
-    private final Deque<SSTable> ssTables = new ConcurrentLinkedDeque<>();
+    private final List<SSTable> ssTables = Collections.synchronizedList(new ArrayList<>());
 
     private final SSTableService ssTableService;
 
@@ -51,7 +48,6 @@ public class MyDAO implements DAO {
         try (Stream<Path> streamPath = Files.walk(config.getDir())) {
             log.info("Read SSTables");
             streamPath.filter(file -> file.toString().endsWith(SSTable.EXTENSION))
-                    .sorted()
                     .map(SSTable::new)
                     .forEach(ssTables::add);
 
@@ -72,13 +68,12 @@ public class MyDAO implements DAO {
 
     @Override
     public Iterator<Record> range(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
-        ConcurrentNavigableMap<ByteBuffer, Record> storageHash = storage.clone();
-        Iterator<Record> memoryIterator = getSubMap(fromKey, toKey, storageHash).values().stream()
-                .filter(x -> x.getValue() != null)
-                .iterator();
-        Iterator<Record> sstableIterators = ssTableService.getRange(ssTables, fromKey, toKey);
-        Iterator<Record> anser =  DAO.mergeTwo(new PeekingIterator(memoryIterator), new PeekingIterator(sstableIterators));
-        return filterTombstones(anser);
+            ConcurrentNavigableMap<ByteBuffer, Record> storageHash = storage.clone();
+            Iterator<Record> memoryIterator = getSubMap(fromKey, toKey, storageHash).values().stream()
+                    .iterator();
+            Iterator<Record> sstableIterators = ssTableService.getRange(ssTables, fromKey, toKey);
+            Iterator<Record> anser = DAO.mergeTwo(new PeekingIterator(sstableIterators), new PeekingIterator(memoryIterator));
+            return filterTombstones(anser);
     }
 
     @Override
@@ -100,10 +95,20 @@ public class MyDAO implements DAO {
     @Override
     public void close() throws IOException {
         synchronized (this) {
-            ssTableService.flush(storage, create());
-            ssTableService.close();
+            if (!storage.isEmpty()) {
+                ssTableService.flush(storage, create());
+            }
             storage.clear();
+            ssTables.stream().forEach(s -> {
+                try {
+                    s.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            });
+            ssTables.clear();
             Files.deleteIfExists(fileLog);
+            log.info("Close ok!");
         }
     }
 

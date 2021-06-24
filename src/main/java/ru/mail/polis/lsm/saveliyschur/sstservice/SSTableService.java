@@ -6,6 +6,7 @@ import ru.mail.polis.lsm.Record;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
@@ -19,28 +20,14 @@ import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
-public class SSTableService implements Closeable {
+public class SSTableService {
 
-    private static Logger log = Logger.getLogger(SSTableService.class.getName());
-
-    private static MappedByteBuffer mappedByteBuffer;
-    private static final Method CLEAN;
-
-    static {
-        Class<?> clazz;
-        try {
-            clazz = Class.forName("sun.nio.ch.FileChannelImpl");
-            CLEAN = clazz.getDeclaredMethod("unmap", MappedByteBuffer.class);
-            CLEAN.setAccessible(true);
-        } catch (NoSuchMethodException | ClassNotFoundException e) {
-            throw new IllegalStateException(e);
-        }
-    }
+    private static final Logger log = Logger.getLogger(SSTableService.class.getName());
 
     public SSTableService(DAOConfig config) {
     }
 
-    public Iterator<Record> getRange(Deque<SSTable> ssTables, ByteBuffer from, ByteBuffer to) {
+    public Iterator<Record> getRange(List<SSTable> ssTables, ByteBuffer from, ByteBuffer to) {
         return DAO.merge(ssTables.stream().map(ssTable -> readSSTable(ssTable, from, to))
                 .collect(Collectors.toList()));
     }
@@ -50,7 +37,12 @@ public class SSTableService implements Closeable {
         log.info("Read SSTable from path: " + file.toString());
         SortedMap<ByteBuffer, Record> resultMap = new TreeMap<>();
         try (FileChannel fileChannel = FileChannel.open(file, StandardOpenOption.READ)) {
-            mappedByteBuffer = fileChannel.map(FileChannel.MapMode.READ_ONLY, 0, fileChannel.size());
+            MappedByteBuffer mappedByteBuffer;
+            if (ssTable.getMapp() == null) {
+                mappedByteBuffer = fileChannel.map(FileChannel.MapMode.READ_ONLY, 0, fileChannel.size());
+            } else {
+                mappedByteBuffer = ssTable.getMapp();
+            }
 
             while (mappedByteBuffer.hasRemaining()) {
                 int keySize = mappedByteBuffer.getInt();
@@ -77,10 +69,12 @@ public class SSTableService implements Closeable {
                     mappedByteBuffer.position(mappedByteBuffer.position() + valueSize);
                 }
             }
+            ssTable.setMapp(mappedByteBuffer);
         } catch (IOException e) {
             e.printStackTrace();
             log.severe("Error in range!");
         }
+
         return resultMap.values().iterator();
     }
 
@@ -119,19 +113,6 @@ public class SSTableService implements Closeable {
             tmp.position(0);
             channel.write(tmp);
             channel.write(value);
-        }
-    }
-
-
-    @Override
-    public void close() throws IOException {
-        log.info("SSTableService close.");
-        if (mappedByteBuffer != null) {
-            try {
-                CLEAN.invoke(null, mappedByteBuffer);
-            } catch (IllegalAccessException | InvocationTargetException e) {
-                throw new IllegalStateException(e);
-            }
         }
     }
 
