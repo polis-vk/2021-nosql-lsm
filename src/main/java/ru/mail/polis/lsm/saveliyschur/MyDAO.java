@@ -71,7 +71,10 @@ public class MyDAO implements DAO {
             ConcurrentNavigableMap<ByteBuffer, Record> storageHash = storage.clone();
             Iterator<Record> memoryIterator = getSubMap(fromKey, toKey, storageHash).values().stream()
                     .iterator();
-            Iterator<Record> sstableIterators = ssTableService.getRange(ssTables, fromKey, toKey);
+            Deque<SSTable> ssTablesDeque = new ConcurrentLinkedDeque<>();
+            ssTables.stream().sorted(SSTable::compareTo).forEach(ssTablesDeque::add);
+
+            Iterator<Record> sstableIterators = ssTableService.getRange(ssTablesDeque, fromKey, toKey);
             Iterator<Record> anser = DAO.mergeTwo(new PeekingIterator(sstableIterators), new PeekingIterator(memoryIterator));
             return filterTombstones(anser);
     }
@@ -211,6 +214,7 @@ public class MyDAO implements DAO {
             @Override
             public Record next() {
                 if (!hasNext()) {
+                    log.severe("No elements in iterator");
                     throw new NoSuchElementException("No elements");
                 }
                 return delegate.next();

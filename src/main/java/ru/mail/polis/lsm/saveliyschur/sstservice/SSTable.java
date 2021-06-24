@@ -43,15 +43,17 @@ public class SSTable implements Closeable, Comparable {
 
     @Override
     public void close() throws IOException {
-        IOException exception = null;
-        try {
-            free(mapp);
-        } catch (Throwable t) {
-            exception = new IOException(t);
-        }
+        if (mapp != null) {
+            IOException exception = null;
+            try {
+                free(mapp);
+            } catch (Throwable t) {
+                exception = new IOException(t);
+            }
 
-        if (exception != null) {
-            throw exception;
+            if (exception != null) {
+                throw exception;
+            }
         }
         log.info("Close is OK!");
     }
@@ -76,6 +78,22 @@ public class SSTable implements Closeable, Comparable {
     @Override
     public int compareTo(Object o) {
         SSTable ssTable = (SSTable) o;
-        return this.path.toString().compareTo(ssTable.getPath().toString());
+
+        String myPath = this.path.toString();
+        String oPath = ssTable.getPath().toString();
+
+        String nameSSTableThis = myPath.substring(myPath.lastIndexOf("\\") + 1);
+        String nameSSTableO = oPath.substring(oPath.lastIndexOf("\\") + 1);
+
+        String thisNumber = nameSSTableThis.replace(SSTable.NAME, "").replace(SSTable.EXTENSION, "");
+        String oNumber = nameSSTableO.replace(SSTable.NAME, "").replace(SSTable.EXTENSION, "");
+
+        log.info("This SSTable number = " + thisNumber);
+        log.info("O SSTabel number = " + oNumber);
+
+        int thisInt = Integer.parseInt(thisNumber);
+        int oInt = Integer.parseInt(oNumber);
+
+        return Integer.compare(thisInt, oInt);
     }
 }

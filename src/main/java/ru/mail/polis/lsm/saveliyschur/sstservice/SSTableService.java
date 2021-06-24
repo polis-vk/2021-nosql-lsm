@@ -27,8 +27,11 @@ public class SSTableService {
     public SSTableService(DAOConfig config) {
     }
 
-    public Iterator<Record> getRange(List<SSTable> ssTables, ByteBuffer from, ByteBuffer to) {
-        return DAO.merge(ssTables.stream().map(ssTable -> readSSTable(ssTable, from, to))
+    public Iterator<Record> getRange(Deque<SSTable> ssTables, ByteBuffer from, ByteBuffer to) {
+        log.info("Get range.");
+        ssTables.forEach(s -> log.info(s.getPath().toString()));
+        return DAO.merge(ssTables.stream()
+                .map(ssTable -> readSSTable(ssTable, from, to))
                 .collect(Collectors.toList()));
     }
 
@@ -63,7 +66,7 @@ public class SSTableService {
                     ByteBuffer value = mappedByteBuffer.slice().limit(valueSize).asReadOnlyBuffer();
                     resultMap.put(key, Record.of(key, value));
                 } else {
-                    resultMap.put(key, null);
+                    resultMap.put(key, Record.tombstone(key));
                 }
                 if (mappedByteBuffer.hasRemaining()) {
                     mappedByteBuffer.position(mappedByteBuffer.position() + valueSize);

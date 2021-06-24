@@ -112,7 +112,7 @@ class PersistenceTest {
         // Load and check not found
         try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
             Iterator<Record> range = dao.range(null, null);
-            System.out.println(range.next());
+
             assertFalse(range.hasNext());
         }
     }
