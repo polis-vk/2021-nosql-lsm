@@ -73,6 +73,32 @@ class MergeTest {
     }
 
     @Test
+    void helper(@TempDir Path data) {
+        ByteBuffer key = wrap("KEY_1");
+        ByteBuffer key2 = wrap("KEY_2");
+        ByteBuffer value = wrap("VALUE_1");
+        ByteBuffer value2 = wrap("VALUE_2");
+
+        Record one = Record.of(key, value);
+        Record two = Record.of(key2, value2);
+
+        List<Record> oneList = List.of(one);
+        List<Record> twoList = List.of(two);
+
+        List<Iterator<Record>> iterators = List.of(oneList.iterator(), twoList.iterator());
+        Iterator<Record> answer = DAO.merge(iterators);
+
+        assertEquals(key, answer.next().getKey());
+        assertEquals(key2, answer.next().getKey());
+
+        Iterator<Record> anser = DAO.mergeTwo(new DAO.PeekingIterator(oneList.iterator()),
+                new DAO.PeekingIterator(twoList.iterator()));
+
+        assertEquals(key, anser.next().getKey());
+        assertEquals(key2, anser.next().getKey());
+    }
+
+    @Test
     void hugeValues(@TempDir Path data) throws IOException {
         // Reference value
         int size = 1024 * 1024;

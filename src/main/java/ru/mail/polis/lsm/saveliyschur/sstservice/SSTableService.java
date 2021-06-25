@@ -40,14 +40,14 @@ public class SSTableService {
         Path file = ssTable.getPath();
         log.info("Read SSTable from path: " + file.toString());
 
+        if (ssTable.getResultMap() != null) {
+            return ssTable.getResultMap();
+        }
+
         SortedMap<ByteBuffer, Record> resultMap = new TreeMap<>();
         try (FileChannel fileChannel = FileChannel.open(file, StandardOpenOption.READ)) {
             MappedByteBuffer mappedByteBuffer;
-            if (ssTable.getMapp() == null) {
                 mappedByteBuffer = fileChannel.map(FileChannel.MapMode.READ_ONLY, 0, fileChannel.size());
-            } else {
-                mappedByteBuffer = ssTable.getMapp();
-            }
 
             while (mappedByteBuffer.hasRemaining()) {
                 int keySize = mappedByteBuffer.getInt();
@@ -67,13 +67,12 @@ public class SSTableService {
                     mappedByteBuffer.position(mappedByteBuffer.position() + valueSize);
                 }
             }
-            if (ssTable.getMapp() == null) {
-                ssTable.setMapp(mappedByteBuffer);
-            }
+            ssTable.setMapp(mappedByteBuffer);
         } catch (IOException e) {
             e.printStackTrace();
             log.severe("Error in range!");
         }
+        ssTable.setResultMap(resultMap);
 
         return resultMap;
     }

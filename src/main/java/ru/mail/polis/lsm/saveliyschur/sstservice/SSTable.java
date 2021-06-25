@@ -1,5 +1,7 @@
 package ru.mail.polis.lsm.saveliyschur.sstservice;
 
+import ru.mail.polis.lsm.Record;
+
 import java.io.Closeable;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
@@ -9,6 +11,7 @@ import java.nio.MappedByteBuffer;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.SortedMap;
 import java.util.logging.Logger;
 import java.util.stream.Stream;
 
@@ -23,6 +26,7 @@ public class SSTable implements Closeable, Comparable<SSTable> {
     public static final String SUFFICS = "_compact";
 
     private Path path;
+    private SortedMap<ByteBuffer, Record> resultMap = null;
 
     static {
         try {
@@ -67,7 +71,20 @@ public class SSTable implements Closeable, Comparable<SSTable> {
         return mapp;
     }
 
+    public SortedMap<ByteBuffer, Record> getResultMap() {
+        return resultMap;
+    }
+
+    public void setResultMap(SortedMap<ByteBuffer, Record> resultMap) {
+        this.resultMap = resultMap;
+    }
+
     public void setMapp(MappedByteBuffer mapp) {
+        try {
+            this.close();
+        } catch (IOException e) {
+            log.severe("Don't close!!!");
+        }
         this.mapp = mapp;
     }
 

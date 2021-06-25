@@ -147,38 +147,41 @@ public class MyDAO implements DAO {
     @Override
     public void compact() {
         synchronized (this) {
-            List<SSTable> ssTablesWithSuffics = Collections.synchronizedList(new ArrayList<>());
-            for (int i = 0; i < ssTables.size(); i = i + 2) {
-                try {
-                    SSTable ssTable = compactTwoFile(ssTables.get(i), ssTables.get(i+1), ssTablesWithSuffics.size());
-                    ssTablesWithSuffics.add(ssTable);
-                } catch (IOException e) {
-                    e.printStackTrace();
-                    log.severe("Ошибка при слиянии compact");
+            while (ssTables.size() > 1) {
+                List<SSTable> ssTablesWithSuffics = Collections.synchronizedList(new ArrayList<>());
+                int sizeForCompact = ssTables.size() % 2 == 0 ? ssTables.size() : ssTables.size() - 1;
+                for (int i = 0; i < sizeForCompact; i = i + 2) {
+                    try {
+                        SSTable ssTable = compactTwoFile(ssTables.get(i), ssTables.get(i + 1), ssTablesWithSuffics.size());
+                        ssTablesWithSuffics.add(ssTable);
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                        log.severe("Ошибка при слиянии compact");
+                    }
                 }
+
+                ssTables.forEach(s -> {
+                    try {
+                        s.close();
+                        Files.deleteIfExists(s.getPath());
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                });
+
+                ssTablesWithSuffics.forEach(ssTable -> {
+                    File file = new File(ssTable.getPath().toString());
+                    File newFile = new File(ssTable.getPath().toString().replaceAll(SSTable.SUFFICS, ""));
+
+                    boolean flag = file.renameTo(newFile);
+                    if (!flag) {
+                        log.severe("Don't rename file for path " + ssTable.getPath().toString());
+                    }
+
+                    ssTable.setPath(newFile.toPath());
+                });
+                ssTables = ssTablesWithSuffics;
             }
-
-            ssTables.forEach(s -> {
-                try {
-                    s.close();
-                    Files.deleteIfExists(s.getPath());
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            });
-
-            ssTablesWithSuffics.forEach(ssTable -> {
-                File file = new File(ssTable.getPath().toString());
-                File newFile = new File(ssTable.getPath().toString().replaceAll(SSTable.SUFFICS, ""));
-
-                boolean flag = file.renameTo(newFile);
-                if (!flag) {
-                    log.severe("Don't rename file for path " + ssTable.getPath().toString());
-                }
-
-                ssTable.setPath(newFile.toPath());
-            });
-            ssTables = ssTablesWithSuffics;
         }
     }
 
