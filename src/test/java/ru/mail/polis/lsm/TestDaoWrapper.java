@@ -1,5 +1,7 @@
 package ru.mail.polis.lsm;
 
+import ru.mail.polis.lsm.saveliyschur.sstservice.SSTable;
+
 import javax.annotation.Nullable;
 import java.io.IOException;
 import java.nio.ByteBuffer;

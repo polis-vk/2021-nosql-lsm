@@ -7,6 +7,7 @@ import ru.mail.polis.lsm.saveliyschur.sstservice.SSTable;
 import ru.mail.polis.lsm.saveliyschur.sstservice.SSTableService;
 
 import javax.annotation.Nullable;
+import javax.annotation.concurrent.GuardedBy;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -20,8 +21,8 @@ import java.util.*;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ConcurrentNavigableMap;
 import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Logger;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class MyDAO implements DAO {
@@ -29,13 +30,17 @@ public class MyDAO implements DAO {
     private static final Logger log = Logger.getLogger(MyDAO.class.getName());
 
     private final ConcurrentSkipListMap<ByteBuffer, Record> storage = new ConcurrentSkipListMap<>();
+    
+    private Long sizeCollections = 0L;
+    private static final Long maxSizeCollection = 2 * 1024 * 1024L;
+
     private final DAOConfig config;
     private static final String LOG_FILE = "log_db.log";
     private static Path fileLog;
 
-    private static long numberSSTables;
+    private long numberSSTables;
 
-    private final List<SSTable> ssTables = Collections.synchronizedList(new ArrayList<>());
+    private List<SSTable> ssTables = Collections.synchronizedList(new ArrayList<>());
 
     private final SSTableService ssTableService;
 
@@ -82,7 +87,15 @@ public class MyDAO implements DAO {
     @Override
     public void upsert(Record record) {
         synchronized (this) {
+            //Проверяем содержит ли коллекция элемент, чтобы заменить размеры
+            if (storage.containsKey(record.getKey())) {
+                Record value = storage.get(record.getKey());
+                sizeCollections = sizeCollections - value.getSize();
+            }
+
             storage.put(record.getKey(), record);
+
+            sizeCollections = sizeCollections + record.getSize();
 
             //We write the entry to the log so that in case of a failure we can recover
             try (FileChannel fileChannel = FileChannel.open(fileLog, StandardOpenOption.WRITE)) {
@@ -91,6 +104,22 @@ public class MyDAO implements DAO {
                 writeInt(record.getValue(), fileChannel, size);
             } catch (IOException e) {
                 e.printStackTrace();
+            }
+
+            if (sizeCollections >= maxSizeCollection) {
+                log.info("Flush file in upset");
+                try {
+                    ssTableService.flush(storage, create());
+                    storage.clear();
+                    Files.deleteIfExists(fileLog);
+                    File logFileCreate = new File(String.valueOf(fileLog.toFile()));
+                    logFileCreate.createNewFile();
+                    sizeCollections = 0L;
+                } catch (IOException e) {
+                    e.printStackTrace();
+                    log.severe("Error write file in upset");
+                }
+                log.info("OK flush file in upset");
             }
         }
     }
@@ -115,8 +144,58 @@ public class MyDAO implements DAO {
         }
     }
 
-    public DAOConfig getConfig() {
-        return config;
+    @Override
+    public void compact() {
+        synchronized (this) {
+            List<SSTable> ssTablesWithSuffics = Collections.synchronizedList(new ArrayList<>());
+            for (int i = 0; i < ssTables.size(); i = i + 2) {
+                try {
+                    SSTable ssTable = compactTwoFile(ssTables.get(i), ssTables.get(i+1), ssTablesWithSuffics.size());
+                    ssTablesWithSuffics.add(ssTable);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                    log.severe("Ошибка при слиянии compact");
+                }
+            }
+
+            ssTables.forEach(s -> {
+                try {
+                    s.close();
+                    Files.deleteIfExists(s.getPath());
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            });
+
+            ssTablesWithSuffics.forEach(ssTable -> {
+                File file = new File(ssTable.getPath().toString());
+                File newFile = new File(ssTable.getPath().toString().replaceAll(SSTable.SUFFICS, ""));
+
+                boolean flag = file.renameTo(newFile);
+                if (!flag) {
+                    log.severe("Don't rename file for path " + ssTable.getPath().toString());
+                }
+
+                ssTable.setPath(newFile.toPath());
+            });
+            ssTables = ssTablesWithSuffics;
+        }
+    }
+
+    public SSTable compactTwoFile(SSTable first, SSTable second, long i) throws IOException {
+        SortedMap<ByteBuffer, Record> firstMap = ssTableService.readSSTable(first);
+        SortedMap<ByteBuffer, Record> secondMap = ssTableService.readSSTable(second);
+
+        SSTable ssTable = createWithSuffics(i);
+        Iterator<Record> iterator = DAO.mergeTwo(new PeekingIterator(firstMap.values().iterator()),
+                new PeekingIterator(secondMap.values().iterator()));
+        AbstractMap<ByteBuffer, Record> flusherMap = new TreeMap<>();
+        while (iterator.hasNext()) {
+            Record record = iterator.next();
+            flusherMap.put(record.getKey(), record);
+        }
+        ssTableService.flush(flusherMap, ssTable);
+        return ssTable;
     }
 
     private ConcurrentNavigableMap<ByteBuffer, Record> getSubMap(@Nullable ByteBuffer fromKey,
@@ -191,6 +270,12 @@ public class MyDAO implements DAO {
         numberSSTables ++;
         ssTables.add(ssTable);
         return ssTable;
+    }
+
+    private SSTable createWithSuffics(long i) {
+        return new SSTable(config.getDir().resolve(SSTable.NAME
+                + i
+                + SSTable.EXTENSION + SSTable.SUFFICS));
     }
 
     private static Iterator<Record> filterTombstones(Iterator<Record> iterator) {

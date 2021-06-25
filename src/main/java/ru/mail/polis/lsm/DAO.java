@@ -1,7 +1,10 @@
 package ru.mail.polis.lsm;
 
+import ru.mail.polis.lsm.saveliyschur.sstservice.SSTable;
+
 import javax.annotation.Nullable;
 import java.io.Closeable;
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.Iterator;
@@ -37,7 +40,6 @@ public interface DAO extends Closeable {
 
         return result;
     }
-<<<<<<< HEAD
 
     static Iterator<Record> merge(List<Iterator<Record>> iterators) {
         if (iterators.size() == 0) {
@@ -134,6 +136,4 @@ public interface DAO extends Closeable {
 
     }
 
-=======
->>>>>>> master
 }

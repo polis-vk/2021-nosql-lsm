@@ -93,7 +93,9 @@ class Utils {
         assertEquals(dao.range(null, null), bufferTreeMap.entrySet());
 
         if (!bufferTreeMap.isEmpty()) {
-            assertEquals(dao.range(bufferTreeMap.firstKey(), DAO.nextKey(bufferTreeMap.lastKey())), bufferTreeMap.entrySet());
+            ByteBuffer firstKey = bufferTreeMap.firstKey();
+            ByteBuffer lastKey = DAO.nextKey(bufferTreeMap.lastKey());
+            assertEquals(dao.range(firstKey, lastKey), bufferTreeMap.entrySet());
             assertEquals(dao.range(bufferTreeMap.firstKey(), null), bufferTreeMap.entrySet());
             assertEquals(dao.range(null, DAO.nextKey(bufferTreeMap.lastKey())), bufferTreeMap.entrySet());
         }

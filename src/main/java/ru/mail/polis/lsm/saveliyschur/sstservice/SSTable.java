@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.logging.Logger;
 import java.util.stream.Stream;
 
-public class SSTable implements Closeable, Comparable {
+public class SSTable implements Closeable, Comparable<SSTable> {
 
     private static final Logger log = Logger.getLogger(SSTable.class.getName());
     private static final Method CLEAN;
@@ -20,8 +20,9 @@ public class SSTable implements Closeable, Comparable {
 
     public static final String NAME = "sstable_";
     public static final String EXTENSION = ".sst";
+    public static final String SUFFICS = "_compact";
 
-    private final Path path;
+    private Path path;
 
     static {
         try {
@@ -39,6 +40,10 @@ public class SSTable implements Closeable, Comparable {
 
     public Path getPath() {
         return path;
+    }
+
+    public void setPath(Path path) {
+        this.path = path;
     }
 
     @Override
@@ -74,13 +79,11 @@ public class SSTable implements Closeable, Comparable {
         }
     }
 
-
     @Override
-    public int compareTo(Object o) {
-        SSTable ssTable = (SSTable) o;
+    public int compareTo(SSTable o) {
 
         String myPath = this.path.toString();
-        String oPath = ssTable.getPath().toString();
+        String oPath = o.getPath().toString();
 
         String nameSSTableThis = myPath.substring(myPath.lastIndexOf("\\") + 1);
         String nameSSTableO = oPath.substring(oPath.lastIndexOf("\\") + 1);

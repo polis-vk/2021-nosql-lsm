@@ -4,6 +4,7 @@ import ru.mail.polis.lsm.DAO;
 import ru.mail.polis.lsm.DAOConfig;
 import ru.mail.polis.lsm.Record;
 
+import javax.annotation.Nullable;
 import java.io.Closeable;
 import java.io.IOException;
 import java.lang.reflect.Field;
@@ -16,6 +17,7 @@ import java.nio.channels.WritableByteChannel;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.*;
+import java.util.concurrent.ConcurrentNavigableMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -34,7 +36,7 @@ public class SSTableService {
                 .collect(Collectors.toList()));
     }
 
-    private Iterator<Record> readSSTable(SSTable ssTable, ByteBuffer from, ByteBuffer to) {
+    public SortedMap<ByteBuffer, Record> readSSTable(SSTable ssTable) {
         Path file = ssTable.getPath();
         log.info("Read SSTable from path: " + file.toString());
 
@@ -55,13 +57,6 @@ public class SSTableService {
 
                 int valueSize = mappedByteBuffer.getInt();
 
-                if (!isInRange(key, from, to)) {
-                    if (valueSize >= 0) {
-                        mappedByteBuffer.position(mappedByteBuffer.position() + valueSize);
-                    }
-                    continue;
-                }
-
                 if (valueSize >= 0) {
                     ByteBuffer value = mappedByteBuffer.slice().limit(valueSize).asReadOnlyBuffer();
                     resultMap.put(key, Record.of(key, value));
@@ -72,27 +67,39 @@ public class SSTableService {
                     mappedByteBuffer.position(mappedByteBuffer.position() + valueSize);
                 }
             }
-            ssTable.setMapp(mappedByteBuffer);
+            if (ssTable.getMapp() == null) {
+                ssTable.setMapp(mappedByteBuffer);
+            }
         } catch (IOException e) {
             e.printStackTrace();
             log.severe("Error in range!");
         }
 
-        return resultMap.values().iterator();
+        return resultMap;
     }
 
-    private boolean isInRange(ByteBuffer key, ByteBuffer from, ByteBuffer to) {
-        if (from == null && to == null) {
-            return true;
-        } else if (to == null) {
-            return key.compareTo(from) >= 0;
-        } else if (from == null) {
-            return key.compareTo(to) < 0;
+    private Iterator<Record> readSSTable(SSTable ssTable, ByteBuffer from, ByteBuffer to) {
+        return getSubMap(from, to, readSSTable(ssTable)).values().iterator();
+    }
+
+    private SortedMap<ByteBuffer, Record> getSubMap(@Nullable ByteBuffer fromKey,
+                                                                 @Nullable ByteBuffer toKey,
+                                                    SortedMap<ByteBuffer, Record> map) {
+        if (fromKey == null && toKey == null) {
+            return map;
         }
-        return key.compareTo(from) >= 0 && key.compareTo(to) < 0;
+        else if (fromKey == null) {
+            return map.headMap(toKey);
+        }
+        else if (toKey == null) {
+            return map.tailMap(fromKey);
+        }
+        else {
+            return map.subMap(fromKey, toKey);
+        }
     }
 
-    public void flush(ConcurrentSkipListMap<ByteBuffer, Record> storage, SSTable ssTable) throws IOException {
+    public void flush(AbstractMap<ByteBuffer, Record> storage, SSTable ssTable) throws IOException {
         Path file = ssTable.getPath();
         log.info("Write SSTable to path: " + file.toString());
         try (FileChannel fileChannel = FileChannel.open(file, StandardOpenOption.CREATE_NEW,

@@ -5,6 +5,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -210,7 +211,7 @@ class PersistenceTest {
         byte[] suffix = sizeBasedRandomData(size);
         int recordsCount = (int) (TestDaoWrapper.MAX_HEAP * 15 / size);
 
-        prepareHugeDao(data, size, suffix);
+        prepareHugeDao(data, recordsCount, suffix);
 
         // Check
         try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
@@ -284,7 +285,7 @@ class PersistenceTest {
         assertEquals(key, next.getKey());
         assertEquals(value, next.getValue());
     }
-    
+
     private void prepareHugeDao(@TempDir Path data, int recordsCount, byte[] suffix) throws IOException {
         try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
             for (int i = 0; i < recordsCount; i++) {
@@ -333,4 +334,58 @@ class PersistenceTest {
         }
     }
 
+    @Test
+    void searchManyRecords(@TempDir Path data) throws IOException {
+        int size = 100000;
+
+        try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
+            for (int i = 0; i < size; i++) {
+                dao.upsert(Record.of(key(i), value(i)));
+            }
+        }
+
+        try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
+            Iterator<Record> recordIterator = dao.range(key(400), key(500));
+            for (int i = 400; i <= 500; i++) {
+                Record record = recordIterator.next();
+                System.out.println(StandardCharsets.UTF_8.decode(record.getKey()).toString() + " " +
+                        StandardCharsets.UTF_8.decode(key(i)).toString());
+            }
+        }
+    }
+
+    @Test
+    void testSimpleCompare(@TempDir Path data) throws IOException {
+        ByteBuffer key = wrap("KEY_1");
+        ByteBuffer value = wrap("VALUE_1");
+        ByteBuffer value2 = wrap("VALUE_2");
+
+        try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
+            dao.upsert(Record.of(key, value));
+        }
+
+        try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
+            Iterator<Record> iterator = dao.range(null, null);
+            assertEquals(value, iterator.next().getValue());
+        }
+
+        try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
+            dao.upsert(Record.of(key, value2));
+
+            Iterator<Record> iterator = dao.range(null, null);
+            assertEquals(value2, iterator.next().getValue());
+        }
+
+        try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
+            Iterator<Record> iterator = dao.range(null, null);
+            assertEquals(value2, iterator.next().getValue());
+        }
+
+        try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
+            dao.compact();
+
+            Iterator<Record> iterator = dao.range(null, null);
+            assertEquals(value2, iterator.next().getValue());
+        }
+    }
 }
