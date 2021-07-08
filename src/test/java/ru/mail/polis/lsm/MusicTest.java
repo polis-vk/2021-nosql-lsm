@@ -67,17 +67,17 @@ class MusicTest {
     }
 
     private static String artistFrom(String artist) {
-        assertEquals(-1, artist.indexOf(DELIMITER));
-        assertEquals(-1, artist.indexOf(DELIMITER_FOR_SUFFIX));
+        assert artist.indexOf(DELIMITER) == -1;
+        assert artist.indexOf(DELIMITER_FOR_SUFFIX) == -1;
 
         return artist;
     }
 
     private static String albumFrom(String artist, String album) {
-        assertEquals(-1, artist.indexOf(DELIMITER));
-        assertEquals(-1, artist.indexOf(DELIMITER_FOR_SUFFIX));
-        assertEquals(-1, album.indexOf(DELIMITER));
-        assertEquals(-1, album.indexOf(DELIMITER_FOR_SUFFIX));
+        assert artist.indexOf(DELIMITER) == -1;
+        assert artist.indexOf(DELIMITER_FOR_SUFFIX) == -1;
+        assert album.indexOf(DELIMITER) == -1;
+        assert album.indexOf(DELIMITER_FOR_SUFFIX) == -1;
 
         return artist + DELIMITER + album;
     }
@@ -87,12 +87,12 @@ class MusicTest {
             String album,
             String track
     ) {
-        assertEquals(-1, artist.indexOf(DELIMITER));
-        assertEquals(-1, artist.indexOf(DELIMITER_FOR_SUFFIX));
-        assertEquals(-1, album.indexOf(DELIMITER));
-        assertEquals(-1, album.indexOf(DELIMITER_FOR_SUFFIX));
-        assertEquals(-1, track.indexOf(DELIMITER));
-        assertEquals(-1, track.indexOf(DELIMITER_FOR_SUFFIX));
+        assert artist.indexOf(DELIMITER) == -1;
+        assert artist.indexOf(DELIMITER_FOR_SUFFIX) == -1;
+        assert album.indexOf(DELIMITER) == -1;
+        assert album.indexOf(DELIMITER_FOR_SUFFIX) == -1;
+        assert track.indexOf(DELIMITER) == -1;
+        assert track.indexOf(DELIMITER_FOR_SUFFIX) == -1;
 
         return artist + DELIMITER + album + DELIMITER + track;
     }

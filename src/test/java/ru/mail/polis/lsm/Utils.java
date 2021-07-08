@@ -16,6 +16,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.NavigableMap;
 import java.util.Random;
 import java.util.TreeMap;
 
@@ -89,13 +90,19 @@ class Utils {
 
     static void assertDaoEquals(DAO dao, Map<ByteBuffer, ByteBuffer> map) {
         TreeMap<ByteBuffer, ByteBuffer> bufferTreeMap = new TreeMap<>(map);
+        NavigableMap<ByteBuffer, ByteBuffer> bufferTreeMapReverse = bufferTreeMap.descendingMap();
 
         assertEquals(dao.range(null, null), bufferTreeMap.entrySet());
+        assertEquals(dao.descendingRange(null, null), bufferTreeMapReverse.entrySet());
 
         if (!bufferTreeMap.isEmpty()) {
             assertEquals(dao.range(bufferTreeMap.firstKey(), DAO.nextKey(bufferTreeMap.lastKey())), bufferTreeMap.entrySet());
             assertEquals(dao.range(bufferTreeMap.firstKey(), null), bufferTreeMap.entrySet());
             assertEquals(dao.range(null, DAO.nextKey(bufferTreeMap.lastKey())), bufferTreeMap.entrySet());
+
+            assertEquals(dao.descendingRange(bufferTreeMap.firstKey(), DAO.nextKey(bufferTreeMap.lastKey())), bufferTreeMapReverse.entrySet());
+            assertEquals(dao.descendingRange(bufferTreeMap.firstKey(), null), bufferTreeMapReverse.entrySet());
+            assertEquals(dao.descendingRange(null, DAO.nextKey(bufferTreeMap.lastKey())), bufferTreeMapReverse.entrySet());
         }
     }
 
@@ -105,7 +112,6 @@ class Utils {
 
         List<String> i1List = new ArrayList<>();
         i1.forEachRemaining(r -> i1List.add(toString(decoder, r.getKey(), r.getValue())));
-
         List<String> i2List = new ArrayList<>();
         for (Map.Entry<ByteBuffer, ByteBuffer> entry : i2) {
             i2List.add(toString(decoder, entry.getKey(), entry.getValue()));

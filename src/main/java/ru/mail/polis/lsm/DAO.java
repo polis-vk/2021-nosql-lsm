@@ -2,6 +2,7 @@ package ru.mail.polis.lsm;
 
 import javax.annotation.Nullable;
 import java.io.Closeable;
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Iterator;
 import java.util.List;
@@ -12,9 +13,11 @@ import java.util.List;
 public interface DAO extends Closeable {
     Iterator<Record> range(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey);
 
+    Iterator<Record> descendingRange(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey);
+
     void upsert(Record record);
 
-    void compact();
+    void compact() throws IOException;
 
     /**
      * Appends {@code Byte.MIN_VALUE} to {@code buffer}.
@@ -34,5 +37,19 @@ public interface DAO extends Closeable {
         result.rewind();
 
         return result;
+    }
+
+    /**
+     * Merge iterators.
+     *
+     * @param iterators list of iterators
+     * @return merged iterator
+     */
+    static Iterator<Record> merge(List<Iterator<Record>> iterators, boolean isDirectOrder) {
+        return new MergeIterator(iterators, isDirectOrder);
+    }
+
+    static Iterator<Record> merge(List<Iterator<Record>> iterators) {
+        return merge(iterators, true);
     }
 }
