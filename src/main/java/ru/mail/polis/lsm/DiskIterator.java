@@ -17,7 +17,8 @@ public class DiskIterator implements Iterator<Record> {
     /**
      * Iterator from hard drive.
      */
-    public DiskIterator(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey, ByteBuffer buffer, ByteBuffer index, Boolean isDirectOrder) {
+    public DiskIterator(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey, ByteBuffer buffer, ByteBuffer index,
+                        Boolean isDirectOrder) {
         this.fromKey = fromKey;
         this.toKey = toKey;
         this.buffer = buffer;

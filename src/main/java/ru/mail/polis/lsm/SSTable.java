@@ -22,6 +22,9 @@ import java.util.stream.Stream;
 
 public class SSTable implements Closeable {
 
+    private final MappedByteBuffer mmap;
+    private final MappedByteBuffer idx;
+
     private static final Method CLEAN;
 
     static {
@@ -53,9 +56,6 @@ public class SSTable implements Closeable {
         this.idxPath = dir;
     }
 
-    private final MappedByteBuffer mmap;
-    private final MappedByteBuffer idx;
-
     static List<SSTable> loadFromDir(Path dir) throws IOException {
         try (Stream<Path> files = Files.list(dir)) {
             return files
@@ -75,6 +75,9 @@ public class SSTable implements Closeable {
         }
     }
 
+    /**
+     * Write SSTable data to hard drive.
+     */
     public static SSTable write(Iterator<Record> records, Path file, Path index) throws IOException {
         Files.deleteIfExists(file);
         Files.deleteIfExists(index);

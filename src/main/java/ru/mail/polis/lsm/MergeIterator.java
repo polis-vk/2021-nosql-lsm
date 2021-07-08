@@ -9,7 +9,7 @@ class MergeIterator implements Iterator<Record> {
     private final PriorityQueue<QueueUnit> queue = new PriorityQueue<>();
     private final List<Iterator<Record>> iterators;
     private final boolean isDirectOrder;
-    private Record current = null;
+    private Record current;
     private Record lastReturned;
     private int lastReturnedIndex;
 
@@ -32,18 +32,18 @@ class MergeIterator implements Iterator<Record> {
         Record result = null;
 
         while (!queue.isEmpty() && result == null) {
-            QueueUnit current = queue.poll();
+            QueueUnit currentElem = queue.poll();
 
-            Iterator<Record> currentIter = iterators.get(current.getSourceNumber());
-            if (lastReturned == null || lastReturnedIndex == current.getSourceNumber()
-                    || !current.getData().getKey().equals(lastReturned.getKey())) {
-                result = current.getData();
+            Iterator<Record> currentIter = iterators.get(currentElem.getSourceNumber());
+            if (lastReturned == null || lastReturnedIndex == currentElem.getSourceNumber()
+                    || !currentElem.getData().getKey().equals(lastReturned.getKey())) {
+                result = currentElem.getData();
                 lastReturned = result;
-                lastReturnedIndex = current.getSourceNumber();
+                lastReturnedIndex = currentElem.getSourceNumber();
             }
 
             if (currentIter.hasNext()) {
-                queue.add(new QueueUnit(currentIter.next(), current.getSourceNumber()));
+                queue.add(new QueueUnit(currentIter.next(), currentElem.getSourceNumber()));
             }
         }
         current = result;
