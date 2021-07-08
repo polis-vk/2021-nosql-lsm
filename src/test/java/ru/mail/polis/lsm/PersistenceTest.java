@@ -238,7 +238,7 @@ class PersistenceTest {
         NavigableMap<ByteBuffer, ByteBuffer> result = source.descendingMap();
 
         try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
-            Iterator<Record> descendingRange = dao.descendingRange(source.firstKey(), source.lastKey());
+            Iterator<Record> descendingRange = dao.descendingRange(source.firstKey(), key(9));
             Utils.assertEquals(descendingRange, result.entrySet());
         }
     }

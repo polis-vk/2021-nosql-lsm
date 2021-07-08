@@ -166,6 +166,9 @@ public class DiskIterator implements Iterator<Record> {
         }
         int pos = left * Integer.BYTES;
 
+        if (!isDirectOrder) {
+            pos = Math.max(pos - Integer.BYTES, 0);
+        }
         idx.position(pos);
 
         return idx.getInt(pos);
