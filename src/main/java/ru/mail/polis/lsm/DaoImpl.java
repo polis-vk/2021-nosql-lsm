@@ -94,14 +94,14 @@ public class DaoImpl implements DAO {
         }
 
         if (fromKey == null) {
-            return descMap.tailMap(toKey, true);
+            return descMap.tailMap(toKey, false);
         }
 
         if (toKey == null) {
             return descMap.headMap(fromKey, true);
         }
 
-        return descMap.subMap(toKey, true, fromKey, true);
+        return descMap.subMap(toKey, false, fromKey, true);
     }
 
     @Override

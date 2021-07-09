@@ -10,7 +10,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.util.*;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.NavigableMap;
+import java.util.TreeMap;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -226,20 +229,33 @@ class PersistenceTest {
     @Test
     void reversePersistenceTest(@TempDir Path data) throws IOException {
         TreeMap<ByteBuffer, ByteBuffer> source = new TreeMap<>();
+        NavigableMap<ByteBuffer, ByteBuffer> result = source.descendingMap();
         try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
             for (int i = 0; i < 10; i++) {
                 Record record = Record.of(key(i), value(i));
                 dao.upsert(record);
                 source.put(record.getKey(), record.getValue());
             }
+
+            Iterator<Record> descendingRange = dao.descendingRange(key(1), key(9));
+            Utils.assertEquals(descendingRange, result.subMap(key(9), false, key(1), true).entrySet());
+
+            descendingRange = dao.descendingRange(key(3), null);
+            Utils.assertEquals(descendingRange, result.headMap(key(3), true).entrySet());
+
+            descendingRange = dao.descendingRange(null, key(6));
+            Utils.assertEquals(descendingRange, result.tailMap(key(6), false).entrySet());
         }
-        source.remove(key(0));
-        source.remove(key(9));
-        NavigableMap<ByteBuffer, ByteBuffer> result = source.descendingMap();
 
         try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
-            Iterator<Record> descendingRange = dao.descendingRange(source.firstKey(), key(9));
-            Utils.assertEquals(descendingRange, result.entrySet());
+            Iterator<Record> descendingRange = dao.descendingRange(key(1), key(9));
+            Utils.assertEquals(descendingRange, result.subMap(key(9), false, key(1), true).entrySet());
+
+            descendingRange = dao.descendingRange(key(3), null);
+            Utils.assertEquals(descendingRange, result.headMap(key(3), true).entrySet());
+
+            descendingRange = dao.descendingRange(null, key(6));
+            Utils.assertEquals(descendingRange, result.tailMap(key(6), false).entrySet());
         }
     }
 
@@ -414,7 +430,7 @@ class PersistenceTest {
 
         Files.walkFileTree(data, new SimpleFileVisitor<>() {
             @Override
-            public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+            public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
                 size[0] += (int) attrs.size();
                 return FileVisitResult.CONTINUE;
             }
