@@ -1,5 +1,7 @@
 package ru.mail.polis.lsm;
 
+import ru.mail.polis.lsm.ponomarev.FasterThanPrevDAOImpl;
+
 import java.io.IOException;
 
 public final class DAOFactory {
@@ -12,9 +14,6 @@ public final class DAOFactory {
      * Create an instance of {@link DAO} with supplied {@link DAOConfig}.
      */
     public static DAO create(DAOConfig config) throws IOException {
-        assert config.getDir().toFile().exists();
-
-        throw new UnsupportedOperationException("Implement me");
+        return new FasterThanPrevDAOImpl(config);
     }
-
 }
