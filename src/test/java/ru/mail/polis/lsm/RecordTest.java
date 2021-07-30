@@ -3,12 +3,11 @@ package ru.mail.polis.lsm;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import java.io.File;
 import java.nio.ByteBuffer;
 import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static ru.mail.polis.lsm.Utils.*;
+import static utils.Utils.*;
 
 public class RecordTest {
     @Test

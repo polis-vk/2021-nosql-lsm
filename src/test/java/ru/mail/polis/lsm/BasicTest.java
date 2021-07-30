@@ -9,18 +9,17 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.TreeMap;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static ru.mail.polis.lsm.Utils.assertDaoEquals;
-import static ru.mail.polis.lsm.Utils.assertEquals;
-import static ru.mail.polis.lsm.Utils.generateMap;
-import static ru.mail.polis.lsm.Utils.key;
-import static ru.mail.polis.lsm.Utils.mapOf;
-import static ru.mail.polis.lsm.Utils.wrap;
+import static utils.Utils.assertDaoEquals;
+import static utils.Utils.assertEquals;
+import static utils.Utils.generateMap;
+import static utils.Utils.key;
+import static utils.Utils.mapOf;
+import static utils.Utils.wrap;
 
 class BasicTest {
 

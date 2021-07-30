@@ -10,10 +10,10 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.TreeMap;
 
-import static ru.mail.polis.lsm.Utils.assertEquals;
-import static ru.mail.polis.lsm.Utils.generateMap;
-import static ru.mail.polis.lsm.Utils.key;
-import static ru.mail.polis.lsm.Utils.value;
+import static utils.Utils.assertEquals;
+import static utils.Utils.generateMap;
+import static utils.Utils.key;
+import static utils.Utils.value;
 
 public class AdvancedTest {
 

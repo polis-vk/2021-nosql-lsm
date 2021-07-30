@@ -1,4 +1,8 @@
-package ru.mail.polis.lsm;
+package utils;
+
+import org.junit.jupiter.api.Assertions;
+import ru.mail.polis.lsm.DAO;
+import ru.mail.polis.lsm.Record;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -21,12 +25,12 @@ import java.util.TreeMap;
 
 import static org.junit.jupiter.api.Assertions.assertIterableEquals;
 
-class Utils {
+public class Utils {
 
     private static final String KEY_PREFIX = "KEY_";
     private static final String VALUE_PREFIX = "VALUE_";
 
-    static Map<ByteBuffer, ByteBuffer> generateMap(int from, int to) {
+    public static Map<ByteBuffer, ByteBuffer> generateMap(int from, int to) {
         Map<ByteBuffer, ByteBuffer> map = new HashMap<>();
         for (int i = from; i < to; i++) {
             map.put(key(i), value(i));
@@ -34,7 +38,7 @@ class Utils {
         return map;
     }
 
-    static Map<ByteBuffer, ByteBuffer> mapOf(String... keyValue) {
+    public static Map<ByteBuffer, ByteBuffer> mapOf(String... keyValue) {
         Map<ByteBuffer, ByteBuffer> map = new HashMap<>(keyValue.length / 2);
         for (int i = 0; i < keyValue.length; i += 2) {
             map.put(wrap(keyValue[i]), wrap(keyValue[i + 1]));
@@ -42,15 +46,15 @@ class Utils {
         return map;
     }
 
-    static ByteBuffer wrap(String text) {
+    public static ByteBuffer wrap(String text) {
         return ByteBuffer.wrap(text.getBytes(StandardCharsets.UTF_8));
     }
 
-    static ByteBuffer key(int index) {
+    public static ByteBuffer key(int index) {
         return wrap(KEY_PREFIX + index);
     }
 
-    static byte[] sizeBasedRandomData(int size) {
+    public static byte[] sizeBasedRandomData(int size) {
         Random random = new Random(size);
         byte[] result = new byte[size];
         for (int i = 0; i < result.length; i++) {
@@ -59,7 +63,7 @@ class Utils {
         return result;
     }
 
-    static ByteBuffer keyWithSuffix(int key, byte[] suffix) {
+    public static ByteBuffer keyWithSuffix(int key, byte[] suffix) {
         String binary = Long.toBinaryString(key);
         int leadingN = 64 - binary.length();
         String builder = "0".repeat(leadingN) + binary;
@@ -71,23 +75,23 @@ class Utils {
         return ByteBuffer.wrap(result);
     }
 
-    static ByteBuffer valueWithSuffix(int value, byte[] suffix) {
+    public static ByteBuffer valueWithSuffix(int value, byte[] suffix) {
         byte[] valueBytes = (VALUE_PREFIX + "_" + value).getBytes(StandardCharsets.UTF_8);
         return join(valueBytes, suffix);
     }
 
-    static ByteBuffer join(byte[] a, byte[] b) {
+    public static ByteBuffer join(byte[] a, byte[] b) {
         byte[] result = new byte[a.length + b.length];
         System.arraycopy(a, 0, result, 0, a.length);
         System.arraycopy(b, 0, result, a.length, b.length);
         return ByteBuffer.wrap(result);
     }
 
-    static ByteBuffer value(int index) {
+    public static ByteBuffer value(int index) {
         return wrap(VALUE_PREFIX + index);
     }
 
-    static void assertDaoEquals(DAO dao, Map<ByteBuffer, ByteBuffer> map) {
+    public static void assertDaoEquals(DAO dao, Map<ByteBuffer, ByteBuffer> map) {
         TreeMap<ByteBuffer, ByteBuffer> bufferTreeMap = new TreeMap<>(map);
 
         assertEquals(dao.range(null, null), bufferTreeMap.entrySet());
@@ -102,7 +106,7 @@ class Utils {
     }
 
     // THIS METHOD IS FOR TESTS ONLY - IT IS EXTREMELY NOT EFFECTIVE
-    static void assertEquals(Iterator<Record> i1, Collection<Map.Entry<ByteBuffer, ByteBuffer>> i2) {
+    public static void assertEquals(Iterator<Record> i1, Collection<Map.Entry<ByteBuffer, ByteBuffer>> i2) {
         CharsetDecoder decoder = StandardCharsets.UTF_8.newDecoder();
 
         List<String> i1List = new ArrayList<>();
@@ -124,15 +128,7 @@ class Utils {
         }
     }
 
-    private static String toString(CharsetDecoder decoder, ByteBuffer key, ByteBuffer value) {
-        try {
-            return decoder.decode(key.duplicate()) + ": " + decoder.decode(value.duplicate());
-        } catch (CharacterCodingException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    static void recursiveDelete(Path path) throws IOException {
+    public static void recursiveDelete(Path path) throws IOException {
         Files.walkFileTree(path,
                 new SimpleFileVisitor<>() {
                     @Override
@@ -148,4 +144,19 @@ class Utils {
                     }
                 });
     }
+
+    public static void assertEqualsRecords(Record expected, Record obtained) {
+        Assertions.assertEquals(expected.getKey(), obtained.getKey());
+        Assertions.assertEquals(expected.getValue(), obtained.getValue());
+    }
+
+
+    private static String toString(CharsetDecoder decoder, ByteBuffer key, ByteBuffer value) {
+        try {
+            return decoder.decode(key.duplicate()) + ": " + decoder.decode(value.duplicate());
+        } catch (CharacterCodingException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
 }

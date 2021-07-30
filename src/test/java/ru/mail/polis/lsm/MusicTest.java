@@ -10,7 +10,7 @@ import java.nio.file.Path;
 import java.util.Iterator;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static ru.mail.polis.lsm.Utils.wrap;
+import static utils.Utils.wrap;
 
 class MusicTest {
     private static final char DELIMITER = '\0';

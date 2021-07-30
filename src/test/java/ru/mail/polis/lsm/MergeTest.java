@@ -3,6 +3,8 @@ package ru.mail.polis.lsm;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.opentest4j.AssertionFailedError;
+import ru.mail.polis.lsm.saveliyschur.utils.UtilsIterator;
+import utils.Utils;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -13,48 +15,9 @@ import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.*;
-import static ru.mail.polis.lsm.Utils.*;
+import static utils.Utils.*;
 
 class MergeTest {
-
-    @Test
-    void mergeSimple() throws IOException {
-        List<Record> one = new ArrayList<>(1);
-        List<Record> two = new ArrayList<>(1);
-
-        ByteBuffer key = wrap("KEY");
-        ByteBuffer value = wrap("VALUE_1");
-
-        one.add(Record.of(key, value));
-        two.add(Record.tombstone(key));
-
-        DAO.PeekingIterator oneIterator = new DAO.PeekingIterator(one.iterator());
-        DAO.PeekingIterator twoIterator = new DAO.PeekingIterator(two.iterator());
-
-        Iterator<Record> answer = DAO.mergeTwo(oneIterator, twoIterator);
-        assertTrue(answer.hasNext());
-        assertNull(answer.next().getValue());
-    }
-
-    @Test
-    void mergeSimpleTwo() throws IOException {
-        List<Record> one = new ArrayList<>(1);
-        List<Record> two = new ArrayList<>(1);
-
-        ByteBuffer key = wrap("KEY");
-        ByteBuffer value = wrap("VALUE_1");
-
-        one.add(Record.of(key, value));
-        two.add(Record.tombstone(key));
-
-        DAO.PeekingIterator oneIterator = new DAO.PeekingIterator(one.iterator());
-        DAO.PeekingIterator twoIterator = new DAO.PeekingIterator(two.iterator());
-
-        Iterator<Record> answer = DAO.mergeTwo(twoIterator, oneIterator);
-        assertTrue(answer.hasNext());
-        assertEquals(value, answer.next().getValue());
-    }
-
     @Test
     void mergeFunction() {
         List<Record> one = new ArrayList<>(1);
@@ -67,35 +30,9 @@ class MergeTest {
         two.add(Record.tombstone(key));
 
         List<Iterator<Record>> iterators = List.of(one.iterator(), two.iterator());
-        Iterator<Record> answer = DAO.merge(iterators);
+        Iterator<Record> answer = UtilsIterator.merge(iterators);
         assertTrue(answer.hasNext());
         assertNull(answer.next().getValue());
-    }
-
-    @Test
-    void helper(@TempDir Path data) {
-        ByteBuffer key = wrap("KEY_1");
-        ByteBuffer key2 = wrap("KEY_2");
-        ByteBuffer value = wrap("VALUE_1");
-        ByteBuffer value2 = wrap("VALUE_2");
-
-        Record one = Record.of(key, value);
-        Record two = Record.of(key2, value2);
-
-        List<Record> oneList = List.of(one);
-        List<Record> twoList = List.of(two);
-
-        List<Iterator<Record>> iterators = List.of(oneList.iterator(), twoList.iterator());
-        Iterator<Record> answer = DAO.merge(iterators);
-
-        assertEquals(key, answer.next().getKey());
-        assertEquals(key2, answer.next().getKey());
-
-        Iterator<Record> anser = DAO.mergeTwo(new DAO.PeekingIterator(oneList.iterator()),
-                new DAO.PeekingIterator(twoList.iterator()));
-
-        assertEquals(key, anser.next().getKey());
-        assertEquals(key2, anser.next().getKey());
     }
 
     @Test
@@ -134,7 +71,7 @@ class MergeTest {
             }
 
             List<Iterator<Record>> iterators = dao.stream().map(d -> d.range(null, null)).collect(Collectors.toList());
-            Iterator<Record> iterator = DAO.merge(iterators);
+            Iterator<Record> iterator = UtilsIterator.merge(iterators);
             for (Map.Entry<String, Integer> entry : expected.entrySet()) {
                 if (!iterator.hasNext()) {
                     throw new AssertionFailedError("Iterator ended on key " + entry.getKey());
@@ -188,7 +125,7 @@ class MergeTest {
         }
         Record left = Record.of(key(0), value(0));
         Record right = Record.of(key(1), value(1));
-        Iterator<Record> iterator = DAO.merge(Arrays.asList(new Repeater(left), new Repeater(right)));
+        Iterator<Record> iterator = UtilsIterator.merge(Arrays.asList(new Repeater(left), new Repeater(right)));
         for (int i = 0; i < 1000; i++) {
             assertTrue(iterator.hasNext());
             Record next = iterator.next();

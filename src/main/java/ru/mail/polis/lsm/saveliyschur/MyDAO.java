@@ -5,6 +5,8 @@ import ru.mail.polis.lsm.DAOConfig;
 import ru.mail.polis.lsm.Record;
 import ru.mail.polis.lsm.saveliyschur.sstservice.SSTable;
 import ru.mail.polis.lsm.saveliyschur.sstservice.SSTableService;
+import ru.mail.polis.lsm.saveliyschur.utils.PeekingIterator;
+import ru.mail.polis.lsm.saveliyschur.utils.UtilsIterator;
 
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.GuardedBy;
@@ -80,7 +82,7 @@ public class MyDAO implements DAO {
             ssTables.stream().sorted(SSTable::compareTo).forEach(ssTablesDeque::add);
 
             Iterator<Record> sstableIterators = ssTableService.getRange(ssTablesDeque, fromKey, toKey);
-            Iterator<Record> anser = DAO.mergeTwo(new PeekingIterator(sstableIterators), new PeekingIterator(memoryIterator));
+            Iterator<Record> anser = UtilsIterator.mergeTwo(new PeekingIterator(sstableIterators), new PeekingIterator(memoryIterator));
             return filterTombstones(anser);
     }
 
@@ -190,7 +192,7 @@ public class MyDAO implements DAO {
         SortedMap<ByteBuffer, Record> secondMap = ssTableService.readSSTable(second);
 
         SSTable ssTable = createWithSuffics(i);
-        Iterator<Record> iterator = DAO.mergeTwo(new PeekingIterator(firstMap.values().iterator()),
+        Iterator<Record> iterator = UtilsIterator.mergeTwo(new PeekingIterator(firstMap.values().iterator()),
                 new PeekingIterator(secondMap.values().iterator()));
         AbstractMap<ByteBuffer, Record> flusherMap = new TreeMap<>();
         while (iterator.hasNext()) {

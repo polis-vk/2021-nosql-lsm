@@ -3,6 +3,7 @@ package ru.mail.polis.lsm.saveliyschur.sstservice;
 import ru.mail.polis.lsm.DAO;
 import ru.mail.polis.lsm.DAOConfig;
 import ru.mail.polis.lsm.Record;
+import ru.mail.polis.lsm.saveliyschur.utils.UtilsIterator;
 
 import javax.annotation.Nullable;
 import java.io.Closeable;
@@ -31,7 +32,7 @@ public class SSTableService {
 
     public Iterator<Record> getRange(Deque<SSTable> ssTables, ByteBuffer from, ByteBuffer to) {
         log.info("Get range.");
-        return DAO.merge(ssTables.stream()
+        return UtilsIterator.merge(ssTables.stream()
                 .map(ssTable -> readSSTable(ssTable, from, to))
                 .collect(Collectors.toList()));
     }

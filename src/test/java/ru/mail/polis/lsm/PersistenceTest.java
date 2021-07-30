@@ -2,10 +2,10 @@ package ru.mail.polis.lsm;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import utils.Utils;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -17,14 +17,14 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static ru.mail.polis.lsm.Utils.assertDaoEquals;
-import static ru.mail.polis.lsm.Utils.key;
-import static ru.mail.polis.lsm.Utils.keyWithSuffix;
-import static ru.mail.polis.lsm.Utils.recursiveDelete;
-import static ru.mail.polis.lsm.Utils.sizeBasedRandomData;
-import static ru.mail.polis.lsm.Utils.value;
-import static ru.mail.polis.lsm.Utils.valueWithSuffix;
-import static ru.mail.polis.lsm.Utils.wrap;
+import static utils.Utils.assertDaoEquals;
+import static utils.Utils.key;
+import static utils.Utils.keyWithSuffix;
+import static utils.Utils.recursiveDelete;
+import static utils.Utils.sizeBasedRandomData;
+import static utils.Utils.value;
+import static utils.Utils.valueWithSuffix;
+import static utils.Utils.wrap;
 
 class PersistenceTest {
 
