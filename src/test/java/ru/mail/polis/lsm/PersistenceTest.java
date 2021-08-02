@@ -4,12 +4,14 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
+import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.Iterator;
-import java.util.stream.Stream;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.*;
@@ -179,60 +181,49 @@ class PersistenceTest {
     }
 
     @Test
-    void compact(@TempDir Path data) throws IOException {
-        try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
-            for (int i = 0; i < 250000; i++) {
-                ByteBuffer key = key(i);
-                ByteBuffer value = value(i);
-                dao.upsert(Record.of(key, value));
-            }
-            for (int i = 0; i < 250000; i++) {
-                ByteBuffer key = key(i);
-                ByteBuffer value = value(i);
-                dao.upsert(Record.of(key, value));
-            }
-            long numberOfFilesBefore;
-            long sizeOfDirBefore;
-            long numberOfFilesAfter;
-            long sizeOfDirAfter;
-            try (Stream<Path> stream = Files.list(data)) {
-                numberOfFilesBefore = stream
-                        .count();
-            }
-            try (Stream<Path> stream = Files.walk(data)) {
-                sizeOfDirBefore = stream
-                        .filter(Files::isRegularFile)
-                        .mapToLong(file -> {
-                            try {
-                                return Files.size(file);
-                            } catch (IOException e) {
-                                throw new UncheckedIOException(e);
-                            }
-                        })
-                        .sum();
-            }
-            dao.compact();
-            try (Stream<Path> stream = Files.list(data)) {
-                numberOfFilesAfter = stream
-                        .count();
-            }
-            try (Stream<Path> stream = Files.walk(data)) {
-                sizeOfDirAfter = stream
-                        .filter(Files::isRegularFile)
-                        .mapToLong(file -> {
-                            try {
-                                return Files.size(file);
-                            } catch (IOException e) {
-                                throw new UncheckedIOException(e);
-                            }
-                        })
-                        .sum();
+    void burnAndCompact(@TempDir Path data) throws IOException {
+        Map<ByteBuffer, ByteBuffer> map = Utils.generateMap(0, 1);
+
+        int overwrites = 100;
+        for (int i = 0; i < overwrites; i++) {
+            try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
+                map.forEach((k, v) -> dao.upsert(Record.of(k, v)));
             }
 
-            assertTrue(numberOfFilesBefore > numberOfFilesAfter);
-            assertEquals(numberOfFilesAfter, 2);
-            assertTrue(sizeOfDirBefore > sizeOfDirAfter);
+            // Check
+            try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
+                assertDaoEquals(dao, map);
+            }
         }
+
+        int beforeCompactSize = getDirSize(data);
+
+        try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
+            dao.compact();
+            assertDaoEquals(dao, map);
+        }
+
+        // just for sure
+        try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
+            assertDaoEquals(dao, map);
+        }
+
+        int size = getDirSize(data);
+        assertTrue(beforeCompactSize / 50 > size);
+    }
+
+    private int getDirSize(Path data) throws IOException {
+        int[] size = new int[1];
+
+        Files.walkFileTree(data, new SimpleFileVisitor<>() {
+            @Override
+            public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+                size[0] += (int) attrs.size();
+                return FileVisitResult.CONTINUE;
+            }
+        });
+
+        return size[0];
     }
 
     private void verifyNext(byte[] suffix, Iterator<Record> range, int index) {
@@ -255,5 +246,4 @@ class PersistenceTest {
             }
         }
     }
-
 }
