@@ -80,8 +80,7 @@ public class LmsDAO implements DAO {
         Iterator<Record> iterator = range(null, null);
 
         Path dir = config.dir;
-        Path fileName = dir.resolve("file_" + nextSSTableIndex);
-        nextSSTableIndex++;
+        Path fileName = dir.resolve("compaction_file");
 
         Path indexFileName = SSTable.getIndexFile(fileName);
 
@@ -97,6 +96,8 @@ public class LmsDAO implements DAO {
             for (Path file : files) {
                 Files.delete(file);
             }
+
+            nextSSTableIndex = 0;
         }
 
         ssTables.clear();
