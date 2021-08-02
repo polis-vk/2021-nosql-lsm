@@ -11,6 +11,7 @@ import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.*;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ConcurrentSkipListMap;
@@ -96,12 +97,18 @@ public class LmsDAO implements DAO {
             for (Path file : files) {
                 Files.delete(file);
             }
-
-            nextSSTableIndex = 0;
         }
 
         ssTables.clear();
         ssTables.add(ssTable);
+
+        Path newFirstFile = dir.resolve("file_0");
+        Path newFirstIndexFile = SSTable.getIndexFile(newFirstFile);
+
+        Files.move(fileName, newFirstFile, StandardCopyOption.ATOMIC_MOVE);
+        Files.move(indexFileName, newFirstIndexFile, StandardCopyOption.ATOMIC_MOVE);
+
+        nextSSTableIndex = 1;
     }
 
     @Override
