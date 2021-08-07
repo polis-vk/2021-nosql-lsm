@@ -15,7 +15,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Objects;
+import java.util.NoSuchElementException;
 
 public class SSTable implements Closeable {
 
@@ -27,7 +31,7 @@ public class SSTable implements Closeable {
             Class<?> aClass = Class.forName("sun.nio.ch.FileChannelImpl");
             CLEAN = aClass.getDeclaredMethod("unmap", MappedByteBuffer.class);
             CLEAN.setAccessible(true);
-        } catch (Exception e) {
+        } catch (ClassNotFoundException | NoSuchMethodException e) {
             throw new IllegalStateException(e);
         }
     }
@@ -35,12 +39,25 @@ public class SSTable implements Closeable {
     private final MappedByteBuffer mmap;
     private final MappedByteBuffer idx;
 
+    /**
+     * SSTable constructor creates SSTable and index file from the specified file.
+     *
+     * @param file with records
+     * @throws IOException if a problem occurs while opening a file
+     */
     public SSTable(Path file) throws IOException {
         Path indexFile = getIndexFile(file);
         mmap = open(file);
         idx = open(indexFile);
     }
 
+    /**
+     * Loads existing ssTables from the specified directory.
+     *
+     * @param dir - directory with SSTables
+     * @return list of SSTables
+     * @throws IOException if a problem while creating an SSTable occurs
+     */
     public static List<SSTable> loadFromDir(Path dir) throws IOException {
         List<SSTable> ssTables = new ArrayList<>();
         for (int i = 0; ; i++) {
@@ -52,6 +69,14 @@ public class SSTable implements Closeable {
         }
     }
 
+    /**
+     * Writes records to the specified file.
+     *
+     * @param file in which records will be written
+     * @param iterator over range of records to write
+     * @return new SSTable
+     * @throws IOException if a problem while writing to file occurs
+     */
     public static SSTable write(Path file, Iterator<Record> iterator) throws IOException {
         Path tmpFile = getTmpFile(file);
         Path indexFile = getIndexFile(file);
@@ -87,6 +112,12 @@ public class SSTable implements Closeable {
         return new SSTable(file);
     }
 
+    /**
+     * Returns the size of the record in bytes.
+     *
+     * @param record of key and value
+     * @return size of the record as as sum of size of key and size of value
+     */
     public static int sizeOf(Record record) {
         int keySize = Integer.BYTES + record.getKeySize();
         int valueSize = Integer.BYTES + record.getValueSize();
@@ -106,6 +137,40 @@ public class SSTable implements Closeable {
                 fromOffset == -1 ? maxSize : fromOffset,
                 toOffset == -1 ? maxSize : toOffset
         );
+    }
+
+    private static Iterator<Record> range(ByteBuffer buffer, int fromOffset, int toOffset) {
+        buffer.position(fromOffset);
+
+        return new Iterator<>() {
+            @Override
+            public boolean hasNext() {
+                return buffer.position() < toOffset;
+            }
+
+            @Override
+            public Record next() {
+                if (!hasNext()) {
+                    throw new NoSuchElementException("Limit is reached");
+                }
+                int keySize = buffer.getInt();
+                ByteBuffer key = read(keySize);
+
+                int valueSize = buffer.getInt();
+                if (valueSize == -1) {
+                    return Record.tombstone(key);
+                }
+                ByteBuffer value = read(valueSize);
+
+                return Record.of(key, value);
+            }
+
+            private ByteBuffer read(int size) {
+                ByteBuffer result = buffer.slice().limit(size);
+                buffer.position(buffer.position() + size);
+                return result;
+            }
+        };
     }
 
     @Override
@@ -160,7 +225,6 @@ public class SSTable implements Closeable {
             buffer.position(offset);
             int existingKeySize = buffer.getInt();
 
-            int result;
             int mismatchPos = buffer.mismatch(keyToFind);
             if (mismatchPos == -1) {
                 return offset;
@@ -170,6 +234,7 @@ public class SSTable implements Closeable {
                 return offset;
             }
 
+            int result;
             if (mismatchPos < existingKeySize && mismatchPos < keyToFind.remaining()) {
                 result = Byte.compare(
                         keyToFind.get(keyToFind.position() + mismatchPos),
@@ -193,40 +258,6 @@ public class SSTable implements Closeable {
         }
 
         return idx.getInt(left * Integer.BYTES);
-    }
-
-    private static Iterator<Record> range(ByteBuffer buffer, int fromOffset, int toOffset) {
-        buffer.position(fromOffset);
-
-        return new Iterator<>() {
-            @Override
-            public boolean hasNext() {
-                return buffer.position() < toOffset;
-            }
-
-            @Override
-            public Record next() {
-                if (!hasNext()) {
-                    throw new NoSuchElementException("Limit is reached");
-                }
-                int keySize = buffer.getInt();
-                ByteBuffer key = read(keySize);
-
-                int valueSize = buffer.getInt();
-                if (valueSize == -1) {
-                    return Record.tombstone(key);
-                }
-                ByteBuffer value = read(valueSize);
-
-                return Record.of(key, value);
-            }
-
-            private ByteBuffer read(int size) {
-                ByteBuffer result = buffer.slice().limit(size);
-                buffer.position(buffer.position() + size);
-                return result;
-            }
-        };
     }
 
     protected static Path getIndexFile(Path file) {

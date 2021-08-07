@@ -12,7 +12,13 @@ import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.util.*;
+import java.util.Collections;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Iterator;
+import java.util.NavigableMap;
+import java.util.SortedMap;
+import java.util.NoSuchElementException;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.stream.Collectors;
@@ -40,9 +46,9 @@ public class LmsDAO implements DAO {
      */
     public LmsDAO(DAOConfig config) throws IOException {
         this.config = config;
-        List<SSTable> ssTables = SSTable.loadFromDir(config.dir);
-        nextSSTableIndex = ssTables.size();
-        this.ssTables.addAll(ssTables);
+        List<SSTable> existingSSTables = SSTable.loadFromDir(config.dir);
+        nextSSTableIndex = existingSSTables.size();
+        ssTables.addAll(existingSSTables);
     }
 
     @Override
@@ -51,7 +57,10 @@ public class LmsDAO implements DAO {
             try {
                 Iterator<Record> ssTableRanges = ssTableRanges(fromKey, toKey);
                 Iterator<Record> memoryRange = map(fromKey, toKey).values().iterator();
-                Iterator<Record> iterator = mergeTwo(new PeekingIterator(ssTableRanges), new PeekingIterator(memoryRange));
+                Iterator<Record> iterator = mergeTwo(
+                        new PeekingIterator(ssTableRanges),
+                        new PeekingIterator(memoryRange)
+                );
                 return filterTombstones(iterator);
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
@@ -111,7 +120,6 @@ public class LmsDAO implements DAO {
         nextSSTableIndex = 1;
     }
 
-
     @Override
     public void close() throws IOException {
         synchronized (this) {
@@ -134,9 +142,8 @@ public class LmsDAO implements DAO {
 
         SSTable ssTable = SSTable.write(file, memoryStorage.values().iterator());
         ssTables.add(ssTable);
-        memoryStorage  = new ConcurrentSkipListMap<>();
+        memoryStorage = new ConcurrentSkipListMap<>();
     }
-
 
     private int sizeOf(Record record) {
         return SSTable.sizeOf(record);
@@ -222,7 +229,7 @@ public class LmsDAO implements DAO {
     /**
      * Merges two sorted iterators.
      *
-     * @param left  has lower priority
+     * @param left has lower priority
      * @param right has higher priority
      * @return iterator over merged sorted records
      */

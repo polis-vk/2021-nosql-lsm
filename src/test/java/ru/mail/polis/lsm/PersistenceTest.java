@@ -217,7 +217,7 @@ class PersistenceTest {
 
         Files.walkFileTree(data, new SimpleFileVisitor<>() {
             @Override
-            public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+            public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
                 size[0] += (int) attrs.size();
                 return FileVisitResult.CONTINUE;
             }
