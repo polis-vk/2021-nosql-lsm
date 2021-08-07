@@ -20,7 +20,7 @@ import java.util.stream.Stream;
 
 public class LmsDAO implements DAO {
 
-    private final SortedMap<ByteBuffer, Record> memoryStorage = new ConcurrentSkipListMap<>();
+    private NavigableMap<ByteBuffer, Record> memoryStorage = new ConcurrentSkipListMap<>();
     private final ConcurrentLinkedDeque<SSTable> ssTables = new ConcurrentLinkedDeque<>();
 
     @SuppressWarnings("unused")
@@ -111,6 +111,7 @@ public class LmsDAO implements DAO {
         nextSSTableIndex = 1;
     }
 
+
     @Override
     public void close() throws IOException {
         synchronized (this) {
@@ -133,7 +134,7 @@ public class LmsDAO implements DAO {
 
         SSTable ssTable = SSTable.write(file, memoryStorage.values().iterator());
         ssTables.add(ssTable);
-        memoryStorage.clear();
+        memoryStorage  = new ConcurrentSkipListMap<>();
     }
 
 

@@ -122,7 +122,7 @@ public class SSTable implements Closeable {
             free(idx);
         } catch (IOException e) {
             if (exception == null) {
-                 exception = e;
+                exception = e;
             } else {
                 exception.addSuppressed(e);
             }
@@ -147,26 +147,36 @@ public class SSTable implements Closeable {
         }
     }
 
-    private int offset(ByteBuffer buffer, final ByteBuffer key) {
+    private int offset(ByteBuffer buffer, final ByteBuffer keyToFind) {
         int left = 0;
         int rightLimit = idx.remaining() / Integer.BYTES;
         int right = rightLimit;
+
+        int keyToFindSize = keyToFind.remaining();
 
         while (left < right) {
             int mid = left + ((right - left) >>> 1);
             int offset = idx.getInt(mid * Integer.BYTES);
             buffer.position(offset);
-            int keySize = buffer.getInt();
+            int existingKeySize = buffer.getInt();
 
             int result;
-            int mismatch = buffer.mismatch(key);
-            if (mismatch == -1) {
+            int mismatchPos = buffer.mismatch(keyToFind);
+            if (mismatchPos == -1) {
                 return offset;
-            } else if (mismatch < keySize) {
+            }
+
+            if (existingKeySize == keyToFindSize && mismatchPos == existingKeySize) {
+                return offset;
+            }
+
+            if (mismatchPos < existingKeySize && mismatchPos < keyToFind.remaining()) {
                 result = Byte.compare(
-                        key.get(key.position() + mismatch),
-                        buffer.get(buffer.position() + mismatch)
+                        keyToFind.get(keyToFind.position() + mismatchPos),
+                        buffer.get(buffer.position() + mismatchPos)
                 );
+            } else if (mismatchPos >= existingKeySize) {
+                result = 1;
             } else {
                 result = -1;
             }
