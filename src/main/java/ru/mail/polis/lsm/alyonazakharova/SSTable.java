@@ -18,8 +18,8 @@ import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Objects;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 
 public class SSTable implements Closeable {
 
@@ -124,6 +124,13 @@ public class SSTable implements Closeable {
         return keySize + valueSize;
     }
 
+    /**
+     * Returns iterator over sorted records by specified keys.
+     *
+     * @param fromKey including
+     * @param toKey excluding
+     * @return iterator over records
+     */
     public Iterator<Record> range(@Nullable final ByteBuffer fromKey, @Nullable final ByteBuffer toKey) {
         ByteBuffer buffer = mmap.asReadOnlyBuffer();
 
