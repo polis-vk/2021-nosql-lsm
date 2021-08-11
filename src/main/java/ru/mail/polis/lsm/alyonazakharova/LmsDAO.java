@@ -88,17 +88,12 @@ public class LmsDAO implements DAO {
     @Override
     public void compact() throws IOException {
         Iterator<Record> iterator = range(null, null);
-
         Path dir = config.dir;
-        Path fileName = dir.resolve("compaction_file");
-
-        Path indexFileName = SSTable.getIndexFile(fileName);
-
-        SSTable ssTable = SSTable.write(fileName, iterator);
+        List<SSTable> compactedSSTables = SSTable.writeCompacted(dir, iterator);
 
         try (Stream<Path> stream = Files.list(dir)) {
             List<Path> files = stream
-                    .filter(file -> !file.startsWith(fileName) && !file.startsWith(indexFileName))
+                    .filter(file -> !file.toFile().getName().contains(SSTable.COMPACTED_FILE_PREFIX))
                     .collect(Collectors.toList());
 
             closeTables();
@@ -109,15 +104,18 @@ public class LmsDAO implements DAO {
         }
 
         ssTables.clear();
-        ssTables.add(ssTable);
+        ssTables.addAll(compactedSSTables);
 
-        Path newFirstFile = dir.resolve("file_0");
-        Path newFirstIndexFile = SSTable.getIndexFile(newFirstFile);
+        for (int i = 0; i < compactedSSTables.size(); i++) {
+            Path newFile = dir.resolve(SSTable.SSTABLE_FILE_PREFIX + i);
+            Path newIndexFile = SSTable.getIndexFile(newFile);
+            Path oldFile = compactedSSTables.get(i).getFile();
+            Path oldIndexFile = SSTable.getIndexFile(oldFile);
+            Files.move(oldFile, newFile, StandardCopyOption.ATOMIC_MOVE);
+            Files.move(oldIndexFile, newIndexFile, StandardCopyOption.ATOMIC_MOVE);
+        }
 
-        Files.move(fileName, newFirstFile, StandardCopyOption.ATOMIC_MOVE);
-        Files.move(indexFileName, newFirstIndexFile, StandardCopyOption.ATOMIC_MOVE);
-
-        nextSSTableIndex = 1;
+        nextSSTableIndex = compactedSSTables.size() + 1;
     }
 
     @Override
@@ -229,7 +227,7 @@ public class LmsDAO implements DAO {
     /**
      * Merges two sorted iterators.
      *
-     * @param left has lower priority
+     * @param left  has lower priority
      * @param right has higher priority
      * @return iterator over merged sorted records
      */

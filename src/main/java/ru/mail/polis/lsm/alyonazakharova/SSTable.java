@@ -24,7 +24,9 @@ import java.util.Objects;
 public class SSTable implements Closeable {
 
     private static final Method CLEAN;
-    private static final String SSTABLE_FILE_PREFIX = "file_";
+
+    protected static final String SSTABLE_FILE_PREFIX = "file_";
+    protected static final String COMPACTED_FILE_PREFIX = "compacted_";
 
     static {
         try {
@@ -39,6 +41,8 @@ public class SSTable implements Closeable {
     private final MappedByteBuffer mmap;
     private final MappedByteBuffer idx;
 
+    private final Path file;
+
     /**
      * SSTable constructor creates SSTable and index file from the specified file.
      *
@@ -46,9 +50,14 @@ public class SSTable implements Closeable {
      * @throws IOException if a problem occurs while opening a file
      */
     public SSTable(Path file) throws IOException {
+        this.file = file;
         Path indexFile = getIndexFile(file);
         mmap = open(file);
         idx = open(indexFile);
+    }
+
+    public Path getFile() {
+        return file;
     }
 
     /**
@@ -106,10 +115,63 @@ public class SSTable implements Closeable {
             fileChannel.force(false);
         }
 
-        rename(indexFile, tmpIndexFile);
-        rename(file, tmpFile);
+        rename(tmpIndexFile, indexFile);
+        rename(tmpFile, file);
 
         return new SSTable(file);
+    }
+
+    /**
+     * Write compacted data into new SSTables of the same size.
+     *
+     * @param dir is a directory where files are stored
+     * @param iterator is an iterator over sorted unique records
+     * @return list of SSTables
+     * @throws IOException if an error while working with file occurs
+     */
+    public static List<SSTable> writeCompacted(Path dir, Iterator<Record> iterator) throws IOException {
+        List<SSTable> compactedSSTables = new ArrayList<>();
+        int memoryConsumption;
+        ByteBuffer size = ByteBuffer.allocate(Integer.BYTES);
+
+        while (iterator.hasNext()) {
+            memoryConsumption = 0;
+
+            Path file = dir.resolve(COMPACTED_FILE_PREFIX + compactedSSTables.size());
+
+            Path tmpFile = getTmpFile(file);
+            Path indexFile = getIndexFile(file);
+            Path tmpIndexFile = getTmpFile(indexFile);
+
+            try (FileChannel fileChannel = openForWrite(tmpFile);
+                 FileChannel indexChannel = openForWrite(tmpIndexFile)) {
+                while (iterator.hasNext()) {
+                    // 100 - ето из воздуха взятое значение, просто чтобы потестить
+                    // наверное, можно было бы использовать здесь memoryLimit, который использовали для флаша
+                    if (memoryConsumption > 100) {
+                        break;
+                    }
+                    long position = fileChannel.position();
+                    writeInt((int) position, indexChannel, size);
+
+                    Record record = iterator.next();
+                    writeValueWithSize(record.getKey(), fileChannel, size);
+                    if (record.isTombstone()) {
+                        writeInt(-1, fileChannel, size);
+                    } else {
+                        ByteBuffer value = Objects.requireNonNull(record.getValue());
+                        writeValueWithSize(value, fileChannel, size);
+                    }
+                    memoryConsumption += sizeOf(record);
+                }
+                fileChannel.force(false);
+            }
+            rename(tmpIndexFile, indexFile);
+            rename(tmpFile, file);
+
+            compactedSSTables.add(new SSTable(file));
+        }
+        return compactedSSTables;
     }
 
     /**
@@ -293,7 +355,7 @@ public class SSTable implements Closeable {
                 StandardOpenOption.TRUNCATE_EXISTING);
     }
 
-    private static void rename(Path file, Path tmpFile) throws IOException {
+    private static void rename(Path tmpFile, Path file) throws IOException {
         Files.deleteIfExists(file);
         Files.move(tmpFile, file, StandardCopyOption.ATOMIC_MOVE);
     }

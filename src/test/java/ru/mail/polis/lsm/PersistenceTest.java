@@ -214,7 +214,7 @@ class PersistenceTest {
 
     @Test
     void uniqueRecordsCompact(@TempDir Path data) throws IOException {
-        for (int i = 0; i < 100; i++) {
+        for (int i = 0; i < 10; i++) {
             try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
                 dao.upsert(Record.of(key(i), value(i)));
             }
@@ -283,6 +283,7 @@ class PersistenceTest {
 
         int size = getDirSize(data);
 
+        assertTrue(beforeCompactSize > 0);
         assertEquals(0, size);
     }
 
