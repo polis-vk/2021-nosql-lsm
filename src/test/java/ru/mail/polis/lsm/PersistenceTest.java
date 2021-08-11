@@ -212,6 +212,80 @@ class PersistenceTest {
         assertTrue(beforeCompactSize / 50 > size);
     }
 
+    @Test
+    void uniqueRecordsCompact(@TempDir Path data) throws IOException {
+        for (int i = 0; i < 100; i++) {
+            try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
+                dao.upsert(Record.of(key(i), value(i)));
+            }
+        }
+
+        int beforeCompactSize = getDirSize(data);
+
+        try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
+            dao.compact();
+        }
+
+        int size = getDirSize(data);
+
+        assertEquals(beforeCompactSize, size);
+    }
+
+    @Test
+    void multipleCompact(@TempDir Path data) throws IOException {
+        for (int j = 0; j < 2; j++) {
+            for (int i = 0; i < 10; i++) {
+                try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
+                    dao.upsert(Record.of(key(i), value(i)));
+                }
+            }
+        }
+
+        int beforeCompactSize = getDirSize(data);
+
+        try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
+            dao.compact();
+        }
+
+        int afterCompactSize = getDirSize(data);
+
+        for (int i = 0; i < 10; i++) {
+            try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
+                dao.upsert(Record.of(key(i), value(i)));
+            }
+        }
+
+        int beforeSecondCompactSize = getDirSize(data);
+
+        try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
+            dao.compact();
+        }
+
+        int size = getDirSize(data);
+
+        assertTrue( afterCompactSize < beforeCompactSize / 1.9);
+        assertTrue(size < beforeSecondCompactSize / 1.9);
+    }
+
+    @Test
+    void tombstoneCompact(@TempDir Path data) throws IOException {
+        for (int i = 0; i < 10; i++) {
+            try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
+                dao.upsert(Record.tombstone(key(i)));
+            }
+        }
+
+        int beforeCompactSize = getDirSize(data);
+
+        try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
+            dao.compact();
+        }
+
+        int size = getDirSize(data);
+
+        assertEquals(0, size);
+    }
+
     private int getDirSize(Path data) throws IOException {
         int[] size = new int[1];
 
