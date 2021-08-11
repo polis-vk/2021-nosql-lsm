@@ -34,16 +34,15 @@ public class Record {
         return value == null;
     }
 
-    /**
-     * Get size Record in Bytes
-     * @return Size Record
-     */
-    public long getSize() {
-        if (value == null) {
-            return key.remaining();
-        } else {
-            return key.remaining() + value.remaining();
-        }
+    public int getSize() {
+        return getKeySize() + getValueSize();
     }
 
+    public int getKeySize() {
+        return Integer.BYTES + key.remaining();
+    }
+
+    public int getValueSize() {
+        return value == null ? 0 : Integer.BYTES + value.remaining();
+    }
 }

@@ -1,7 +1,8 @@
-package ru.mail.polis.lsm;
+package units;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import ru.mail.polis.lsm.Record;
 
 import java.nio.ByteBuffer;
 import java.nio.file.Path;
@@ -17,9 +18,9 @@ public class RecordTest {
 
         Record record = Record.of(key, value);
         long size = record.getSize();
-        assertEquals(18L, size);
+        assertEquals(26L, size);
 
-        assertEquals(8L, Record.tombstone(key).getSize());
+        assertEquals(12, Record.tombstone(key).getSize());
     }
 
 }

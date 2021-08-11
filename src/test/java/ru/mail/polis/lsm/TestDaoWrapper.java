@@ -8,7 +8,7 @@ import java.nio.ByteBuffer;
 import java.util.Iterator;
 
 public class TestDaoWrapper implements DAO {
-    static final long MAX_HEAP = 128 * 1024 * 1024;
+    public static long MAX_HEAP = 128 * 1024 * 1024;
 
     private final DAO delegate;
 
@@ -31,11 +31,6 @@ public class TestDaoWrapper implements DAO {
     @Override
     public void upsert(Record record) {
         delegate.upsert(record);
-    }
-
-    @Override
-    public void compact() {
-        delegate.compact();
     }
 
     @Override

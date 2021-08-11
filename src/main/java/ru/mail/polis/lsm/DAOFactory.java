@@ -1,6 +1,6 @@
 package ru.mail.polis.lsm;
 
-import ru.mail.polis.lsm.saveliyschur.MyDAO;
+import ru.mail.polis.lsm.saveliyschur.sstservice.LSMDao;
 
 import java.io.IOException;
 
@@ -10,13 +10,10 @@ public final class DAOFactory {
         // Only static methods
     }
 
-    /**
-     * Create an instance of {@link DAO} with supplied {@link DAOConfig}.
-     */
     public static DAO create(DAOConfig config) throws IOException {
         assert config.getDir().toFile().exists();
 
-        return new MyDAO(config);
+        return new LSMDao(config);
     }
 
 }

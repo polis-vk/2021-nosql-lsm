@@ -2,31 +2,25 @@ package ru.mail.polis.lsm.saveliyschur.sstservice;
 
 import ru.mail.polis.lsm.Record;
 
-import java.io.Closeable;
+import javax.annotation.Nullable;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.SortedMap;
-import java.util.logging.Logger;
-import java.util.stream.Stream;
+import java.nio.file.StandardOpenOption;
+import java.util.Iterator;
+import java.util.NoSuchElementException;
 
-public class SSTable implements Closeable, Comparable<SSTable> {
+public class SSTable implements ISSTable {
 
-    private static final Logger log = Logger.getLogger(SSTable.class.getName());
     private static final Method CLEAN;
-    private MappedByteBuffer mapp;
-
-    public static final String NAME = "sstable_";
-    public static final String EXTENSION = ".sst";
-    public static final String SUFFICS = "_compact";
-
-    private Path path;
-    private SortedMap<ByteBuffer, Record> resultMap = null;
+    public static final String SSTABLE_FILE_PREFIX = "file_";
+    private final Path file;
 
     static {
         try {
@@ -38,54 +32,83 @@ public class SSTable implements Closeable, Comparable<SSTable> {
         }
     }
 
-    public SSTable(Path path) {
-        this.path = path;
+    private final MappedByteBuffer mmap;
+    private final MappedByteBuffer idx;
+
+    public SSTable(Path file) throws IOException {
+        this.file = file;
+
+        Path indexFile = getIndexFile(file);
+
+        mmap = open(file);
+        idx = open(indexFile);
     }
 
-    public Path getPath() {
-        return path;
-    }
+    @Override
+    public Iterator<Record> range(@Nullable ByteBuffer fromKey, @Nullable ByteBuffer toKey) {
+        ByteBuffer buffer = mmap.asReadOnlyBuffer();
 
-    public void setPath(Path path) {
-        this.path = path;
+        int maxSize = mmap.remaining();
+
+        int fromOffset = fromKey == null ? 0 : offset(buffer, fromKey);
+        int toOffset = toKey == null ? maxSize : offset(buffer, toKey);
+
+        return range(
+                buffer,
+                fromOffset == -1 ? maxSize : fromOffset,
+                toOffset == -1 ? maxSize : toOffset
+        );
     }
 
     @Override
     public void close() throws IOException {
-        if (mapp != null) {
-            IOException exception = null;
-            try {
-                free(mapp);
-            } catch (Throwable t) {
-                exception = new IOException(t);
-            }
+        IOException exception = null;
+        try {
+            free(mmap);
+        } catch (Throwable t) {
+            exception = new IOException(t);
+        }
 
-            if (exception != null) {
-                throw exception;
+        try {
+            free(idx);
+        } catch (Throwable t) {
+            if (exception == null) {
+                exception = new IOException(t);
+            } else {
+                exception.addSuppressed(t);
             }
         }
-        log.info("Close is OK!");
+
+        if (exception != null) {
+            throw exception;
+        }
     }
 
-    public MappedByteBuffer getMapp() {
-        return mapp;
-    }
-
-    public SortedMap<ByteBuffer, Record> getResultMap() {
-        return resultMap;
-    }
-
-    public void setResultMap(SortedMap<ByteBuffer, Record> resultMap) {
-        this.resultMap = resultMap;
-    }
-
-    public void setMapp(MappedByteBuffer mapp) {
+    @Override
+    public void deleteWithClose() {
         try {
             this.close();
+            Files.deleteIfExists(file);
+            Files.deleteIfExists(getIndexFile(file));
         } catch (IOException e) {
-            log.severe("Don't close!!!");
+            throw new UncheckedIOException(e);
         }
-        this.mapp = mapp;
+    }
+
+    private Path resolveWithExt(Path file, String ext) {
+        return file.resolveSibling(file.getFileName() + ext);
+    }
+
+    private Path getIndexFile(Path file) {
+        return resolveWithExt(file, ".idx");
+    }
+
+    private static MappedByteBuffer open(Path name) throws IOException {
+        try (
+                FileChannel channel = FileChannel.open(name, StandardOpenOption.READ)
+        ) {
+            return channel.map(FileChannel.MapMode.READ_ONLY, 0, channel.size());
+        }
     }
 
     private static void free(MappedByteBuffer buffer) throws IOException {
@@ -96,21 +119,77 @@ public class SSTable implements Closeable, Comparable<SSTable> {
         }
     }
 
-    @Override
-    public int compareTo(SSTable o) {
+    private int offset(ByteBuffer buffer, ByteBuffer key) {
+        int left = 0;
+        int rightLimit = idx.remaining() / Integer.BYTES;
+        int right = rightLimit;
 
-        String myPath = this.path.toString();
-        String oPath = o.getPath().toString();
+        while (left < right) {
+            int mid = left + ((right - left) >>> 1);
 
-        String nameSSTableThis = myPath.substring(myPath.lastIndexOf("\\") + 1);
-        String nameSSTableO = oPath.substring(oPath.lastIndexOf("\\") + 1);
+            int offset = idx.getInt(mid * Integer.BYTES);
+            buffer.position(offset);
+            int keySize = buffer.getInt();
 
-        String thisNumber = nameSSTableThis.replace(SSTable.NAME, "").replace(SSTable.EXTENSION, "");
-        String oNumber = nameSSTableO.replace(SSTable.NAME, "").replace(SSTable.EXTENSION, "");
+            int result;
+            int mismatch = buffer.mismatch(key);
+            if (mismatch == -1) {
+                return offset;
+            } else if (mismatch < keySize) {
+                result = Byte.compare(
+                        key.get(key.position() + mismatch),
+                        buffer.get(buffer.position() + mismatch)
+                );
+            } else {
+                result = -1;
+            }
 
-        int thisInt = Integer.parseInt(thisNumber);
-        int oInt = Integer.parseInt(oNumber);
+            if (result > 0) {
+                left = mid + 1;
+            } else {
+                right = mid;
+            }
+        }
 
-        return Integer.compare(thisInt, oInt);
+        if (left >= rightLimit) {
+            return -1;
+        }
+
+        return idx.getInt(left * Integer.BYTES);
+    }
+
+    private static Iterator<Record> range(ByteBuffer buffer, int fromOffset, int toOffset) {
+        buffer.position(fromOffset);
+
+        return new Iterator<>() {
+            @Override
+            public boolean hasNext() {
+                return buffer.position() < toOffset;
+            }
+
+            @Override
+            public Record next() {
+                if (!hasNext()) {
+                    throw new NoSuchElementException("Limit is reached");
+                }
+
+                int keySize = buffer.getInt();
+                ByteBuffer key = read(keySize);
+
+                int valueSize = buffer.getInt();
+                if (valueSize == -1) {
+                    return Record.tombstone(key);
+                }
+                ByteBuffer value = read(valueSize);
+
+                return Record.of(key, value);
+            }
+
+            private ByteBuffer read(int size) {
+                ByteBuffer result = (ByteBuffer) buffer.slice().limit(size);
+                buffer.position(buffer.position() + size);
+                return result;
+            }
+        };
     }
 }

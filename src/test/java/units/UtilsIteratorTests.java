@@ -1,7 +1,6 @@
 package units;
 
 import org.junit.jupiter.api.Test;
-import ru.mail.polis.lsm.DAO;
 import ru.mail.polis.lsm.Record;
 import ru.mail.polis.lsm.saveliyschur.utils.PeekingIterator;
 import ru.mail.polis.lsm.saveliyschur.utils.UtilsIterator;
@@ -9,15 +8,12 @@ import utils.Utils;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.NoSuchElementException;
+import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static utils.Utils.wrap;
 
-public class MergeIteratorTests {
+public class UtilsIteratorTests {
 
     @Test
     void nextTestPeekingIterator() {
@@ -37,10 +33,7 @@ public class MergeIteratorTests {
 
         assertFalse(peekingIterator.hasNext());
         Utils.assertEqualsRecords(record, recordNext);
-        try {
-            peekingIterator.next();
-            throw new IllegalStateException("Element exists, bur expected empty iterator");
-        } catch (NoSuchElementException ignored) {}
+        assertThrows(NoSuchElementException.class, peekingIterator::next);
     }
 
 
@@ -80,5 +73,24 @@ public class MergeIteratorTests {
         Iterator<Record> answer = UtilsIterator.mergeTwo(twoIterator, oneIterator);
         assertTrue(answer.hasNext());
         assertEquals(value, answer.next().getValue());
+    }
+
+    @Test
+    void filterTombstoneSimple() {
+        Record record1 = Record.of(wrap("A"), wrap("VALUE_A"));
+        Record record2 = Record.tombstone(wrap("B"));
+        Record record3 = Record.of(wrap("C"), wrap("VALUE_C"));
+        Record record4 = Record.of(wrap("D"), wrap("VALUE_D"));
+        Record record5 = Record.tombstone(wrap("E"));
+
+        Record[] withTombstone = {record1, record2, record3, record4, record5};
+        Iterator<Record> withoutTombstone = UtilsIterator.filterTombstones(
+                Arrays.stream(withTombstone).iterator());
+
+        assertEquals(record1, withoutTombstone.next());
+        assertEquals(record3, withoutTombstone.next());
+        assertEquals(record4, withoutTombstone.next());
+        assertFalse(withoutTombstone.hasNext());
+        assertThrows(NoSuchElementException.class, withoutTombstone::next);
     }
 }

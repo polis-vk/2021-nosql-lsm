@@ -14,16 +14,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
-import java.util.TreeMap;
+import java.util.*;
 
-import static org.junit.jupiter.api.Assertions.assertIterableEquals;
+import static org.junit.jupiter.api.Assertions.*;
 
 public class Utils {
 
@@ -120,6 +113,20 @@ public class Utils {
         assertIterableEquals(i2List, i1List);
     }
 
+    public static void assertIterators(Iterator<Record> obtain, List<Record> expectList) {
+        expectList.sort(Comparator.comparing(v -> toString(v.getKey())));
+        Iterator<Record> expect = expectList.iterator();
+        while (obtain.hasNext()) {
+            Record ob = obtain.next();
+            Record ex = expect.next();
+
+            Assertions.assertEquals(toString(ex.getKey()), toString(ob.getKey()));
+            Assertions.assertEquals(toString(ex.getValue()), toString(ob.getValue()));
+        }
+
+        assertFalse(expect.hasNext());
+    }
+
     public static String toString(ByteBuffer buffer) {
         try {
             return StandardCharsets.UTF_8.newDecoder().decode(buffer).toString();
@@ -130,7 +137,7 @@ public class Utils {
 
     public static void recursiveDelete(Path path) throws IOException {
         Files.walkFileTree(path,
-                new SimpleFileVisitor<>() {
+                new SimpleFileVisitor<Path>() {
                     @Override
                     public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
                         Files.delete(file);

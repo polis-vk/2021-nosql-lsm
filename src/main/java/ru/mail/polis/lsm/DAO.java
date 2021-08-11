@@ -19,8 +19,6 @@ public interface DAO extends Closeable {
 
     void upsert(Record record);
 
-    void compact();
-
     static ByteBuffer nextKey(ByteBuffer buffer) {
         ByteBuffer result = ByteBuffer.allocate(buffer.remaining() + 1);
 

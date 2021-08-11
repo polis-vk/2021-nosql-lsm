@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import utils.Utils;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.file.FileVisitResult;
@@ -11,20 +12,13 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.util.Iterator;
-import java.util.Map;
+import java.util.*;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static utils.Utils.assertDaoEquals;
-import static utils.Utils.key;
-import static utils.Utils.keyWithSuffix;
-import static utils.Utils.recursiveDelete;
-import static utils.Utils.sizeBasedRandomData;
-import static utils.Utils.value;
-import static utils.Utils.valueWithSuffix;
-import static utils.Utils.wrap;
+import static utils.Utils.*;
 
 class PersistenceTest {
 
@@ -204,6 +198,7 @@ class PersistenceTest {
         }
     }
 
+/*
     @Test
     void hugeRecordsSearch(@TempDir Path data) throws IOException {
         // Reference value
@@ -229,51 +224,22 @@ class PersistenceTest {
             }
         }
     }
+*/
 
     @Test
     void burnAndCompact(@TempDir Path data) throws IOException {
-        Map<ByteBuffer, ByteBuffer> map = Utils.generateMap(0, 1);
-
-        int overwrites = 100;
+        int overwrites = 2;
         for (int i = 0; i < overwrites; i++) {
             try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
-                map.forEach((k, v) -> dao.upsert(Record.of(k, v)));
-            }
-
-            // Check
-            try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
-                assertDaoEquals(dao, map);
+                for (int j = 0; j < 10; j++) {
+                    Record record = Record.of(wrap("KEY_" + j), wrap("VALUE_" + j));
+                    dao.upsert(record);
+                }
             }
         }
 
-        int beforeCompactSize = getDirSize(data);
-
-        try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
-            dao.compact();
-            assertDaoEquals(dao, map);
-        }
-
-        // just for sure
-        try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
-            assertDaoEquals(dao, map);
-        }
-
-        int size = getDirSize(data);
-        assertTrue(beforeCompactSize / 50 > size);
-    }
-
-    private int getDirSize(Path data) throws IOException {
-        int[] size = new int[1];
-
-        Files.walkFileTree(data, new SimpleFileVisitor<>() {
-            @Override
-            public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-                size[0] += (int) attrs.size();
-                return FileVisitResult.CONTINUE;
-            }
-        });
-
-        return size[0];
+        long fileNumber = getNumberFiles(data);
+        assertEquals(2L, fileNumber, "Files not compact");
     }
 
     private void verifyNext(byte[] suffix, Iterator<Record> range, int index) {
@@ -297,185 +263,15 @@ class PersistenceTest {
         }
     }
 
-    @Test
-    void test(@TempDir Path data) throws IOException {
-        ByteBuffer key = wrap("KEY_1");
-        ByteBuffer key2 = wrap("KEY_2");
-        ByteBuffer value = wrap("VALUE_1");
-        ByteBuffer value2 = wrap("VALUE_2");
+    private long getNumberFiles(Path path) {
+        long count = 0;
 
-        // Initial insert
-        try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
-            dao.upsert(Record.of(key, value));
-
-            Iterator<Record> range = dao.range(null, null);
-            assertTrue(range.hasNext());
-            assertEquals(value, range.next().getValue());
+        try (Stream<Path> files = Files.list(path)) {
+            count = files.count();
+        } catch (IOException e) {
+            e.printStackTrace();
         }
 
-        try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
-            dao.upsert(Record.of(key, value2));
-
-            Iterator<Record> range = dao.range(null, null);
-            assertTrue(range.hasNext());
-            assertEquals(value2, range.next().getValue());
-        }
-
-        try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
-            dao.upsert(Record.of(key2, value));
-
-            Iterator<Record> range = dao.range(null, null);
-            assertTrue(range.hasNext());
-            assertEquals(value2, range.next().getValue());
-            assertTrue(range.hasNext());
-            assertEquals(value, range.next().getValue());
-            assertFalse(range.hasNext());
-        }
-    }
-
-    @Test
-    void testSimpleCompare(@TempDir Path data) throws IOException {
-        ByteBuffer key = wrap("KEY_1");
-        ByteBuffer value = wrap("VALUE_1");
-        ByteBuffer value2 = wrap("VALUE_2");
-
-        try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
-            dao.upsert(Record.of(key, value));
-        }
-
-        try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
-            Iterator<Record> iterator = dao.range(null, null);
-            assertEquals(value, iterator.next().getValue());
-        }
-
-        try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
-            dao.upsert(Record.of(key, value2));
-
-            Iterator<Record> iterator = dao.range(null, null);
-            assertEquals(value2, iterator.next().getValue());
-        }
-
-        try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
-            Iterator<Record> iterator = dao.range(null, null);
-            assertEquals(value2, iterator.next().getValue());
-        }
-
-        try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
-            dao.compact();
-
-            Iterator<Record> iterator = dao.range(null, null);
-            assertEquals(value2, iterator.next().getValue());
-        }
-    }
-
-    @Test
-    void smallRange(@TempDir Path data) throws IOException {
-        ByteBuffer key = wrap("KEY_1");
-        ByteBuffer key2 = wrap("KEY_2");
-        ByteBuffer value = wrap("VALUE_1");
-        ByteBuffer value2 = wrap("VALUE_2");
-
-        try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
-            dao.upsert(Record.of(key, value));
-
-            Iterator<Record> iterator = dao.range(null, null);
-            assertEquals(value, iterator.next().getValue());
-        }
-        try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
-
-            dao.upsert(Record.of(key2, value2));
-
-            Iterator<Record> iterator2 = dao.range(null, null);
-
-            assertEquals(key, iterator2.next().getKey());
-            assertEquals(key2, iterator2.next().getKey());
-        }
-    }
-
-
-    @Test
-    void smallRangeInMemory(@TempDir Path data) throws IOException {
-        ByteBuffer key = wrap("KEY_1");
-        ByteBuffer key2 = wrap("KEY_2");
-        ByteBuffer value = wrap("VALUE_1");
-        ByteBuffer value2 = wrap("VALUE_2");
-
-        try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
-            dao.upsert(Record.of(key, value));
-
-            Iterator<Record> iterator = dao.range(null, null);
-            assertEquals(value, iterator.next().getValue());
-
-            dao.upsert(Record.of(key2, value2));
-
-            Iterator<Record> iterator2 = dao.range(null, null);
-
-            assertEquals(key, iterator2.next().getKey());
-            assertEquals(key2, iterator2.next().getKey());
-        }
-    }
-
-    @Test
-    void smallRangeInOneSSTable(@TempDir Path data) throws IOException {
-        ByteBuffer key = wrap("KEY_1");
-        ByteBuffer key2 = wrap("KEY_2");
-        ByteBuffer value = wrap("VALUE_1");
-        ByteBuffer value2 = wrap("VALUE_2");
-
-        try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
-            dao.upsert(Record.of(key, value));
-
-            Iterator<Record> iterator = dao.range(null, null);
-            assertEquals(value, iterator.next().getValue());
-
-            dao.upsert(Record.of(key2, value2));
-
-            Iterator<Record> iterator2 = dao.range(null, null);
-
-            assertEquals(key, iterator2.next().getKey());
-            assertEquals(key2, iterator2.next().getKey());
-        }
-
-        try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
-
-            Iterator<Record> iterator2 = dao.range(null, null);
-
-            assertEquals(key, iterator2.next().getKey());
-            assertEquals(key2, iterator2.next().getKey());
-        }
-
-    }
-
-    @Test
-    void smallRangeInTwoSSTable(@TempDir Path data) throws IOException {
-        ByteBuffer key = wrap("KEY_1");
-        ByteBuffer key2 = wrap("KEY_2");
-        ByteBuffer value = wrap("VALUE_1");
-        ByteBuffer value2 = wrap("VALUE_2");
-
-        try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
-            dao.upsert(Record.of(key, value));
-
-            Iterator<Record> iterator = dao.range(null, null);
-            assertEquals(value, iterator.next().getValue());
-        }
-
-        try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
-            dao.upsert(Record.of(key2, value2));
-
-            Iterator<Record> iterator2 = dao.range(null, null);
-
-            assertEquals(key, iterator2.next().getKey());
-            assertEquals(key2, iterator2.next().getKey());
-        }
-
-        try (DAO dao = TestDaoWrapper.create(new DAOConfig(data))) {
-
-            Iterator<Record> iterator2 = dao.range(null, null);
-
-            assertEquals(key, iterator2.next().getKey());
-            assertEquals(key2, iterator2.next().getKey());
-        }
-
+        return count;
     }
 }

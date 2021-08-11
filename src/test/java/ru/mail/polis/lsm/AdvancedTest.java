@@ -29,9 +29,10 @@ public class AdvancedTest {
             map.forEach((k, v) -> dao.upsert(Record.of(k, v)));
 
             iterator = dao.range(null, null);
+
+            assertEquals(iterator, new TreeMap<>(map).entrySet());
         }
 
-        assertEquals(iterator, new TreeMap<>(map).entrySet());
+        System.out.println();
     }
-
 }
